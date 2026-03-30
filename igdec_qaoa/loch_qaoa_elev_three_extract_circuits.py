@@ -1,4 +1,5 @@
 import statistics
+import argparse
 import json
 import os
 import time
@@ -35,6 +36,14 @@ NUM_EXPERIMENT = 30
 REPS = 1
 PROBLEM_SIZE = 7
 NUM_ITERATIONS = 30
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-l",
+    action="store_true",
+    help="If provided, uses only the fist sample"
+)
+args, unknown = parser.parse_known_args()
 
 # ============================================================
 # PROBLEM DEFINITION
@@ -487,11 +496,15 @@ def run_hardware_like_from_saved_circuits():
     base_input_dir = os.path.join("..","trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
 
     program_results = {}
+    it = 1
 
     for sampling_id in range(1, NUM_EXPERIMENT + 1):
-        print(f"\n----- HARDWARE-LIKE {RUN_LABEL} | SAMPLING #{sampling_id} -----")
-
-        sampling_dir = os.path.join(base_input_dir, f"sampling_{sampling_id}")
+        if args.l:
+            print(f"\n----- HARDWARE-LIKE {RUN_LABEL} | SAMPLING #{1} -----")
+            sampling_dir = os.path.join(base_input_dir, f"sampling_{1}")
+        else:
+            print(f"\n----- HARDWARE-LIKE {RUN_LABEL} | SAMPLING #{sampling_id} -----")
+            sampling_dir = os.path.join(base_input_dir, f"sampling_{sampling_id}")
 
         with open(os.path.join(sampling_dir, "initial_random_solution.json"), "r") as f:
             init_data = json.load(f)
@@ -608,26 +621,49 @@ def run_hardware_like_from_saved_circuits():
         final_suite_pcount = float(df.loc[np.array(best_solution) == 1, "pcount"].sum())
         final_suite_dist = float(df.loc[np.array(best_solution) == 1, "dist"].sum())
 
-        program_results[f"sampling_{sampling_id}"] = {
-            "initial_solution": init_data["initial_solution"],
-            "initial_energy": init_data["initial_energy"],
-            "best_solution": best_solution,
-            "best_energy": best_energy,
-            "final_test_suite_cost": final_test_suite_cost,
-            "final_suite_pcount": final_suite_pcount,
-            "final_suite_dist": final_suite_dist,
-            "all_qpu_run_times(ms)": qpu_run_times,
-            "mean_qpu_run_time(ms)": statistics.mean(qpu_run_times) if len(qpu_run_times) > 0 else 0,
-            "stdev_qpu_run_time(ms)": statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0,
-            "all_impact_times(ms)": impact_times,
-            "execution_times(ms)": execution_times
-        }
+        if args.l:
+            program_results[f"sampling_{1}_it_{it}"] = {
+                "initial_solution": init_data["initial_solution"],
+                "initial_energy": init_data["initial_energy"],
+                "best_solution": best_solution,
+                "best_energy": best_energy,
+                "final_test_suite_cost": final_test_suite_cost,
+                "final_suite_pcount": final_suite_pcount,
+                "final_suite_dist": final_suite_dist,
+                "all_qpu_run_times(ms)": qpu_run_times,
+                "mean_qpu_run_time(ms)": statistics.mean(qpu_run_times) if len(qpu_run_times) > 0 else 0,
+                "stdev_qpu_run_time(ms)": statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0,
+                "all_impact_times(ms)": impact_times,
+                "execution_times(ms)": execution_times
+            }
+        else:
+            program_results[f"sampling_{sampling_id}"] = {
+                "initial_solution": init_data["initial_solution"],
+                "initial_energy": init_data["initial_energy"],
+                "best_solution": best_solution,
+                "best_energy": best_energy,
+                "final_test_suite_cost": final_test_suite_cost,
+                "final_suite_pcount": final_suite_pcount,
+                "final_suite_dist": final_suite_dist,
+                "all_qpu_run_times(ms)": qpu_run_times,
+                "mean_qpu_run_time(ms)": statistics.mean(qpu_run_times) if len(qpu_run_times) > 0 else 0,
+                "stdev_qpu_run_time(ms)": statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0,
+                "all_impact_times(ms)": impact_times,
+                "execution_times(ms)": execution_times
+            }
 
-    output_file = os.path.join(results_dir, f"{RUN_LABEL}.json")
-    with open(output_file, "w") as f:
-        json.dump(program_results, f, indent=2)
+    if args.l:
+        output_file = os.path.join(results_dir, f"{RUN_LABEL}_it_{it}.json")
+        with open(output_file, "w") as f:
+            json.dump(program_results, f, indent=2)
+    else:
+        output_file = os.path.join(results_dir, f"{RUN_LABEL}.json")
+        with open(output_file, "w") as f:
+            json.dump(program_results, f, indent=2)
 
     print(f"Saved hardware-like results to: {output_file}")
+
+    it+=1
 
 
 if __name__ == "__main__":

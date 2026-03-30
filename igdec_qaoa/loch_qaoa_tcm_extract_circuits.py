@@ -37,6 +37,14 @@ import os
 
 num_experiments = 30
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-l",
+    action="store_true",
+    help="If provided, uses only the fist sample"
+)
+args, unknown = parser.parse_known_args()
+
 class TestCaseOptimization(OptimizationApplication):
     """Optimization application for the "knapsack problem" [1].
 
@@ -590,17 +598,30 @@ def run_hardware_like_from_saved_circuits():
 
         times, frs = get_data(df)
         program_results = {}
+        it = 1
 
         for sampling_id in range(1, num_experiment + 1):
-            print(f"\n----- HARDWARE-LIKE SAMPLING #{sampling_id} -----")
+            if args.l:
+                print(f"\n----- HARDWARE-LIKE SAMPLING #{1} -----")
+            else:
+                print(f"\n----- HARDWARE-LIKE SAMPLING #{sampling_id} -----")
 
-            sampling_dir = os.path.join(
-                "..",
-                "trained_qaoa_circuits",
-                "igdec_qaoa",
-                file_name,
-                f"sampling_{sampling_id}"
-            )
+            if args.l:
+                sampling_dir = os.path.join(
+                    "..",
+                    "trained_qaoa_circuits",
+                    "igdec_qaoa",
+                    file_name,
+                    f"sampling_{1}"
+                )
+            else:
+                sampling_dir = os.path.join(
+                    "..",
+                    "trained_qaoa_circuits",
+                    "igdec_qaoa",
+                    file_name,
+                    f"sampling_{sampling_id}"
+                )
 
             with open(os.path.join(sampling_dir, "initial_random_solution.json"), "r") as f:
                 init_data = json.load(f)
@@ -716,6 +737,20 @@ def run_hardware_like_from_saved_circuits():
             final_test_suite_cost = float(df.loc[np.array(best_solution) == 1, "time"].sum())
             final_failure_rate = float(df.loc[np.array(best_solution) == 1, "rate"].sum())
 
+            if args.l:
+                program_results[f"sampling_{1}_it_{it}"] = {
+                    "initial_solution": init_data["initial_solution"],
+                    "initial_energy": init_data["initial_energy"],
+                    "best_solution": best_solution,
+                    "best_energy": best_energy,
+                    "final_test_suite_cost": final_test_suite_cost,
+                    "final_failure_rate": final_failure_rate,
+                    "all_qpu_run_times(ms)": qpu_run_times,
+                    "mean_qpu_run_time(ms)": statistics.mean(qpu_run_times) if len(qpu_run_times) > 0 else 0,
+                    "stdev_qpu_run_time(ms)": statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0,
+                    "all_impact_times(ms)": impact_times,
+                    "execution_times(ms)": execution_times
+                }
             program_results[f"sampling_{sampling_id}"] = {
                 "initial_solution": init_data["initial_solution"],
                 "initial_energy": init_data["initial_energy"],
@@ -730,11 +765,18 @@ def run_hardware_like_from_saved_circuits():
                 "execution_times(ms)": execution_times
             }
 
-        output_file = os.path.join(results_dir, f"{file_name}.json")
-        with open(output_file, "w") as f:
-            json.dump(program_results, f, indent=2)
+        if args.l:
+            output_file = os.path.join(results_dir, f"{file_name}_it_{it}.json")
+            with open(output_file, "w") as f:
+                json.dump(program_results, f, indent=2)
+        else:
+            output_file = os.path.join(results_dir, f"{file_name}.json")
+            with open(output_file, "w") as f:
+                json.dump(program_results, f, indent=2)
 
         print(f"Saved hardware-like results to: {output_file}")
+
+        it+=1
 
 
 if __name__ == '__main__':

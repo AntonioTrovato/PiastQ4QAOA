@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import argparse
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -29,6 +30,14 @@ from matplotlib import cm
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict, Counter
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-l",
+    action="store_true",
+    help="If provided, force reps_list to [1]"
+)
+args, unknown = parser.parse_known_args()
 
 bootqa_programs = ["gsdtsr","paintcontrol", "iofrol", "elevator", "elevator2"]
 bootqa_programs_rep_values = {"gsdtsr":1,"paintcontrol":1,"iofrol":1, "elevator":1, "elevator2":1}
@@ -321,6 +330,8 @@ os.makedirs(base_results_dir, exist_ok=True)
 
 num_piast_experiments = 30
 
+reps_list = [1] if args.l else [1, 2, 4, 8, 16]
+
 for bootqa_program in bootqa_programs:
     program_results_dir = os.path.join(base_results_dir, bootqa_program)
     os.makedirs(program_results_dir, exist_ok=True)
@@ -340,7 +351,7 @@ for bootqa_program in bootqa_programs:
     else:
         test_cases_effectiveness = data["rate"].tolist()
 
-    for reps in [1, 2, 4, 8, 16]:
+    for reps in reps_list:
         print(f"\n=== PROGRAM: {bootqa_program}, REPS: {reps} ===")
 
         file_path = os.path.join(

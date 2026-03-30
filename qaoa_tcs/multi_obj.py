@@ -3,6 +3,7 @@
 import os
 import json
 import time
+import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +20,14 @@ from qiskit_aqt_provider.primitives import AQTSampler
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict, Counter
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-l",
+    action="store_true",
+    help="If provided, force reps_list to [1]"
+)
+args, unknown = parser.parse_known_args()
 
 #this cell contains all variable definitions that will be useful throughout the entire project
 sir_programs = ["flex","grep","gzip","sed"]
@@ -362,11 +371,13 @@ os.makedirs(base_results_dir, exist_ok=True)
 
 num_piast_experiments = 30
 
+reps_list = [1] if args.l else [1, 2, 4, 8, 16]
+
 for sir_program in sir_programs:
     program_results_dir = os.path.join(base_results_dir, sir_program)
     os.makedirs(program_results_dir, exist_ok=True)
 
-    for reps in [1, 2, 4, 8, 16]:
+    for reps in reps_list:
 
         print(f"\n=== PROGRAM: {sir_program}, REPS: {reps} ===")
 
