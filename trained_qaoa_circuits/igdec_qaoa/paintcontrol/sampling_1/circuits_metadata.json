@@ -1,0 +1,422 @@
+[
+  {
+    "iteration": 1,
+    "subproblem_index": 1,
+    "case_list": [
+      30,
+      2,
+      3,
+      83,
+      7,
+      16,
+      9
+    ],
+    "qpy_file": "itr_1_subproblem_1.qpy"
+  },
+  {
+    "iteration": 2,
+    "subproblem_index": 1,
+    "case_list": [
+      52,
+      53,
+      17,
+      14,
+      6,
+      63,
+      51
+    ],
+    "qpy_file": "itr_2_subproblem_1.qpy"
+  },
+  {
+    "iteration": 3,
+    "subproblem_index": 1,
+    "case_list": [
+      80,
+      84,
+      48,
+      22,
+      33,
+      4,
+      55
+    ],
+    "qpy_file": "itr_3_subproblem_1.qpy"
+  },
+  {
+    "iteration": 4,
+    "subproblem_index": 1,
+    "case_list": [
+      41,
+      25,
+      29,
+      5,
+      71,
+      34,
+      68
+    ],
+    "qpy_file": "itr_4_subproblem_1.qpy"
+  },
+  {
+    "iteration": 5,
+    "subproblem_index": 1,
+    "case_list": [
+      78,
+      11,
+      70,
+      28,
+      74,
+      75,
+      24
+    ],
+    "qpy_file": "itr_5_subproblem_1.qpy"
+  },
+  {
+    "iteration": 6,
+    "subproblem_index": 1,
+    "case_list": [
+      46,
+      44,
+      37,
+      10,
+      27,
+      8,
+      65
+    ],
+    "qpy_file": "itr_6_subproblem_1.qpy"
+  },
+  {
+    "iteration": 7,
+    "subproblem_index": 1,
+    "case_list": [
+      31,
+      59,
+      47,
+      18,
+      60,
+      65,
+      20
+    ],
+    "qpy_file": "itr_7_subproblem_1.qpy"
+  },
+  {
+    "iteration": 8,
+    "subproblem_index": 1,
+    "case_list": [
+      50,
+      43,
+      39,
+      15,
+      13,
+      18,
+      54
+    ],
+    "qpy_file": "itr_8_subproblem_1.qpy"
+  },
+  {
+    "iteration": 9,
+    "subproblem_index": 1,
+    "case_list": [
+      60,
+      47,
+      43,
+      39,
+      15,
+      65,
+      20
+    ],
+    "qpy_file": "itr_9_subproblem_1.qpy"
+  },
+  {
+    "iteration": 10,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_10_subproblem_1.qpy"
+  },
+  {
+    "iteration": 11,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_11_subproblem_1.qpy"
+  },
+  {
+    "iteration": 12,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_12_subproblem_1.qpy"
+  },
+  {
+    "iteration": 13,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_13_subproblem_1.qpy"
+  },
+  {
+    "iteration": 14,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_14_subproblem_1.qpy"
+  },
+  {
+    "iteration": 15,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_15_subproblem_1.qpy"
+  },
+  {
+    "iteration": 16,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_16_subproblem_1.qpy"
+  },
+  {
+    "iteration": 17,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_17_subproblem_1.qpy"
+  },
+  {
+    "iteration": 18,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_18_subproblem_1.qpy"
+  },
+  {
+    "iteration": 19,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_19_subproblem_1.qpy"
+  },
+  {
+    "iteration": 20,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_20_subproblem_1.qpy"
+  },
+  {
+    "iteration": 21,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_21_subproblem_1.qpy"
+  },
+  {
+    "iteration": 22,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_22_subproblem_1.qpy"
+  },
+  {
+    "iteration": 23,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_23_subproblem_1.qpy"
+  },
+  {
+    "iteration": 24,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_24_subproblem_1.qpy"
+  },
+  {
+    "iteration": 25,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_25_subproblem_1.qpy"
+  },
+  {
+    "iteration": 26,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_26_subproblem_1.qpy"
+  },
+  {
+    "iteration": 27,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_27_subproblem_1.qpy"
+  },
+  {
+    "iteration": 28,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_28_subproblem_1.qpy"
+  },
+  {
+    "iteration": 29,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_29_subproblem_1.qpy"
+  },
+  {
+    "iteration": 30,
+    "subproblem_index": 1,
+    "case_list": [
+      20,
+      43,
+      65,
+      39,
+      82,
+      13,
+      18
+    ],
+    "qpy_file": "itr_30_subproblem_1.qpy"
+  }
+]

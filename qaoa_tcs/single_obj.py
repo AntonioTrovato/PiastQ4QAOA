@@ -3,7 +3,6 @@
 import os
 import json
 import time
-import argparse
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -31,16 +30,8 @@ from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict, Counter
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-l",
-    action="store_true",
-    help="If provided, force reps_list to [1]"
-)
-args, unknown = parser.parse_known_args()
-
-bootqa_programs = ["gsdtsr","paintcontrol", "iofrol", "elevator", "elevator2"]
-bootqa_programs_rep_values = {"gsdtsr":1,"paintcontrol":1,"iofrol":1, "elevator":1, "elevator2":1}
+bootqa_programs = ["paintcontrol"]
+bootqa_programs_rep_values = {"paintcontrol":1}
 experiments = 10
 
 def get_data(data_name):
@@ -300,21 +291,13 @@ def run_circuit_with_batching(circuit, sampler):
     total_counts = Counter()
 
     # 307 x 200 shots
-    for _ in range(307):
+    for _ in range(8):
         sampler.options.shots = 200
         result = sampler.run([circuit]).result()
         counts = result.quasi_dists[0].binary_probabilities()
 
         for k, v in counts.items():
             total_counts[k] += v * 200
-
-    # final 40 shots
-    sampler.options.shots = 40
-    result = sampler.run([circuit]).result()
-    counts = result.quasi_dists[0].binary_probabilities()
-
-    for k, v in counts.items():
-        total_counts[k] += v * 40
 
     return total_counts
 
@@ -328,9 +311,7 @@ sampling_sampler.set_transpile_options(optimization_level=3)
 base_results_dir = "results/selectqaoa/piastq"
 os.makedirs(base_results_dir, exist_ok=True)
 
-num_piast_experiments = 30
-
-reps_list = [1] if args.l else [1, 2, 4, 8, 16]
+num_piast_experiments = 10
 
 for bootqa_program in bootqa_programs:
     program_results_dir = os.path.join(base_results_dir, bootqa_program)
@@ -351,7 +332,7 @@ for bootqa_program in bootqa_programs:
     else:
         test_cases_effectiveness = data["rate"].tolist()
 
-    for reps in reps_list:
+    for reps in [1]:
         print(f"\n=== PROGRAM: {bootqa_program}, REPS: {reps} ===")
 
         file_path = os.path.join(
