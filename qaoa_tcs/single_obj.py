@@ -30,8 +30,8 @@ from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict, Counter
 
-bootqa_programs = ["paintcontrol"]
-bootqa_programs_rep_values = {"paintcontrol":1}
+bootqa_programs = ["iofrol"]
+bootqa_programs_rep_values = {"iofrol":1}
 experiments = 10
 
 def get_data(data_name):
@@ -290,14 +290,14 @@ def run_circuit_with_batching(circuit, sampler):
     """
     total_counts = Counter()
 
-    # 307 x 200 shots
-    for _ in range(8):
-        sampler.options.shots = 200
+    # 80 shots
+    for _ in range(1):
+        sampler.options.shots = 80
         result = sampler.run([circuit]).result()
         counts = result.quasi_dists[0].binary_probabilities()
 
         for k, v in counts.items():
-            total_counts[k] += v * 200
+            total_counts[k] += v * 80
 
     return total_counts
 

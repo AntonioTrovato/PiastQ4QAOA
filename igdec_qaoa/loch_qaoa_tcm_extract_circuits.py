@@ -276,19 +276,19 @@ def get_initial_fval(length,df):
 def run_circuit_with_batching(circuit, sampler):
     """
     Simulate hardware constraint: max 200 shots per batch.
-    Total target shots = 2048 * 30 = 61440
-    => 307 batches x 200 shots + 1 batch x 40 shots
+    Total target shots = 80
+    => 1 batch x 80 shots
     """
     from collections import Counter
 
     total_counts = Counter()
 
-    for _ in range(8):
-        sampler.options.shots = 200
+    for _ in range(1):
+        sampler.options.shots = 80
         result = sampler.run([circuit]).result()
         counts = result.quasi_dists[0].binary_probabilities()
         for k, v in counts.items():
-            total_counts[k] += v * 200
+            total_counts[k] += v * 80
 
     return total_counts
 
@@ -313,7 +313,7 @@ def run_hardware_like_from_saved_circuits():
 
     sampling_sampler.set_transpile_options(optimization_level=3)
 
-    for file_name in ["paintcontrol"]:
+    for file_name in ["iofrol"]:
         print(f"\n========== HARDWARE-LIKE PROGRAM: {file_name} ==========")
 
         df = pd.read_csv(
