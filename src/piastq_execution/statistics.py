@@ -227,17 +227,29 @@ def compare_two_groups(x: Sequence[float], y: Sequence[float], alpha: float = 0.
 
 
 # ---------------------------------------------------------------------------
-# Multi-objective: Pareto dominance, Hypervolume (2D), Inverted Generational
-# Distance -- used for the flex/grep/gzip/sed multi-objective QAOA-TCS combos.
+# Multi-objective: Pareto dominance, Hypervolume (any number of objectives),
+# Inverted Generational Distance -- used for the flex/grep/gzip/sed
+# multi-objective QAOA-TCS combos, whose QUBO (and the paper's own HV/IGD/
+# Pareto-dominance evaluation in SelectQAOA/MOQ-Pipeline.ipynb -- see
+# total_cost()/total_coverage()/total_faults()/pareto_dominance() there) has
+# three objectives: execution cost (minimize), statement coverage (maximize),
+# fault coverage (maximize). Everything here maximizes every objective by
+# convention -- callers minimizing an objective (cost) pass its negation, so
+# a point is `(-cost, coverage, faults)`; this exactly reproduces the
+# notebook's `pareto_dominance()` (cost2 <= cost1 and coverage2 >= coverage1
+# and faults2 >= faults1, with at least one strict) once negated.
 # ---------------------------------------------------------------------------
 
 def dominates(a: Sequence[float], b: Sequence[float]) -> bool:
-    """True if point `a` dominates `b` under maximization on every objective."""
+    """True if point `a` dominates `b` under maximization on every objective.
+    Works for any number of objectives (2 for a plain effectiveness/cost
+    front, 3 for QAOA-TCS multi-objective's cost/coverage/faults, etc.)."""
     return all(ai >= bi for ai, bi in zip(a, b)) and any(ai > bi for ai, bi in zip(a, b))
 
 
 def pareto_front_indices(points: Sequence[Sequence[float]]) -> List[int]:
-    """Indices of the non-dominated points in `points` (maximize every objective)."""
+    """Indices of the non-dominated points in `points` (maximize every
+    objective; any number of objectives)."""
     non_dominated = []
     for i, p in enumerate(points):
         if not any(dominates(points[j], p) for j in range(len(points)) if j != i):
@@ -245,24 +257,56 @@ def pareto_front_indices(points: Sequence[Sequence[float]]) -> List[int]:
     return non_dominated
 
 
-def hypervolume_2d(front: Sequence[Tuple[float, float]], reference_point: Tuple[float, float]) -> float:
-    """Hypervolume dominated by a 2D Pareto front (maximization), relative to
-    a reference point that every front point dominates. Standard rectangle-
-    sweep algorithm: sort by the first objective ascending, sweep accumulating
-    rectangle areas against the reference point.
+def hypervolume(front: Sequence[Sequence[float]], reference_point: Sequence[float]) -> float:
+    """Hypervolume dominated by a Pareto front (maximization on every
+    objective), relative to a reference point every front point dominates.
+
+    Exact recursive slicing algorithm (HSO / "hypervolume by slicing
+    objectives", Fonseca et al.): sorts by the last objective and sweeps it,
+    recursing into the remaining objectives for each slice. Works for any
+    number of objectives >= 1; for 2 objectives this reduces to the same
+    rectangle-sweep hypervolume_2d() already computed (verified in tests).
     """
-    if not front:
+    dim = len(reference_point)
+    if dim == 0 or not front:
         return 0.0
-    rx, ry = reference_point
-    pts = sorted(front, key=lambda p: p[0])
+    return _hypervolume_recursive(list(front), list(reference_point), dim)
+
+
+def _hypervolume_recursive(points: List[Sequence[float]], reference_point: List[float], dim: int) -> float:
+    if dim == 1:
+        heights = [p[0] for p in points if p[0] > reference_point[0]]
+        return max(heights) - reference_point[0] if heights else 0.0
+
+    last = dim - 1
+    filtered = [p for p in points if p[last] > reference_point[last]]
+    if not filtered:
+        return 0.0
+
+    sorted_desc = sorted(filtered, key=lambda p: -p[last])
+
     volume = 0.0
-    prev_x = rx
-    for x, y in pts:
-        if x <= rx or y <= ry:
-            continue
-        volume += (x - prev_x) * (y - ry)
-        prev_x = x
+    active_projected: List[Sequence[float]] = []
+    prev_height = sorted_desc[0][last]
+    for p in sorted_desc:
+        height = p[last]
+        if height < prev_height:
+            slice_hv = _hypervolume_recursive(active_projected, reference_point[:last], last)
+            volume += slice_hv * (prev_height - height)
+            prev_height = height
+        active_projected.append(p[:last])
+
+    slice_hv = _hypervolume_recursive(active_projected, reference_point[:last], last)
+    volume += slice_hv * (prev_height - reference_point[last])
+
     return volume
+
+
+def hypervolume_2d(front: Sequence[Tuple[float, float]], reference_point: Tuple[float, float]) -> float:
+    """2-objective special case of hypervolume(), kept as a thin, explicitly-
+    named wrapper for existing 2D call sites (single-objective-style 2D
+    fronts)."""
+    return hypervolume(front, reference_point)
 
 
 def inverted_generational_distance(front: Sequence[Sequence[float]], reference_front: Sequence[Sequence[float]]) -> float:

@@ -11,7 +11,14 @@ the right metric set, per the study design:
   - multi-objective (flex/grep/gzip/sed): number of non-dominated solutions
     contributed to a reference Pareto frontier, Hypervolume, IGD, plus the
     same execution-time/mitigation-overhead/classical-post-processing-time
-    metrics as single-objective.
+    metrics as single-objective. Points are 3-objective
+    `(-execution_cost, statement_coverage, fault_coverage)` tuples -- cost
+    negated so `piastq_execution.statistics`'s "maximize every objective"
+    convention applies uniformly -- matching both SelectQAOA/
+    MOQ-Pipeline.ipynb's HV/IGD/Pareto-dominance evaluation
+    (`total_cost()`/`total_coverage()`/`total_faults()`/`pareto_dominance()`
+    there) and `qaoa_tcs/multi_obj.py`'s `build_pareto_front()`, which uses
+    the same three objectives to pick candidates during execution.
 
 `execution_time_seconds` means the same thing, computed the same way, for
 every one of the three pipelines this module serves (QAOA-TCS single-
@@ -36,7 +43,7 @@ from piastq_execution.mitigation import CalibrationRecord, correct_counts
 from piastq_execution.raw_counts import RawCountsRecord
 from piastq_execution.statistics import (
     build_reference_front,
-    hypervolume_2d,
+    hypervolume,
     inverted_generational_distance,
     pareto_front_indices,
 )
@@ -315,9 +322,9 @@ class MultiObjectiveEvaluation:
 def evaluate_multi_objective_combo(
     combo: str,
     method: str,
-    pareto_points: Sequence[Tuple[float, float]],
-    all_methods_points: Dict[str, Sequence[Tuple[float, float]]],
-    reference_point: Tuple[float, float],
+    pareto_points: Sequence[Tuple[float, ...]],
+    all_methods_points: Dict[str, Sequence[Tuple[float, ...]]],
+    reference_point: Tuple[float, ...],
     raw_records: Sequence[RawCountsRecord],
     calibration_record: Optional[CalibrationRecord] = None,
     calibration_shots_per_circuit: int = 0,
@@ -326,6 +333,13 @@ def evaluate_multi_objective_combo(
     frontier built from the union of every compared method's non-dominated
     solutions for this dataset (`all_methods_points` must include `method`'s
     own points under its own key).
+
+    `pareto_points`/`all_methods_points`/`reference_point` are 3-tuples of
+    `(-execution_cost, statement_coverage, fault_coverage)` for QAOA-TCS
+    multi-objective (cost negated -- see module docstring); `hypervolume()`
+    and every other statistics.py function used here are dimension-agnostic,
+    so this also works unchanged for a differently-shaped multi-objective
+    front if one is ever added.
     """
     start = time.time()
 
@@ -335,7 +349,7 @@ def evaluate_multi_objective_combo(
     reference_front = build_reference_front(all_methods_points)
     num_non_dominated = sum(1 for p in own_front if p in reference_front)
 
-    hv = hypervolume_2d(own_front, reference_point)
+    hv = hypervolume(own_front, reference_point)
     igd = inverted_generational_distance(own_front, reference_front)
 
     elapsed = time.time() - start

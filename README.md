@@ -441,25 +441,47 @@ authoring/review session.
   points), Hypervolume, IGD, plus the same execution-time/overhead/
   post-processing metrics as single-objective.
 
-**Note on "execution cost" vs. "execution time":** the *test-suite*
-execution cost (`execution_cost` — sum of the selected tests' `time`/`cost`
-column) is a **single-objective-only** metric, because it's one of the
-QUBO's own objective terms there (alongside effectiveness); the
-multi-objective Pareto front's two dimensions are fault coverage and
-statement coverage, not cost, so `execution_cost` has no
-`MultiObjectiveEvaluation` equivalent.
+**The multi-objective QUBO -- and its HV/IGD/Pareto evaluation -- has
+*three* objectives, not two: execution cost (minimize), statement coverage
+(maximize), fault coverage (maximize).** `make_linear_terms()`'s linear term
+trades off cost against fault coverage; `make_quadratic_terms()`'s quadratic
+penalty pushes toward statement-coverage diversity. This is exactly the
+`(total_cost, total_coverage, total_faults)` / `pareto_dominance()` triple
+`SelectQAOA/MOQ-Pipeline.ipynb` itself uses for HV/IGD. `build_pareto_front()`
+in `multi_obj.py` was corrected to match: it now computes all three per
+growing-prefix candidate and filters via true 3-objective non-domination
+(`piastq_execution.statistics.pareto_front_indices()`, cost negated to
+`-execution_cost` so "maximize every objective" applies uniformly) — it
+previously only tracked fault/statement coverage (missing cost as a
+Pareto dimension entirely) and had a real bug in how it accumulated
+statement coverage (summed `covered_lines()` once *per test case* in the
+candidate instead of once per candidate, inflating it by suite size).
+`evaluate_multi_objective_combo()`'s `pareto_points`/`all_methods_points`/
+`reference_point` are these same 3-tuples; `hypervolume()`
+(`piastq_execution/statistics.py`) is a dimension-agnostic exact recursive
+implementation (not the old rectangle-sweep `hypervolume_2d`, kept only as
+a thin 2D-specific wrapper for other 2D uses), so nothing besides these two
+functions' inputs needed to change to go from 2 to 3 objectives.
 
-*Quantum-hardware* execution time (`execution_time_seconds`) is a
-**different, always-present metric on both dataclasses**: for one
-experiment repetition, it's the sum of the wall-clock time spent executing
-each subproblem's QAOA circuit (`compute_execution_time_seconds()`, one
-`RawCountsRecord` per subproblem/cluster) — computed identically for all
-three pipelines this module serves (QAOA-TCS single-objective, QAOA-TCS
-multi-objective, IGDec-QAOA single-objective). For TREx, pass in every
-twirl instance's `RawCountsRecord`, not just one per subproblem — the sum
-naturally reflects TREx's extra hardware passes. `mitigation_overhead`
-(`.total_shots`, `.calibration_circuits`) tracks the shot-based cost of
-mitigation itself (MEM/M3 calibration), separate from raw execution time;
+So `execution_cost` (single-objective's own metric — sum of the selected
+tests' `time`/`cost` column, one of that QUBO's objective terms alongside
+effectiveness) has no `MultiObjectiveEvaluation` field of its own for a
+different reason than before: multi-objective's cost is already *inside*
+the 3-objective Pareto/HV/IGD analysis (as `-execution_cost`, the first
+coordinate of every point), not absent from it.
+
+*Quantum-hardware* execution time (`execution_time_seconds`) is a separate,
+**always-present metric on both dataclasses** — not to be confused with the
+QUBO's execution-cost objective above: for one experiment repetition, it's
+the sum of the wall-clock time spent executing each subproblem's QAOA
+circuit (`compute_execution_time_seconds()`, one `RawCountsRecord` per
+subproblem/cluster) — computed identically for all three pipelines this
+module serves (QAOA-TCS single-objective, QAOA-TCS multi-objective,
+IGDec-QAOA single-objective). For TREx, pass in every twirl instance's
+`RawCountsRecord`, not just one per subproblem — the sum naturally reflects
+TREx's extra hardware passes. `mitigation_overhead` (`.total_shots`,
+`.calibration_circuits`) tracks the shot-based cost of mitigation itself
+(MEM/M3 calibration), separate from raw execution time;
 `classical_post_processing_seconds` is the (non-hardware) correction +
 metric-computation time.
 

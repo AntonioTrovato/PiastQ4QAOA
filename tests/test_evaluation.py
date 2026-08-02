@@ -196,9 +196,12 @@ class TestEvaluateSingleObjectiveCombo(unittest.TestCase):
 
 
 class TestEvaluateMultiObjectiveCombo(unittest.TestCase):
-    def test_hand_verified_hv_and_igd(self):
-        raw_points = [(1, 5), (2, 2)]
-        mem_points = [(5, 1), (3, 3)]
+    def test_hand_verified_hv_and_igd_three_objectives(self):
+        # Points are (-cost, statement_coverage, fault_coverage), matching
+        # SelectQAOA/MOQ-Pipeline.ipynb's actual 3-objective HV/IGD
+        # evaluation (total_cost negated, total_coverage, total_faults).
+        raw_points = [(-1, 5, 2), (-2, 2, 4)]
+        mem_points = [(-1, 6, 3), (-3, 3, 5)]
         all_points = {"raw": raw_points, "mem": mem_points}
         records = [make_raw_record(80, 1.0)]
 
@@ -207,19 +210,21 @@ class TestEvaluateMultiObjectiveCombo(unittest.TestCase):
             method="raw",
             pareto_points=raw_points,
             all_methods_points=all_points,
-            reference_point=(0, 0),
+            reference_point=(-10, 0, 0),
             raw_records=records,
         )
-        # raw's OWN front (dominance within its own points only) is both
-        # points: (1,5) and (2,2) don't dominate each other.
-        # HV vs ref(0,0), sorted by x: (1,5) area=1*5=5, prev_x=1;
-        # (2,2) area=(2-1)*2=2; total=7.
-        self.assertAlmostEqual(result.hypervolume, 7.0)
-        # reference front (union pareto across raw+mem) = {(1,5),(5,1),(3,3)}
-        # -- (2,2) is globally dominated by mem's (3,3), so only (1,5) from
-        # raw's own front survives into the reference frontier.
+        # raw's OWN front (dominance within its own 2 points only): neither
+        # (-1,5,2) nor (-2,2,4) dominates the other -> both stay.
+        # HV vs ref(-10,0,0), verified two ways (recursive slicing and
+        # inclusion-exclusion of the two boxes): box1=(8*2*4)=64,
+        # box2=(9*5*2)=90, intersection=(8*2*2)=32, union=64+90-32=122.
+        self.assertAlmostEqual(result.hypervolume, 122.0)
+        # reference front (union pareto across raw+mem) excludes (-1,5,2)
+        # (dominated by mem's (-1,6,3): same cost, strictly more coverage,
+        # more faults) but keeps (-2,2,4) -> only 1 of raw's own 2 points
+        # survives into the reference frontier.
         self.assertEqual(result.num_non_dominated, 1)
-        self.assertGreater(result.igd, 0.0)  # raw's front doesn't cover (5,1) or (3,3)
+        self.assertGreater(result.igd, 0.0)  # raw's front doesn't cover (-1,6,3) or (-3,3,5)
         self.assertAlmostEqual(result.execution_time_seconds, 1.0)
 
 

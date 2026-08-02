@@ -21,6 +21,7 @@ from piastq_execution.statistics import (
     compare_two_groups,
     dominates,
     dunn_test,
+    hypervolume,
     hypervolume_2d,
     inverted_generational_distance,
     pareto_front_indices,
@@ -185,6 +186,65 @@ class TestParetoAndHV(unittest.TestCase):
         }
         ref = build_reference_front(runs)
         self.assertEqual(set(ref), {(1, 5), (5, 1), (3, 3)})
+
+
+class TestHypervolumeND(unittest.TestCase):
+    """hypervolume() generalizes hypervolume_2d() to any number of objectives
+    (SelectQAOA/MOQ-Pipeline.ipynb's actual multi-objective evaluation uses 3:
+    cost (negated -- minimized), statement coverage, fault coverage)."""
+
+    def test_matches_2d_hand_computed_cases(self):
+        # same cases as TestParetoAndHV's 2D tests, via the general function
+        self.assertAlmostEqual(hypervolume([(3, 3)], reference_point=(0, 0)), 9.0)
+        self.assertAlmostEqual(hypervolume([(1, 4), (3, 2)], reference_point=(0, 0)), 8.0)
+        self.assertEqual(hypervolume([], reference_point=(0, 0)), 0.0)
+
+    def test_3d_single_point_is_a_box_volume(self):
+        # single point (2,2,2), reference (0,0,0) -> box volume 2*2*2=8
+        self.assertAlmostEqual(hypervolume([(2, 2, 2)], reference_point=(0, 0, 0)), 8.0)
+
+    def test_3d_two_points_hand_computed_via_inclusion_exclusion(self):
+        # box1=[0,3]x[0,1]x[0,1] vol=3; box2=[0,1]x[0,3]x[0,1] vol=3;
+        # intersection=[0,1]x[0,1]x[0,1] vol=1; union=3+3-1=5
+        front = [(3, 1, 1), (1, 3, 1)]
+        self.assertAlmostEqual(hypervolume(front, reference_point=(0, 0, 0)), 5.0)
+
+    def test_3d_dominated_point_contributes_nothing(self):
+        # (1,1,1) is dominated by (2,2,2) on every objective -> same HV as
+        # the single dominating point alone.
+        front = [(2, 2, 2), (1, 1, 1)]
+        self.assertAlmostEqual(hypervolume(front, reference_point=(0, 0, 0)), 8.0)
+
+
+class TestThreeObjectiveDominance(unittest.TestCase):
+    """Cost/coverage/faults dominance, matching SelectQAOA/MOQ-Pipeline.ipynb's
+    pareto_dominance(tuple1, tuple2): tuple2 dominates tuple1 iff
+    cost2<=cost1 and coverage2>=coverage1 and faults2>=faults1 (>=1 strict).
+    Reproduced here via dominates()/pareto_front_indices() on
+    (-cost, coverage, faults) points -- cost negated so "maximize every
+    objective" applies uniformly.
+    """
+
+    def test_lower_cost_same_coverage_and_faults_dominates(self):
+        # (cost=5, coverage=10, faults=2) vs (cost=8, coverage=10, faults=2):
+        # the first has equal coverage/faults but strictly lower cost, so
+        # under pareto_dominance() the first dominates the second.
+        cheaper = (-5, 10, 2)
+        pricier = (-8, 10, 2)
+        self.assertTrue(dominates(cheaper, pricier))
+        self.assertFalse(dominates(pricier, cheaper))
+
+    def test_pareto_front_indices_keeps_the_cost_effective_tradeoff(self):
+        # A: cheap but low coverage/faults. B: expensive but high
+        # coverage/faults. C: same cost as B but strictly worse on both ->
+        # dominated by B, should be excluded.
+        points = [
+            (-2, 5, 1),    # A: cost=2, coverage=5, faults=1
+            (-10, 20, 8),  # B: cost=10, coverage=20, faults=8
+            (-10, 15, 6),  # C: cost=10, coverage=15, faults=6 -- dominated by B
+        ]
+        front = pareto_front_indices(points)
+        self.assertEqual(set(front), {0, 1})
 
 
 if __name__ == "__main__":

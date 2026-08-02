@@ -7,6 +7,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
+from piastq_execution.statistics import pareto_front_indices
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -306,31 +307,40 @@ def covered_lines(sir_program, test_cases_list):
 
 
 def build_pareto_front(sir_program, selected_tests):
-    """This method builds the pareto front additionally from a sub test suite solution"""
-    pareto_front = []
-    max_fault_coverage = 0
-    max_stmt_coverage = 0
+    """Builds the pareto front from a sub test suite solution across all
+    three of the QUBO's objectives: execution cost (minimize), fault
+    coverage (maximize), statement coverage (maximize) -- matching
+    make_linear_terms()'s cost/fault-coverage tradeoff and
+    make_quadratic_terms()'s statement-coverage-diversity penalty, and
+    exactly the (total_cost, total_coverage, total_faults)/
+    pareto_dominance() triple SelectQAOA/MOQ-Pipeline.ipynb's own HV/IGD
+    evaluation uses.
+
+    Candidates considered are the growing prefixes of `selected_tests` (the
+    paper's "Additional-Greedy" method: only prefixes of the given
+    test-selection order are considered, not every possible subset); returns
+    the subset of those candidates that is non-dominated across all three
+    objectives, via piastq_execution.statistics.pareto_front_indices() (cost
+    negated so its "maximize every objective" convention applies uniformly).
+    """
+    candidate_solutions = []
+    points = []
 
     for index in range(1, len(selected_tests) + 1):
         # exract the first index selected tests
         candidate_solution = selected_tests[:index]
+        candidate_solution_cost = 0
         candidate_solution_fault_coverage = 0
-        candidate_solution_stmt_coverage = 0
         for selected_test in candidate_solution:
+            candidate_solution_cost += test_cases_costs[sir_program][selected_test]
             candidate_solution_fault_coverage += faults_dictionary[sir_program][selected_test]
-            candidate_solution_stmt_coverage += covered_lines(sir_program, candidate_solution)
-        # if the actual pareto front dominates the candidate solution, get to the next candidate
-        if max_fault_coverage >= candidate_solution_fault_coverage and max_stmt_coverage >= candidate_solution_stmt_coverage:
-            continue
-        # eventually update the pareto front information
-        if candidate_solution_stmt_coverage > max_stmt_coverage:
-            max_stmt_coverage = candidate_solution_stmt_coverage
-        if candidate_solution_fault_coverage > max_fault_coverage:
-            max_fault_coverage = candidate_solution_fault_coverage
-        # add the candidate solution to the pareto front
-        pareto_front.append(candidate_solution)
+        candidate_solution_stmt_coverage = covered_lines(sir_program, candidate_solution)
 
-    return pareto_front
+        candidate_solutions.append(candidate_solution)
+        points.append((-candidate_solution_cost, candidate_solution_stmt_coverage, candidate_solution_fault_coverage))
+
+    non_dominated_indices = pareto_front_indices(points)
+    return [candidate_solutions[i] for i in non_dominated_indices]
 
 
 # Only rep_1 is used by this replication package (matching the circuits
