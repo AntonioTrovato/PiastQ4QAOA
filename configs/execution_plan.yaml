@@ -64,25 +64,25 @@ combos:
     objective_mode: multi_objective
     dataset: flex
     circuits_dir: flex
-    methods: [raw, mem, m3]
+    methods: [raw, mem, m3, trex]
   grep_qaoa_tcs:
     algorithm: qaoa_tcs
     objective_mode: multi_objective
     dataset: grep
     circuits_dir: grep
-    methods: [raw, mem, m3]
+    methods: [raw, mem, m3, trex]
   gzip_qaoa_tcs:
     algorithm: qaoa_tcs
     objective_mode: multi_objective
     dataset: gzip
     circuits_dir: gzip
-    methods: [raw, mem, m3]
+    methods: [raw, mem, m3, trex]
   sed_qaoa_tcs:
     algorithm: qaoa_tcs
     objective_mode: multi_objective
     dataset: sed
     circuits_dir: sed
-    methods: [raw, mem, m3]
+    methods: [raw, mem, m3, trex]
 
   # ---- IGDec-QAOA, single-objective only (5) ----
   gsdtsr_igdec_qaoa:

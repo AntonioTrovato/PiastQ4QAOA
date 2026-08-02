@@ -316,11 +316,11 @@ corrected_distribution = correct_counts("m3", raw_counts, calibration, num_qubit
 ### TREx (measurement twirling)
 
 Unlike MEM/M3, TREx has **no separate calibration step**, and — unlike
-MEM/M3 — it's actually wired into the execution scripts, not just available
-as library functions: `single_obj.py`'s `run_hardware_execution()` and the
-three IGDec-QAOA single-objective scripts' `run_hardware_like_from_saved_circuits()`
-each run a second, dedicated hardware pass per circuit, right after the raw
-pass:
+MEM/M3 — it's actually wired into every execution script, not just available
+as library functions: `single_obj.py` and `multi_obj.py`'s
+`run_hardware_execution()`, and the three IGDec-QAOA single-objective
+scripts' `run_hardware_like_from_saved_circuits()`, each run a second,
+dedicated hardware pass per circuit, right after the raw pass:
 
 ```python
 for twirl_idx in range(trex_twirl_instances):
@@ -376,11 +376,11 @@ bitstring. Alongside each combo's existing derived outputs (unchanged format:
 full raw counts dict, circuit/cluster/(iteration+subproblem) id,
 algorithm/objective_mode/dataset, shots requested vs. returned, physical
 qubit mapping, backend name/version/timestamp, and wall-clock time.
-Single-objective combos (both QAOA-TCS and IGDec-QAOA) also write a second,
-separate `*-trex-raw_counts.jsonl` (§5's TREx section) — same record shape,
-plus a populated `twirl_mask` field on every row. These `.jsonl` dumps are
-gitignored since they're large, per-run hardware artifacts, not authored
-content.
+Every combo (QAOA-TCS single- and multi-objective, and IGDec-QAOA
+single-objective) also writes a second, separate `*-trex-raw_counts.jsonl`
+(§5's TREx section) — same record shape, plus a populated `twirl_mask` field
+on every row. These `.jsonl` dumps are gitignored since they're large,
+per-run hardware artifacts, not authored content.
 
 ---
 
@@ -421,14 +421,19 @@ pools:
 > combos, the planner reduces repetitions to 1, shots/circuit to the 200
 > floor, and still drops TREx everywhere just to fit (`trex_twirl_instances`
 > extra hardware passes per circuit, 32 by default, is expensive — see §5).
-> The 7-pool default is more forgiving (TREx survives for the QAOA-TCS
-> multi-objective pool and several IGDec-QAOA pools at 15h each) but still
-> drops it where a pool's circuit count is large relative to 15h (e.g.
-> `iofrol_igdec_qaoa`, `paintcontrol_igdec_qaoa` in the shipped config). If
+> The 7-pool default has the same problem at 15h/pool: every combo that
+> already has real trained circuits on disk (`iofrol_igdec_qaoa`,
+> `paintcontrol_igdec_qaoa`) has TREx dropped there too; the pools that
+> currently show TREx "surviving" (`gsdtsr_igdec_qaoa`,
+> `elevator_o2_igdec_qaoa`, `elevator_o3_igdec_qaoa`) only do so because
+> those combos have no trained circuits generated yet in this environment
+> (§4.2's `... train` step) — an empty inventory costs 0h regardless of
+> method, which is a false positive, not a real budget win. Once you
+> generate those circuits, expect TREx to be dropped there too at 15h. If
 > you need TREx data for a specific combo, give it (or a small group of
 > combos) its own pool with a larger `total_hours`, or lower
-> `trex_twirl_instances` for that run — don't rely on a single small global
-> pool to preserve it.
+> `trex_twirl_instances` for that run — don't rely on a 15h pool to preserve
+> it once real circuits are in place.
 
 **Reconfiguring the plan**: edit `configs/execution_plan.yaml`.
 
@@ -628,11 +633,11 @@ about a second (111 tests total).
       repo).
    c. `python single_obj.py` / `multi_obj.py` (§4.1) and the IGDec scripts'
       default mode (§4.2) — hardware execution, produces raw counts
-      (`*-raw_counts.jsonl`) and the existing derived outputs. For the four
-      single-objective scripts (`single_obj.py` and the three
-      `loch_qaoa_*_extract_circuits.py`), this also automatically runs the
-      TREx twirl-instance pass (§5) and writes `*-trex-raw_counts.jsonl` —
-      no separate step needed, but budget for it (§7).
+      (`*-raw_counts.jsonl`) and the existing derived outputs. Every one of
+      these five scripts (`single_obj.py`, `multi_obj.py`, and the three
+      `loch_qaoa_*_extract_circuits.py`) also automatically runs the TREx
+      twirl-instance pass (§5) and writes `*-trex-raw_counts.jsonl` — no
+      separate step needed, but budget for it (§7).
    d. `run_calibration.py` (§5) — MEM/M3 calibration, once per circuit
       width in use, stored under `calibration/`. Not needed for TREx (no
       calibration step).
