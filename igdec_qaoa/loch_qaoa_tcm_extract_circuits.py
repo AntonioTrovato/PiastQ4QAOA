@@ -1,4 +1,9 @@
 import statistics
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
 
 from qiskit_aer import Aer
 from qiskit_algorithms.utils import algorithm_globals
@@ -273,24 +278,281 @@ def get_initial_fval(length,df):
     return best_solution, best_energy
 
 
-def run_circuit_with_batching(circuit, sampler):
+def save_trained_circuits_and_initial_solutions():
     """
-    Simulate hardware constraint: max 200 shots per batch.
-    Total target shots = 80
-    => 1 batch x 80 shots
+    Train IGDec-QAOA in ideal noiseless simulation and save, for gsdtsr:
+    - one folder per initial random sampling
+    - initial random solution
+    - one trained circuit per solved subproblem
+    - metadata to reconstruct the exact execution order
+
+    NOT executed automatically (run `python loch_qaoa_tcm_extract_circuits.py train`
+    on the machine that does the actual training) and NOT run in this authoring
+    session. iofrol and paintcontrol are already trained (trained_qaoa_circuits/
+    igdec_qaoa/{iofrol,paintcontrol}/) and are untouched by this function.
+
+    Compute estimate (gsdtsr, filtered to rate > 0 -> 287 of 5,555 rows):
+    each of the 10 samplings runs 10 impact-reordering iterations; each
+    iteration re-solves ceil-capped subproblems covering the top 15% of the
+    (filtered) dataset by impact, i.e. floor(0.15 * 287 / 7) = 6 seven-qubit
+    subproblems per iteration. That is 10 * 10 * 6 = ~600 ideal-simulator QAOA
+    subproblem-solves (COBYLA(500) + statevector sampler each), likely on the
+    order of a few hours wall-clock depending on the machine.
     """
-    from collections import Counter
+    base_output_dir = "trained_qaoa_circuits/igdec_qaoa"
+    os.makedirs(base_output_dir, exist_ok=True)
 
-    total_counts = Counter()
+    num_samplings = 10
+    num_iterations = 10
+    reps = 1
+    problem_size = 7
 
-    for _ in range(1):
-        sampler.options.shots = 80
-        result = sampler.run([circuit]).result()
-        counts = result.quasi_dists[0].binary_probabilities()
-        for k, v in counts.items():
-            total_counts[k] += v * 80
+    ideal_sampler = AerSampler()
+    ideal_sampler.options.shots = None
 
-    return total_counts
+    for file_name in ["gsdtsr"]:
+        print(f"\n========== PROGRAM: {file_name} ==========")
+
+        df = pd.read_csv(
+            "../datasets/quantum_sota_datasets/" + file_name + ".csv",
+            dtype={"time": float, "rate": float}
+        )
+        # matches qaoa_tcs/single_obj.py's get_data() filtering logic
+        df = df[df['rate'] > 0]
+
+        length = len(df)
+        times, frs = get_data(df)
+
+        program_dir = os.path.join(base_output_dir, file_name)
+        os.makedirs(program_dir, exist_ok=True)
+
+        for sampling_id in range(1, num_samplings + 1):
+            print(f"\n----- RANDOM INITIAL SAMPLING #{sampling_id} -----")
+
+            sampling_dir = os.path.join(program_dir, f"sampling_{sampling_id}")
+            os.makedirs(sampling_dir, exist_ok=True)
+
+            # initial random solution
+            best_solution, best_energy = get_initial_fval(length,df)
+            solution = best_solution.copy()
+
+            with open(os.path.join(sampling_dir, "initial_random_solution.json"), "w") as f:
+                json.dump(
+                    {
+                        "initial_solution": best_solution,
+                        "initial_energy": best_energy
+                    },
+                    f,
+                    indent=2
+                )
+
+            best_itr = 0
+            start_impact = time.time()
+            impact_order = OrderByImpactNum(best_solution, df, best_energy)
+            end_impact = time.time()
+            impact_time = end_impact - start_impact
+
+            index_end = problem_size
+            index_begin = 0
+            count = 0
+            itr_num = 0
+
+            total_qaoa = 0
+            total_exe = 0
+            total_impact = 0
+            execution_times = []
+            best_itr_times = []
+            best_itr_rates = []
+
+            circuits_metadata = []
+
+            while count < num_iterations:
+                df_time = 0
+                qaoa_time_total = 0
+                exe_count = 0
+                itr_num += 1
+                total_start = time.time()
+
+                if problem_size > 0.15 * len(df):
+                    exe_count += 1
+                    case_list = impact_order[index_begin:index_end]
+                    qubo, testcase = create_qubo(times, frs, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+
+                    qaoa = QAOA(
+                        sampler=ideal_sampler,
+                        optimizer=COBYLA(500),
+                        reps=reps
+                    )
+
+                    operator, offset = qubo.to_ising()
+
+                    start_qaoa = time.time()
+                    qaoa_result = qaoa.compute_minimum_eigenvalue(operator)
+                    end_qaoa = time.time()
+                    qaoa_time = end_qaoa - start_qaoa
+
+                    qaoa_time_total += qaoa_time
+
+                    # save trained circuit
+                    optimal_params = qaoa_result.optimal_point
+                    ansatz = qaoa.ansatz
+                    bound_circuit = ansatz.assign_parameters(optimal_params)
+
+                    circuit_filename = f"itr_{itr_num}_subproblem_1.qpy"
+                    with open(os.path.join(sampling_dir, circuit_filename), "wb") as f:
+                        qpy.dump(bound_circuit, f)
+
+                    circuits_metadata.append(
+                        {
+                            "iteration": itr_num,
+                            "subproblem_index": 1,
+                            "case_list": [int(x) for x in case_list],
+                            "qpy_file": circuit_filename
+                        }
+                    )
+
+                    eigenstate = qaoa_result.eigenstate
+                    most_likely = max(eigenstate.items(), key=lambda x: x[1])[0]
+
+                    if isinstance(most_likely, int):
+                        n = qubo.get_num_binary_vars()
+                        bitstring = [int(b) for b in format(most_likely, f'0{n}b')[::-1]]
+                    elif isinstance(most_likely, str):
+                        bitstring = [int(b) for b in most_likely[::-1]]
+                    else:
+                        raise ValueError(f"Unsupported eigenstate key type: {type(most_likely)}")
+
+                    start_df = time.time()
+                    origin_solution = []
+                    for case in case_list:
+                        origin_solution.append(solution[case])
+
+                    for case_index in range(len(case_list)):
+                        solution[case_list[case_index]] = bitstring[case_index]
+
+                    result_fval = qubo.objective.evaluate(bitstring)
+                    end_df = time.time()
+                    df_time += end_df - start_df
+
+                else:
+                    subproblem_idx = 0
+                    result_fval = None
+
+                    while index_end <= 0.15 * len(df):
+                        exe_count += 1
+                        subproblem_idx += 1
+
+                        case_list = impact_order[index_begin:index_end]
+                        qubo, testcase = create_qubo(times, frs, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+
+                        qaoa = QAOA(
+                            sampler=ideal_sampler,
+                            optimizer=COBYLA(500),
+                            reps=reps
+                        )
+
+                        operator, offset = qubo.to_ising()
+
+                        start_qaoa = time.time()
+                        qaoa_result = qaoa.compute_minimum_eigenvalue(operator)
+                        end_qaoa = time.time()
+                        qaoa_time = end_qaoa - start_qaoa
+
+                        qaoa_time_total += qaoa_time
+
+                        # save trained circuit
+                        optimal_params = qaoa_result.optimal_point
+                        ansatz = qaoa.ansatz
+                        bound_circuit = ansatz.assign_parameters(optimal_params)
+
+                        circuit_filename = f"itr_{itr_num}_subproblem_{subproblem_idx}.qpy"
+                        with open(os.path.join(sampling_dir, circuit_filename), "wb") as f:
+                            qpy.dump(bound_circuit, f)
+
+                        circuits_metadata.append(
+                            {
+                                "iteration": itr_num,
+                                "subproblem_index": subproblem_idx,
+                                "case_list": [int(x) for x in case_list],
+                                "qpy_file": circuit_filename
+                            }
+                        )
+
+                        eigenstate = qaoa_result.eigenstate
+                        most_likely = max(eigenstate.items(), key=lambda x: x[1])[0]
+
+                        if isinstance(most_likely, int):
+                            n = qubo.get_num_binary_vars()
+                            bitstring = [int(b) for b in format(most_likely, f'0{n}b')[::-1]]
+                        elif isinstance(most_likely, str):
+                            bitstring = [int(b) for b in most_likely[::-1]]
+                        else:
+                            raise ValueError(f"Unsupported eigenstate key type: {type(most_likely)}")
+
+                        start_df = time.time()
+                        origin_solution = []
+                        for case in case_list:
+                            origin_solution.append(solution[case])
+
+                        for case_index in range(len(case_list)):
+                            solution[case_list[case_index]] = bitstring[case_index]
+
+                        result_fval = qubo.objective.evaluate(bitstring)
+
+                        index_begin += problem_size
+                        index_end += problem_size
+                        end_df = time.time()
+                        df_time += end_df - start_df
+
+                energy = result_fval
+
+                if energy < best_energy:
+                    best_itr = itr_num
+                    best_solution = solution.copy()
+                    best_energy = energy
+
+                total_end = time.time()
+                total_itr_time = total_end - total_start - df_time + impact_time
+
+                execution_times.append(impact_time + qaoa_time_total)
+                total_qaoa += qaoa_time_total
+                total_exe += total_itr_time
+                total_impact += impact_time
+
+                best_itr_times.append(df.loc[np.array(best_solution) == 1, "time"].sum())
+                best_itr_rates.append(df.loc[np.array(best_solution) == 1, "rate"].sum())
+
+                start_impact = time.time()
+                impact_order = OrderByImpactNum(solution, df, energy)
+                end_impact = time.time()
+                impact_time = end_impact - start_impact
+
+                print("best:" + str(best_energy))
+                count += 1
+                index_begin = 0
+                index_end = problem_size
+
+            with open(os.path.join(sampling_dir, "circuits_metadata.json"), "w") as f:
+                json.dump(circuits_metadata, f, indent=2)
+
+            with open(os.path.join(sampling_dir, "training_summary.json"), "w") as f:
+                json.dump(
+                    {
+                        "best_itr": best_itr,
+                        "best_fval": best_energy,
+                        "best_solution": best_solution,
+                        "total_qaoa": total_qaoa,
+                        "total_impact": total_impact,
+                        "total_exe": total_exe,
+                        "execution_times": execution_times,
+                        "final_test_suite_costs": [float(x) for x in best_itr_times],
+                        "final_failure_rates": [float(x) for x in best_itr_rates]
+                    },
+                    f,
+                    indent=2
+                )
+
+            print(f"Saved trained circuits and metadata in: {sampling_dir}")
 
 
 def run_hardware_like_from_saved_circuits():
@@ -323,6 +585,9 @@ def run_hardware_like_from_saved_circuits():
 
         times, frs = get_data(df)
         program_results = {}
+
+        raw_counts_path = os.path.join(results_dir, f"{file_name}-raw_counts.jsonl")
+        raw_counts_writer = RawCountsWriter(raw_counts_path)
 
         for sampling_id in range(1, num_experiment + 1):
             print(f"\n----- HARDWARE-LIKE SAMPLING #{sampling_id} -----")
@@ -377,8 +642,21 @@ def run_hardware_like_from_saved_circuits():
                     circuit = circuits[0]
 
                     start_qpu = time.time()
-                    counts = run_circuit_with_batching(circuit, sampling_sampler)
+                    counts, raw_record = run_circuit_with_batching_recorded(
+                        circuit,
+                        sampling_sampler,
+                        algorithm="igdec_qaoa",
+                        objective_mode="single_objective",
+                        dataset=file_name,
+                        circuit_id=f"{file_name}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}",
+                        backend=backend,
+                        iteration_id=meta["iteration"],
+                        subproblem_id=meta["subproblem_index"],
+                        shots_per_batch=80,
+                        num_batches=1,
+                    )
                     end_qpu = time.time()
+                    raw_counts_writer.write(raw_record)
 
                     qpu_time = end_qpu - start_qpu
                     qaoa_time_total += qpu_time
@@ -408,8 +686,21 @@ def run_hardware_like_from_saved_circuits():
                         circuit = circuits[0]
 
                         start_qpu = time.time()
-                        counts = run_circuit_with_batching(circuit, sampling_sampler)
+                        counts, raw_record = run_circuit_with_batching_recorded(
+                            circuit,
+                            sampling_sampler,
+                            algorithm="igdec_qaoa",
+                            objective_mode="single_objective",
+                            dataset=file_name,
+                            circuit_id=f"{file_name}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}",
+                            backend=backend,
+                            iteration_id=meta["iteration"],
+                            subproblem_id=meta["subproblem_index"],
+                            shots_per_batch=80,
+                            num_batches=1,
+                        )
                         end_qpu = time.time()
+                        raw_counts_writer.write(raw_record)
 
                         qpu_time = end_qpu - start_qpu
                         qaoa_time_total += qpu_time
@@ -463,12 +754,21 @@ def run_hardware_like_from_saved_circuits():
                 "execution_times(ms)": execution_times
             }
 
+        raw_counts_writer.close()
+
         output_file = os.path.join(results_dir, f"{file_name}.json")
         with open(output_file, "w") as f:
             json.dump(program_results, f, indent=2)
 
         print(f"Saved hardware-like results to: {output_file}")
+        print(f"Saved raw counts to: {raw_counts_path}")
 
 
 if __name__ == '__main__':
-    run_hardware_like_from_saved_circuits()
+    # `python loch_qaoa_tcm_extract_circuits.py train` (re)trains gsdtsr's
+    # IGDec-QAOA circuits on an ideal simulator -- this must run on the machine
+    # that does the actual training, not the one authoring this code.
+    if len(sys.argv) > 1 and sys.argv[1] == "train":
+        save_trained_circuits_and_initial_solutions()
+    else:
+        run_hardware_like_from_saved_circuits()

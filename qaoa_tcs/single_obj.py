@@ -1,8 +1,12 @@
 #this cell contains all the imports needed by the pipeline
 #to run it on the browser: jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10
 import os
+import sys
 import json
 import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -28,10 +32,10 @@ from matplotlib import cm
 
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
-from collections import defaultdict, Counter
+from collections import defaultdict
 
-bootqa_programs = ["iofrol"]
-bootqa_programs_rep_values = {"iofrol":1}
+bootqa_programs = ["gsdtsr", "paintcontrol", "iofrol", "elevator", "elevator2"]
+bootqa_programs_rep_values = {"gsdtsr": 1, "paintcontrol": 1, "iofrol": 1, "elevator": 1, "elevator2": 1}
 experiments = 10
 
 def get_data(data_name):
@@ -283,24 +287,6 @@ def bootstrap_confidence_interval(data, num_samples, confidence_alpha=0.95):
 
     return lower_bound, upper_bound
 
-def run_circuit_with_batching(circuit, sampler):
-    """Simulate hardware constraint: max 200 shots per run.
-    Total target shots = 2048 * 30 = 61440
-    => 307 runs x 200 shots + 1 run x 40 shots
-    """
-    total_counts = Counter()
-
-    # 80 shots
-    for _ in range(1):
-        sampler.options.shots = 80
-        result = sampler.run([circuit]).result()
-        counts = result.quasi_dists[0].binary_probabilities()
-
-        for k, v in counts.items():
-            total_counts[k] += v * 80
-
-    return total_counts
-
 provider = AQTProvider("ACCESS_TOKEN")
 backend = provider.get_backend("offline_simulator_no_noise")
 
@@ -345,10 +331,17 @@ for bootqa_program in bootqa_programs:
             f"{bootqa_program}-rep-{reps}-subsuites.json"
         )
 
+        raw_counts_file_path = os.path.join(
+            program_results_dir,
+            f"{bootqa_program}-rep-{reps}-raw_counts.jsonl"
+        )
+
         json_data = {}
         solutions = {}
         subsuites_data = {}
         qpu_run_times = []
+
+        raw_counts_writer = RawCountsWriter(raw_counts_file_path)
 
         for exp_id in range(1, num_piast_experiments + 1):
             print(f"\n--- Experiment {exp_id} ---")
@@ -373,8 +366,22 @@ for bootqa_program in bootqa_programs:
                 circuit = circuits[0]
 
                 s = time.time()
-                counts = run_circuit_with_batching(circuit, sampling_sampler)
+                counts, raw_record = run_circuit_with_batching_recorded(
+                    circuit,
+                    sampling_sampler,
+                    algorithm="qaoa_tcs",
+                    objective_mode="single_objective",
+                    dataset=bootqa_program,
+                    circuit_id=f"{bootqa_program}_rep{reps}_cluster{cluster_idx}",
+                    backend=backend,
+                    cluster_id=int(cluster_id),
+                    iteration_id=exp_id,
+                    shots_per_batch=80,
+                    num_batches=1,
+                )
                 e = time.time()
+
+                raw_counts_writer.write(raw_record)
 
                 qpu_run_times.append((e - s) * 1000)
 
@@ -442,6 +449,9 @@ for bootqa_program in bootqa_programs:
         with open(subsuites_file_path, "w") as f:
             json.dump(subsuites_data, f, indent=2)
 
+        raw_counts_writer.close()
+
         print(f"Saved results: {file_path}")
         print(f"Saved cluster assignments: {subsuites_file_path}")
+        print(f"Saved raw counts: {raw_counts_file_path}")
 

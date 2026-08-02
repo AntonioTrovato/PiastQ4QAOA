@@ -1,0 +1,140 @@
+# Shot/time budget plan for the 14 QAOA-TCS / IGDec-QAOA combos in this
+# replication package. See piastq_execution/budget_planner.py for the model.
+#
+# The `combos` section defines *what* each combo needs (used to discover its
+# real circuit inventory under trained_qaoa_circuits/) and *which mitigation
+# methods* it should be evaluated with. The `pools` section defines *when/
+# where* those combos actually get to run: each pool is an independent time
+# budget with an explicit combo list. This example mixes granularities on
+# purpose -- one pool per objective-mode for QAOA-TCS, one pool per dataset
+# for IGDec-QAOA -- to show that "global" (one pool, all 14 combos) and
+# "per_combo" (14 pools of one combo each) are just two points on the same
+# spectrum, not separate modes. Edit `pools:` freely; nothing else needs to
+# change.
+
+seconds_per_batch: 15          # wall-clock per <=200-shot batch on PIAST-Q
+shots_per_batch_cap: 200        # hardware constraint: max shots per run
+target_shots_per_circuit: 2048  # desired shots/circuit before any degradation
+min_shots_per_circuit: 200      # floor: never go below one batch
+target_repetitions: 10          # desired repetitions before any degradation
+calibration_shots_per_circuit: 200
+
+combos:
+  # ---- QAOA-TCS, single-objective (5) ----
+  gsdtsr_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: single_objective
+    dataset: gsdtsr
+    circuits_dir: gsdtsr
+    methods: [raw, mem, m3, trex]
+  iofrol_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: single_objective
+    dataset: iofrol
+    circuits_dir: iofrol
+    methods: [raw, mem, m3, trex]
+  paintcontrol_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: single_objective
+    dataset: paintcontrol
+    circuits_dir: paintcontrol
+    methods: [raw, mem, m3, trex]
+  elevator_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: single_objective
+    dataset: elevator
+    circuits_dir: elevator
+    methods: [raw, mem, m3, trex]
+  elevator2_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: single_objective
+    dataset: elevator2
+    circuits_dir: elevator2
+    methods: [raw, mem, m3, trex]
+
+  # ---- QAOA-TCS, multi-objective (4) ----
+  flex_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: multi_objective
+    dataset: flex
+    circuits_dir: flex
+    methods: [raw, mem, m3]
+  grep_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: multi_objective
+    dataset: grep
+    circuits_dir: grep
+    methods: [raw, mem, m3]
+  gzip_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: multi_objective
+    dataset: gzip
+    circuits_dir: gzip
+    methods: [raw, mem, m3]
+  sed_qaoa_tcs:
+    algorithm: qaoa_tcs
+    objective_mode: multi_objective
+    dataset: sed
+    circuits_dir: sed
+    methods: [raw, mem, m3]
+
+  # ---- IGDec-QAOA, single-objective only (5) ----
+  gsdtsr_igdec_qaoa:
+    algorithm: igdec_qaoa
+    objective_mode: single_objective
+    dataset: gsdtsr
+    circuits_dir: gsdtsr
+    methods: [raw, mem, m3, trex]
+  iofrol_igdec_qaoa:
+    algorithm: igdec_qaoa
+    objective_mode: single_objective
+    dataset: iofrol
+    circuits_dir: iofrol
+    methods: [raw, mem, m3, trex]
+  paintcontrol_igdec_qaoa:
+    algorithm: igdec_qaoa
+    objective_mode: single_objective
+    dataset: paintcontrol
+    circuits_dir: paintcontrol
+    methods: [raw, mem, m3, trex]
+  elevator_o2_igdec_qaoa:
+    algorithm: igdec_qaoa
+    objective_mode: single_objective
+    dataset: elevator_o2
+    circuits_dir: elevator_two
+    methods: [raw, mem, m3, trex]
+  elevator_o3_igdec_qaoa:
+    algorithm: igdec_qaoa
+    objective_mode: single_objective
+    dataset: elevator_o3
+    circuits_dir: elevator_three
+    methods: [raw, mem, m3, trex]
+
+pools:
+  - name: qaoa_tcs_single_objective
+    total_hours: 15
+    combos: [gsdtsr_qaoa_tcs, iofrol_qaoa_tcs, paintcontrol_qaoa_tcs, elevator_qaoa_tcs, elevator2_qaoa_tcs]
+
+  - name: qaoa_tcs_multi_objective
+    total_hours: 15
+    combos: [flex_qaoa_tcs, grep_qaoa_tcs, gzip_qaoa_tcs, sed_qaoa_tcs]
+
+  - name: igdec_qaoa_gsdtsr
+    total_hours: 15
+    combos: [gsdtsr_igdec_qaoa]
+
+  - name: igdec_qaoa_iofrol
+    total_hours: 15
+    combos: [iofrol_igdec_qaoa]
+
+  - name: igdec_qaoa_paintcontrol
+    total_hours: 15
+    combos: [paintcontrol_igdec_qaoa]
+
+  - name: igdec_qaoa_elevator_o2
+    total_hours: 15
+    combos: [elevator_o2_igdec_qaoa]
+
+  - name: igdec_qaoa_elevator_o3
+    total_hours: 15
+    combos: [elevator_o3_igdec_qaoa]

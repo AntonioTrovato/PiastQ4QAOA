@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+.idea/
+
+# Python environment
+qiskit_env/
+__pycache__/
+*.pyc
+
+# Raw per-shot-batch hardware execution dumps (piastq_execution/raw_counts.py).
+# These are large, regenerable-only-by-rerunning-hardware artifacts produced
+# per combo x repetition x circuit; derived/aggregate results (the existing
+# *.json / *-subsuites.json / pareto_front_N files) stay tracked as before.
+**/*-raw_counts.jsonl
+
+# Calibration snapshots (piastq_execution/mitigation.py CalibrationStore) --
+# hardware-run output, not authored content. Keep the directory itself.
+calibration/*.json
+!calibration/.gitkeep
+
+# Budget planner output (piastq_execution/budget_planner.py) -- regenerated
+# on demand from configs/execution_plan.yaml + trained_qaoa_circuits/.
+results/execution_plan/
