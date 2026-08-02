@@ -8,6 +8,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
 from piastq_execution.statistics import pareto_front_indices
+from piastq_execution.backend_config import get_backend
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +21,6 @@ from qiskit_optimization.converters import QuadraticProgramToQubo
 from qiskit_algorithms import QAOA
 from qiskit_algorithms.optimizers import COBYLA
 
-from qiskit_aqt_provider import AQTProvider
 from qiskit_aqt_provider.primitives import AQTSampler
 
 from sklearn.preprocessing import StandardScaler
@@ -415,8 +415,7 @@ def run_hardware_execution():
     Re-run QAOA-TCS multi-objective by loading the trained circuits and
     executing each on the configured backend.
     """
-    provider = AQTProvider("ACCESS_TOKEN")
-    backend = provider.get_backend("offline_simulator_no_noise")
+    backend = get_backend()
 
     sampling_sampler = AQTSampler(backend)
 

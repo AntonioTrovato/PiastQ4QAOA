@@ -182,6 +182,7 @@ def compute_execution_time_seconds(raw_records: Sequence[RawCountsRecord]) -> fl
 class MitigationOverhead:
     calibration_circuits: int
     total_shots: int
+    calibration_wall_clock_seconds: float
 
 
 def compute_mitigation_overhead(
@@ -191,22 +192,30 @@ def compute_mitigation_overhead(
 ) -> MitigationOverhead:
     """Aggregates shot-based overhead: total shots spent on the raw circuit
     executions passed in, plus (if a calibration record is supplied) the
-    extra calibration circuits/shots it cost. See compute_execution_time_seconds()
-    for the wall-clock-time counterpart.
+    extra calibration circuits/shots it cost, and the *measured* hardware
+    time that calibration actually took
+    (`calibration_record.calibration_wall_clock_seconds`, from
+    run_calibration.py timing every calibration circuit's execution -- not
+    an estimate). Zero for raw/TREx, since neither uses a calibration
+    record. See compute_execution_time_seconds() for the QAOA-circuit
+    wall-clock-time counterpart (present on every method, including raw).
     """
     total_shots = sum(r.total_shots_returned for r in raw_records)
 
     calibration_circuits = 0
+    calibration_wall_clock_seconds = 0.0
     if calibration_record is not None:
         if calibration_record.method == "mem":
             calibration_circuits = 2 ** calibration_record.num_qubits
         elif calibration_record.method == "m3":
             calibration_circuits = 2 * calibration_record.num_qubits
         total_shots += calibration_circuits * calibration_shots_per_circuit
+        calibration_wall_clock_seconds = calibration_record.calibration_wall_clock_seconds
 
     return MitigationOverhead(
         calibration_circuits=calibration_circuits,
         total_shots=total_shots,
+        calibration_wall_clock_seconds=calibration_wall_clock_seconds,
     )
 
 

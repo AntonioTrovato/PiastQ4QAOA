@@ -28,12 +28,13 @@ script as-is.
 
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from qiskit_aqt_provider import AQTProvider
 from qiskit_aqt_provider.primitives import AQTSampler
 
+from piastq_execution.backend_config import get_backend
 from piastq_execution.mitigation import (
     CalibrationStore,
     build_confusion_matrix,
@@ -49,16 +50,26 @@ CALIBRATION_SHOTS = 200  # one 200-shot batch per calibration circuit
 
 
 def _run_and_count(circuit, sampler, shots=CALIBRATION_SHOTS):
+    """Returns (counts, elapsed_seconds) -- elapsed_seconds is the measured
+    wall-clock time of this one circuit's sampler.run() call, summed by the
+    caller across every calibration circuit to get
+    CalibrationRecord.calibration_wall_clock_seconds."""
     sampler.options.shots = shots
+    start = time.time()
     result = sampler.run([circuit]).result()
+    elapsed = time.time() - start
     probabilities = result.quasi_dists[0].binary_probabilities()
-    return {bitstring: int(round(prob * shots)) for bitstring, prob in probabilities.items()}
+    counts = {bitstring: int(round(prob * shots)) for bitstring, prob in probabilities.items()}
+    return counts, elapsed
 
 
 def calibrate_mem(width, sampler, backend, store):
     calibration_counts = {}
+    total_wall_clock_seconds = 0.0
     for bitstring, circuit in build_mem_calibration_circuits(width):
-        calibration_counts[bitstring] = _run_and_count(circuit, sampler)
+        counts, elapsed = _run_and_count(circuit, sampler)
+        calibration_counts[bitstring] = counts
+        total_wall_clock_seconds += elapsed
 
     matrix = build_confusion_matrix(calibration_counts, width)
     physical_qubits = list(range(width))
@@ -67,15 +78,19 @@ def calibrate_mem(width, sampler, backend, store):
         matrix, physical_qubits,
         backend_identity["backend_name"], backend_identity["backend_version"],
         CALIBRATION_SHOTS,
+        total_wall_clock_seconds,
     )
     path = store.save(record)
-    print(f"  MEM width={width}: saved calibration to {path}")
+    print(f"  MEM width={width}: saved calibration to {path} ({total_wall_clock_seconds:.2f}s)")
 
 
 def calibrate_m3(width, sampler, backend, store):
     calibration_counts = {}
+    total_wall_clock_seconds = 0.0
     for qubit, prepared_bit, circuit in build_m3_calibration_circuits(width):
-        calibration_counts[(qubit, prepared_bit)] = _run_and_count(circuit, sampler)
+        counts, elapsed = _run_and_count(circuit, sampler)
+        calibration_counts[(qubit, prepared_bit)] = counts
+        total_wall_clock_seconds += elapsed
 
     single_qubit_cals = build_m3_single_qubit_cals(calibration_counts, width)
     physical_qubits = list(range(width))
@@ -84,14 +99,14 @@ def calibrate_m3(width, sampler, backend, store):
         single_qubit_cals, physical_qubits,
         backend_identity["backend_name"], backend_identity["backend_version"],
         CALIBRATION_SHOTS,
+        total_wall_clock_seconds,
     )
     path = store.save(record)
-    print(f"  M3 width={width}: saved calibration to {path}")
+    print(f"  M3 width={width}: saved calibration to {path} ({total_wall_clock_seconds:.2f}s)")
 
 
 def run_calibration(widths):
-    provider = AQTProvider("ACCESS_TOKEN")
-    backend = provider.get_backend("offline_simulator_no_noise")
+    backend = get_backend()
     sampler = AQTSampler(backend)
     sampler.set_transpile_options(optimization_level=3)
 

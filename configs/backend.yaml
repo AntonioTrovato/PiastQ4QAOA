@@ -1,0 +1,16 @@
+# Single source of truth for the AQT/PIAST-Q API token and backend name used
+# by every script that opens a real (or simulated) quantum backend:
+#   qaoa_tcs/single_obj.py, qaoa_tcs/multi_obj.py,
+#   igdec_qaoa/loch_qaoa_tcm_extract_circuits.py,
+#   igdec_qaoa/loch_qaoa_elev_two_extract_circuits.py,
+#   igdec_qaoa/loch_qaoa_elev_three_extract_circuits.py,
+#   piastq_execution/run_calibration.py
+#
+# To switch from the local offline simulator to real PIAST-Q hardware, edit
+# ONLY this file (or set the PIASTQ_API_TOKEN / PIASTQ_BACKEND_NAME
+# environment variables, which take precedence over these values -- useful
+# for keeping the real token out of version control). No script needs to be
+# touched.
+
+api_token: ACCESS_TOKEN
+backend_name: offline_simulator_no_noise

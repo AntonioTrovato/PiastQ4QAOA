@@ -22,11 +22,16 @@ from qiskit_optimization.algorithms import OptimizationResult
 from qiskit_optimization.applications import OptimizationApplication
 from qiskit_optimization.problems import QuadraticProgram
 from qiskit_optimization.translators import from_docplex_mp
-from qiskit_aqt_provider import AQTProvider
 from qiskit_aqt_provider.primitives import AQTSampler
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
+from piastq_execution.backend_config import get_backend
+from piastq_execution.mitigation import (
+    build_trex_twirled_circuit,
+    generate_random_twirl_mask,
+    load_trex_twirl_instances,
+)
 
 
 # ============================================================
@@ -469,8 +474,7 @@ def run_hardware_like_from_saved_circuits():
     results_dir = os.path.join("..", "..", "results", "igdec_qaoa")
     os.makedirs(results_dir, exist_ok=True)
 
-    provider = AQTProvider("ACCESS_TOKEN")
-    backend = provider.get_backend("offline_simulator_no_noise")
+    backend = get_backend()
 
     sampling_sampler = AQTSampler(backend)
 
@@ -488,6 +492,15 @@ def run_hardware_like_from_saved_circuits():
 
     raw_counts_path = os.path.join(results_dir, f"{RUN_LABEL}-raw_counts.jsonl")
     raw_counts_writer = RawCountsWriter(raw_counts_path)
+
+    trex_raw_counts_path = os.path.join(results_dir, f"{RUN_LABEL}-trex-raw_counts.jsonl")
+    trex_counts_writer = RawCountsWriter(trex_raw_counts_path)
+
+    # TREx: number of independently-twirled hardware passes per circuit, read
+    # from configs/execution_plan.yaml so it matches what budget_planner.py
+    # priced (see piastq_execution.mitigation.load_trex_twirl_instances).
+    trex_twirl_instances = load_trex_twirl_instances()
+    trex_rng = random.Random()
 
     for sampling_id in range(1, NUM_EXPERIMENT + 1):
         print(f"\n----- HARDWARE-LIKE {RUN_LABEL} | SAMPLING #{sampling_id} -----")
@@ -552,6 +565,30 @@ def run_hardware_like_from_saved_circuits():
                 end_qpu = time.time()
                 raw_counts_writer.write(raw_record)
 
+                # TREx: a distinct hardware pass per twirl instance -- cannot
+                # reuse the raw counts above. Written to a separate file
+                # since it's mitigation data, not the raw baseline;
+                # evaluation-time undoing/aggregation is
+                # piastq_execution.mitigation.aggregate_trex_records().
+                for twirl_idx in range(trex_twirl_instances):
+                    twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                    twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                    _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                        twirled_circuit,
+                        sampling_sampler,
+                        algorithm="igdec_qaoa",
+                        objective_mode="single_objective",
+                        dataset=RUN_LABEL,
+                        circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
+                        backend=backend,
+                        iteration_id=meta["iteration"],
+                        subproblem_id=meta["subproblem_index"],
+                        shots_per_batch=80,
+                        num_batches=1,
+                        twirl_mask=twirl_mask,
+                    )
+                    trex_counts_writer.write(trex_record)
+
                 qpu_time = end_qpu - start_qpu
                 qaoa_time_total += qpu_time
                 qpu_run_times.append(qpu_time * 1000)
@@ -595,6 +632,30 @@ def run_hardware_like_from_saved_circuits():
                     )
                     end_qpu = time.time()
                     raw_counts_writer.write(raw_record)
+
+                    # TREx: a distinct hardware pass per twirl instance --
+                    # cannot reuse the raw counts above. Written to a
+                    # separate file since it's mitigation data, not the raw
+                    # baseline; evaluation-time undoing/aggregation is
+                    # piastq_execution.mitigation.aggregate_trex_records().
+                    for twirl_idx in range(trex_twirl_instances):
+                        twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                        twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                        _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                            twirled_circuit,
+                            sampling_sampler,
+                            algorithm="igdec_qaoa",
+                            objective_mode="single_objective",
+                            dataset=RUN_LABEL,
+                            circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
+                            backend=backend,
+                            iteration_id=meta["iteration"],
+                            subproblem_id=meta["subproblem_index"],
+                            shots_per_batch=80,
+                            num_batches=1,
+                            twirl_mask=twirl_mask,
+                        )
+                        trex_counts_writer.write(trex_record)
 
                     qpu_time = end_qpu - start_qpu
                     qaoa_time_total += qpu_time
@@ -651,6 +712,7 @@ def run_hardware_like_from_saved_circuits():
         }
 
     raw_counts_writer.close()
+    trex_counts_writer.close()
 
     output_file = os.path.join(results_dir, f"{RUN_LABEL}.json")
     with open(output_file, "w") as f:
@@ -658,6 +720,7 @@ def run_hardware_like_from_saved_circuits():
 
     print(f"Saved hardware-like results to: {output_file}")
     print(f"Saved raw counts to: {raw_counts_path}")
+    print(f"Saved TREx raw counts to: {trex_raw_counts_path}")
 
 
 if __name__ == "__main__":

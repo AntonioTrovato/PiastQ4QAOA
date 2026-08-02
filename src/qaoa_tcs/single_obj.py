@@ -7,6 +7,12 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
+from piastq_execution.backend_config import get_backend
+from piastq_execution.mitigation import (
+    build_trex_twirled_circuit,
+    generate_random_twirl_mask,
+    load_trex_twirl_instances,
+)
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,7 +26,6 @@ from scipy.stats import mannwhitneyu, shapiro
 
 from qiskit import qpy
 from qiskit_optimization import QuadraticProgram
-from qiskit_aqt_provider import AQTProvider
 from qiskit_aqt_provider.primitives import AQTSampler
 from qiskit_algorithms.optimizers import COBYLA
 from qiskit_algorithms import QAOA
@@ -400,8 +405,7 @@ def run_hardware_execution():
     Re-run QAOA-TCS single-objective by loading the trained circuits and
     executing each on the configured backend.
     """
-    provider = AQTProvider("ACCESS_TOKEN")
-    backend = provider.get_backend("offline_simulator_no_noise")
+    backend = get_backend()
 
     sampling_sampler = AQTSampler(backend)
 
@@ -411,6 +415,12 @@ def run_hardware_execution():
     os.makedirs(base_results_dir, exist_ok=True)
 
     num_piast_experiments = 10
+
+    # TREx: number of independently-twirled hardware passes per circuit, read
+    # from configs/execution_plan.yaml so it matches what budget_planner.py
+    # priced (see piastq_execution.mitigation.load_trex_twirl_instances).
+    trex_twirl_instances = load_trex_twirl_instances()
+    trex_rng = random.Random()
 
     for bootqa_program in bootqa_programs:
         program_results_dir = os.path.join(base_results_dir, bootqa_program)
@@ -449,12 +459,18 @@ def run_hardware_execution():
                 f"{bootqa_program}-rep-{reps}-raw_counts.jsonl"
             )
 
+            trex_raw_counts_file_path = os.path.join(
+                program_results_dir,
+                f"{bootqa_program}-rep-{reps}-trex-raw_counts.jsonl"
+            )
+
             json_data = {}
             solutions = {}
             subsuites_data = {}
             qpu_run_times = []
 
             raw_counts_writer = RawCountsWriter(raw_counts_file_path)
+            trex_counts_writer = RawCountsWriter(trex_raw_counts_file_path)
 
             for exp_id in range(1, num_piast_experiments + 1):
                 print(f"\n--- Experiment {exp_id} ---")
@@ -497,6 +513,30 @@ def run_hardware_execution():
                     e = time.time()
 
                     raw_counts_writer.write(raw_record)
+
+                    # TREx: a distinct hardware pass per twirl instance --
+                    # cannot reuse the raw counts above. Written to a
+                    # separate file since it's mitigation data, not the raw
+                    # baseline; evaluation-time undoing/aggregation is
+                    # piastq_execution.mitigation.aggregate_trex_records().
+                    for twirl_idx in range(trex_twirl_instances):
+                        twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                        twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                        _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                            twirled_circuit,
+                            sampling_sampler,
+                            algorithm="qaoa_tcs",
+                            objective_mode="single_objective",
+                            dataset=bootqa_program,
+                            circuit_id=f"{bootqa_program}_rep{reps}_cluster{cluster_idx}_trex{twirl_idx}",
+                            backend=backend,
+                            cluster_id=int(cluster_id),
+                            iteration_id=exp_id,
+                            shots_per_batch=80,
+                            num_batches=1,
+                            twirl_mask=twirl_mask,
+                        )
+                        trex_counts_writer.write(trex_record)
 
                     qpu_run_times.append((e - s) * 1000)
 
@@ -565,10 +605,12 @@ def run_hardware_execution():
                 json.dump(subsuites_data, f, indent=2)
 
             raw_counts_writer.close()
+            trex_counts_writer.close()
 
             print(f"Saved results: {file_path}")
             print(f"Saved cluster assignments: {subsuites_file_path}")
             print(f"Saved raw counts: {raw_counts_file_path}")
+            print(f"Saved TREx raw counts: {trex_raw_counts_file_path}")
 
 
 if __name__ == "__main__":

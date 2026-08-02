@@ -19,10 +19,10 @@ from __future__ import annotations
 import json
 import os
 import random
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -130,7 +130,8 @@ def correct_counts_with_matrix(
 
 # ---------------------------------------------------------------------------
 # M3 (per-qubit independent/marginal calibration, corrected via mthree when
-# available, with a local Kronecker-product + NNLS fallback otherwise)
+# available, with a reduced-support NNLS fallback otherwise -- see
+# _correct_counts_m3_reduced())
 # ---------------------------------------------------------------------------
 
 def build_m3_calibration_circuits(num_qubits: int):
@@ -181,15 +182,68 @@ def build_m3_single_qubit_cals(
     return cals
 
 
-def _kron_full_matrix(single_qubit_cals: Sequence[np.ndarray]) -> np.ndarray:
-    """Tensor product of per-qubit 2x2 matrices into the full 2**n x 2**n
-    matrix, in the little-endian order qiskit uses for bitstring indices
-    (qubit 0 is the fastest-varying / rightmost Kronecker factor).
+def _correct_counts_m3_reduced(
+    raw_counts: Dict[str, int],
+    single_qubit_cals: Sequence[np.ndarray],
+    num_qubits: int,
+    method: str = "nnls",
+) -> Dict[str, float]:
+    """Fallback used by correct_counts_m3() when the `mthree` package isn't
+    installed.
+
+    Restricts the assignment matrix to just the bitstrings actually observed
+    in `raw_counts` -- typically far fewer than 2**num_qubits for a QAOA
+    output distribution concentrated on a handful of low-energy states --
+    computing each entry as a product of per-qubit calibration probabilities,
+    instead of materializing the full 2**num_qubits x 2**num_qubits matrix
+    the way MEM does. This mirrors the real M3 algorithm's approach (Nation
+    et al. 2021, "Scalable Mitigation of Measurement Errors on Quantum
+    Computers"): restrict correction to the noisy distribution's support
+    rather than every possible bitstring, which is what keeps M3
+    sub-exponential in practice. It's still a simplification of the actual
+    `mthree` implementation (which also expands the support to nearby
+    bitstrings reachable by low-order bit flips, and uses an iterative
+    solver rather than dense NNLS) -- installing `mthree` (already in
+    requirements.txt) is preferred over relying on this path.
     """
-    full = single_qubit_cals[-1]
-    for mat in reversed(single_qubit_cals[:-1]):
-        full = np.kron(full, mat)
-    return full
+    bitstrings = sorted(raw_counts.keys())
+    n = len(bitstrings)
+    total_shots = sum(raw_counts.values())
+    if total_shots == 0:
+        raise ValueError("raw_counts is empty (zero total shots)")
+
+    reduced_matrix = np.zeros((n, n))
+    for i, measured in enumerate(bitstrings):
+        for j, prepared in enumerate(bitstrings):
+            prob = 1.0
+            for q in range(num_qubits):
+                measured_bit = int(measured[::-1][q])
+                prepared_bit = int(prepared[::-1][q])
+                prob *= single_qubit_cals[q][measured_bit, prepared_bit]
+            reduced_matrix[i, j] = prob
+
+    p_noisy = np.array([raw_counts[b] / total_shots for b in bitstrings])
+
+    if method == "nnls":
+        from scipy.optimize import nnls
+
+        x, _residual = nnls(reduced_matrix, p_noisy)
+    elif method == "pinv":
+        x = np.linalg.pinv(reduced_matrix) @ p_noisy
+        x = np.clip(x, 0, None)
+    else:
+        raise ValueError(f"Unknown correction method '{method}'")
+
+    total = x.sum()
+    if total <= 0:
+        x = p_noisy
+        total = x.sum()
+        if total <= 0:
+            x = np.ones(n) / n
+            total = 1.0
+    x = x / total
+
+    return {b: float(p) for b, p in zip(bitstrings, x) if p > 0}
 
 
 def correct_counts_m3(
@@ -202,8 +256,9 @@ def correct_counts_m3(
 
     Tries the `mthree` package first (M3Mitigation(system=None) +
     cals_from_matrices(), confirmed to work without any live backend object);
-    falls back to a local Kronecker-product-plus-NNLS correction, reusing
-    correct_counts_with_matrix(), if mthree is not installed.
+    falls back to _correct_counts_m3_reduced() -- a reduced-support
+    approximation that, like real M3, never materializes the full
+    2**num_qubits x 2**num_qubits matrix -- if mthree is not installed.
     """
     num_qubits = len(single_qubit_cals)
     if physical_qubits is None:
@@ -217,8 +272,7 @@ def correct_counts_m3(
         quasi = mit.apply_correction(dict(raw_counts), qubits=list(physical_qubits))
         return dict(quasi)
     except ImportError:
-        full_matrix = _kron_full_matrix(list(single_qubit_cals))
-        return correct_counts_with_matrix(raw_counts, full_matrix, num_qubits, method=method)
+        return _correct_counts_m3_reduced(raw_counts, single_qubit_cals, num_qubits, method=method)
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +290,39 @@ def correct_counts_m3(
 # a materially larger undertaking -- it requires a per-gate twirling set to
 # preserve the ideal unitary -- and is not implemented here; only the
 # measurement-twirling MVP described in the task is.
+
+# Default number of independent twirl instances (each a distinct hardware
+# execution) averaged together per circuit. 32 matches the commonly used
+# default for measurement-twirling randomizations in Qiskit Runtime's
+# twirled-readout implementations -- a reasonable balance between averaging
+# out readout bias and added hardware time. Configurable per study via
+# `trex_twirl_instances` in configs/execution_plan.yaml (see
+# load_trex_twirl_instances()) rather than hardcoded at every call site.
+DEFAULT_TREX_TWIRL_INSTANCES = 32
+
+
+def load_trex_twirl_instances(config_path: Optional[str] = None) -> int:
+    """Reads `trex_twirl_instances` from configs/execution_plan.yaml -- the
+    single place this is configured, shared by budget_planner.py's cost
+    model and every execution script that actually runs the TREx
+    twirl-instance loop, so they can never disagree about how many twirl
+    instances a TREx pass costs vs. how many it actually runs.
+
+    Falls back to DEFAULT_TREX_TWIRL_INSTANCES if the file or key is absent.
+    """
+    import yaml
+
+    if config_path is None:
+        here = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(here, "..", "..", "configs", "execution_plan.yaml")
+
+    if not os.path.exists(config_path):
+        return DEFAULT_TREX_TWIRL_INSTANCES
+
+    with open(config_path) as f:
+        raw = yaml.safe_load(f) or {}
+    return int(raw.get("trex_twirl_instances", DEFAULT_TREX_TWIRL_INSTANCES))
+
 
 def generate_random_twirl_mask(num_qubits: int, rng: Optional[random.Random] = None) -> List[int]:
     rng = rng or random
@@ -291,6 +378,36 @@ def aggregate_trex_instances(instances: Sequence[Tuple[Sequence[int], Dict[str, 
     return dict(total)
 
 
+def aggregate_trex_records(records: Sequence[Any]) -> Dict[Tuple[Any, Any, Any], Dict[str, int]]:
+    """Groups TREx raw-counts records (each a RawCountsRecord with its own
+    `twirl_mask` set, as written to `*-trex-raw_counts.jsonl` by the
+    execution scripts) by `(cluster_id, iteration_id, subproblem_id)` and
+    aggregates each group's twirl instances into one twirl-undone counts dict
+    per circuit -- the shape
+    `piastq_execution.evaluation.evaluate_single_objective_combo(method="trex",
+    cluster_raw_counts=..., ...)` expects.
+
+    The 3-part key (rather than just cluster/iteration) is what keeps
+    QAOA-TCS (identifies a circuit by cluster_id + iteration_id,
+    subproblem_id always None) and IGDec-QAOA (identifies a circuit by
+    iteration_id + subproblem_id, cluster_id always None) from colliding:
+    both algorithms leave the field they don't use at its default None, so
+    grouping on all three together is unambiguous for either.
+
+    `records` items only need `.twirl_mask`, `.aggregated_counts`,
+    `.cluster_id`, `.iteration_id`, and `.subproblem_id` attributes
+    (duck-typed, so this works directly on RawCountsRecord instances without
+    importing that class here).
+    """
+    by_key: Dict[Tuple[Any, Any, Any], List[Tuple[Sequence[int], Dict[str, int]]]] = defaultdict(list)
+    for record in records:
+        if record.twirl_mask is None:
+            raise ValueError(f"Raw-counts record {record.circuit_id!r} has no twirl_mask -- not a TREx record")
+        key = (record.cluster_id, record.iteration_id, record.subproblem_id)
+        by_key[key].append((record.twirl_mask, record.aggregated_counts))
+    return {key: aggregate_trex_instances(instances) for key, instances in by_key.items()}
+
+
 # ---------------------------------------------------------------------------
 # Calibration storage (shared by MEM and M3)
 # ---------------------------------------------------------------------------
@@ -304,6 +421,7 @@ class CalibrationRecord:
     backend_version: str
     calibration_timestamp: str
     shots_per_calibration_circuit: int
+    calibration_wall_clock_seconds: float  # measured hardware time for every calibration circuit combined
     data: dict  # method-specific: MEM -> {"confusion_matrix": [[...]]}; M3 -> {"single_qubit_cals": [[[...]], ...]}
 
     def to_json_dict(self) -> dict:
@@ -326,6 +444,7 @@ def make_mem_calibration_record(
     backend_name: str,
     backend_version: str,
     shots_per_calibration_circuit: int,
+    calibration_wall_clock_seconds: float,
 ) -> CalibrationRecord:
     return CalibrationRecord(
         method="mem",
@@ -335,6 +454,7 @@ def make_mem_calibration_record(
         backend_version=backend_version,
         calibration_timestamp=datetime.now(timezone.utc).isoformat(),
         shots_per_calibration_circuit=shots_per_calibration_circuit,
+        calibration_wall_clock_seconds=calibration_wall_clock_seconds,
         data={"confusion_matrix": confusion_matrix.tolist()},
     )
 
@@ -345,6 +465,7 @@ def make_m3_calibration_record(
     backend_name: str,
     backend_version: str,
     shots_per_calibration_circuit: int,
+    calibration_wall_clock_seconds: float,
 ) -> CalibrationRecord:
     return CalibrationRecord(
         method="m3",
@@ -354,6 +475,7 @@ def make_m3_calibration_record(
         backend_version=backend_version,
         calibration_timestamp=datetime.now(timezone.utc).isoformat(),
         shots_per_calibration_circuit=shots_per_calibration_circuit,
+        calibration_wall_clock_seconds=calibration_wall_clock_seconds,
         data={"single_qubit_cals": [m.tolist() for m in single_qubit_cals]},
     )
 
@@ -404,9 +526,16 @@ def correct_counts(
     physical_qubits: Optional[Sequence[int]] = None,
 ) -> Dict[str, float]:
     """Single entry point used identically regardless of algorithm/dataset:
-    `method` is "raw", "mem", or "m3" (TREx is applied at collection time via
-    aggregate_trex_instances(), not here, since it needs the twirl masks)."""
-    if method == "raw":
+    `method` is "raw", "mem", "m3", or "trex".
+
+    For "trex", `raw_counts` must already be twirl-undone and aggregated
+    across every twirl instance (via aggregate_trex_records() /
+    aggregate_trex_instances()) -- undoing the twirl needs each instance's
+    mask, which this function's plain counts-dict signature has no room for,
+    so that step happens before calling this. Once aggregated, a TREx counts
+    dict is normalized exactly like the raw baseline.
+    """
+    if method in ("raw", "trex"):
         total = sum(raw_counts.values())
         return {k: v / total for k, v in raw_counts.items()} if total else {}
     if method == "mem":

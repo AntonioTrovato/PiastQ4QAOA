@@ -78,6 +78,8 @@ class TestCalibrateMem(unittest.TestCase):
             self.assertAlmostEqual(matrix[0, 0], 1.0)
             self.assertAlmostEqual(matrix[1, 1], 1.0)
             self.assertEqual(record.backend_name, "fake_offline_simulator")
+            self.assertIsInstance(record.calibration_wall_clock_seconds, float)
+            self.assertGreaterEqual(record.calibration_wall_clock_seconds, 0.0)
 
 
 class TestCalibrateM3(unittest.TestCase):
@@ -96,6 +98,8 @@ class TestCalibrateM3(unittest.TestCase):
             self.assertEqual(len(cals), 1)
             self.assertAlmostEqual(cals[0][0, 0], 1.0)
             self.assertAlmostEqual(cals[0][1, 1], 1.0)
+            self.assertIsInstance(record.calibration_wall_clock_seconds, float)
+            self.assertGreaterEqual(record.calibration_wall_clock_seconds, 0.0)
 
 
 if __name__ == "__main__":

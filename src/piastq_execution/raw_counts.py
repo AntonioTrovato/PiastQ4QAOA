@@ -55,6 +55,7 @@ class RawCountsRecord:
     total_shots_returned: int
     total_wall_clock_seconds: float
     aggregated_counts: Dict[str, int]
+    twirl_mask: Optional[List[int]] = None  # set only for TREx twirl-instance executions
 
     def to_json_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -156,6 +157,7 @@ def run_circuit_with_batching_recorded(
     remainder_shots: int = 0,
     optimization_level: int = 3,
     record_qubit_mapping: bool = True,
+    twirl_mask: Optional[List[int]] = None,
 ):
     """Shot-batched circuit execution with full raw-data capture.
 
@@ -167,6 +169,13 @@ def run_circuit_with_batching_recorded(
         batches, for drop-in use by existing argmax-based selection code.
       - `record`: a RawCountsRecord with every batch's raw counts plus metadata,
         for the raw-counts persistence file.
+
+    `twirl_mask`: pass the mask used to build `circuit` (via
+    piastq_execution.mitigation.build_trex_twirled_circuit) when this call is
+    one TREx twirl instance, so the mask travels with its counts in the
+    persisted record and can be undone later with
+    piastq_execution.mitigation.aggregate_trex_records(). Leave as None for
+    every non-TREx (raw/MEM/M3) execution.
     """
     batch_records: List[BatchRecord] = []
 
@@ -204,6 +213,7 @@ def run_circuit_with_batching_recorded(
         total_shots_returned=sum(b.shots_returned for b in batch_records),
         total_wall_clock_seconds=sum(b.wall_clock_seconds for b in batch_records),
         aggregated_counts=dict(total_counts),
+        twirl_mask=list(twirl_mask) if twirl_mask is not None else None,
     )
 
     return total_counts, record

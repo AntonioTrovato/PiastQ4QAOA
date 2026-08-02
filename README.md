@@ -229,10 +229,12 @@ run this training in an authoring/review session; run it on the machine
 that will actually spend that compute.**
 
 Both `single_obj.py`/`multi_obj.py` and all three IGDec-QAOA scripts connect
-via `AQTProvider("ACCESS_TOKEN").get_backend("offline_simulator_no_noise")`
-exactly as before — a known placeholder ahead of real hardware access, left
-untouched. **Run every hardware-execution entry point (everything above
-except `... train`) on the machine that actually has PIAST-Q/AQT access.**
+via `piastq_execution.backend_config.get_backend()`, which reads the API
+token/backend name from `configs/backend.yaml` (currently the placeholder
+`offline_simulator_no_noise`) — see §10 step 5's note for how to point this
+at real PIAST-Q hardware from that one file. **Run every hardware-execution
+entry point (everything above except `... train`) on the machine that
+actually has PIAST-Q/AQT access.**
 
 ---
 
@@ -268,7 +270,10 @@ hardware.
    `AQTSampler`/backend every other script uses, builds the `2**n x 2**n`
    confusion matrix (`build_confusion_matrix`), and saves it under
    `calibration/mem_q<physical-qubits>.json` via `CalibrationStore` —
-   tagged with a timestamp and backend snapshot.
+   tagged with a timestamp, backend snapshot, and the *measured* wall-clock
+   time every calibration circuit's execution actually took
+   (`calibration_wall_clock_seconds`, timed in `run_calibration.py`, not
+   estimated — see §8's mitigation-overhead note).
 
 2. **Correct any raw-counts entry** against that stored calibration,
    whenever you want (no hardware needed for this step):
@@ -294,8 +299,14 @@ Same two-step shape as MEM, but with `2*n` (not `2**n`) calibration
 circuits per width — `run_calibration.py` runs both MEM and M3 calibration
 in the same pass. Correction goes through the `mthree` package
 (`M3Mitigation(system=None)` + `cals_from_matrices()` — confirmed to work
-fully standalone, no IBM backend object needed), with a local
-Kronecker-product + NNLS fallback if `mthree` isn't installed:
+fully standalone, no IBM backend object needed). If `mthree` isn't
+installed, `_correct_counts_m3_reduced()` is used instead — it restricts the
+assignment matrix to just the bitstrings observed in that circuit's raw
+counts (typically far fewer than `2**n` for a QAOA output distribution
+concentrated on a handful of low-energy states) rather than building the
+full `2**n x 2**n` matrix, mirroring how real M3 stays sub-exponential by
+restricting correction to the noisy distribution's support instead of every
+possible bitstring:
 
 ```python
 calibration = store.load("m3", physical_qubits=[0, 1, 2, 3, 4, 5, 6])
@@ -304,40 +315,49 @@ corrected_distribution = correct_counts("m3", raw_counts, calibration, num_qubit
 
 ### TREx (measurement twirling)
 
-Unlike MEM/M3, TREx has **no separate calibration step** — it's applied
-per circuit execution, at the point where a script would otherwise call
-`run_circuit_with_batching_recorded()` once for the raw pass. Run it several
-times with a different random twirl mask each time, then aggregate:
+Unlike MEM/M3, TREx has **no separate calibration step**, and — unlike
+MEM/M3 — it's actually wired into the execution scripts, not just available
+as library functions: `single_obj.py`'s `run_hardware_execution()` and the
+three IGDec-QAOA single-objective scripts' `run_hardware_like_from_saved_circuits()`
+each run a second, dedicated hardware pass per circuit, right after the raw
+pass:
 
 ```python
-import random
-from piastq_execution.mitigation import (
-    build_trex_twirled_circuit, generate_random_twirl_mask, aggregate_trex_instances,
-)
-from piastq_execution.raw_counts import run_circuit_with_batching_recorded
-
-rng = random.Random()
-instances = []
-for _ in range(NUM_TWIRL_INSTANCES):
-    mask = generate_random_twirl_mask(circuit.num_qubits, rng=rng)
-    twirled_circuit = build_trex_twirled_circuit(circuit, mask)
-    counts, raw_record = run_circuit_with_batching_recorded(
-        twirled_circuit, sampler, algorithm=..., objective_mode=..., dataset=...,
-        circuit_id=f"{circuit_id}_trex{mask}", backend=backend,
+for twirl_idx in range(trex_twirl_instances):
+    twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+    twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+    _trex_counts, trex_record = run_circuit_with_batching_recorded(
+        twirled_circuit, sampling_sampler, algorithm=..., objective_mode=..., dataset=...,
+        circuit_id=f"{circuit_id}_trex{twirl_idx}", backend=backend,
+        cluster_id=..., iteration_id=..., shots_per_batch=80, num_batches=1,
+        twirl_mask=twirl_mask,
     )
-    instances.append((mask, counts))
-
-trex_corrected_counts = aggregate_trex_instances(instances)  # already twirl-undone
+    trex_counts_writer.write(trex_record)
 ```
 
-Each twirl instance is a distinct hardware execution (its own raw-counts
-record, tagged `_trex<mask>` in `circuit_id` so it's distinguishable from the
-raw baseline in `*-raw_counts.jsonl`) — this is what "TREx can't reuse raw
-counts, unlike MEM/M3" means in practice, and why the budget planner (§7)
-prices it as a full second hardware pass. `NUM_TWIRL_INSTANCES` is a
-judgment call for whoever runs this (more instances = better averaging of
-the readout bias, more hardware time); it isn't hardcoded anywhere so you
-can tune it per pool.
+Each twirl instance is a distinct hardware execution — this is what "TREx
+can't reuse raw counts, unlike MEM/M3" means in practice — written to a
+**separate file**, `*-trex-raw_counts.jsonl`, alongside (not mixed into) the
+existing `*-raw_counts.jsonl`. `RawCountsRecord` carries a `twirl_mask`
+field (set only on these records) so the mask travels with its counts.
+
+`trex_twirl_instances` (how many twirl instances per circuit — more
+instances means better averaging of the readout bias, at the cost of more
+hardware time) is **configurable in one place**: `trex_twirl_instances` in
+`configs/execution_plan.yaml` (default `32`, matching the commonly used
+default for measurement-twirling randomizations in Qiskit Runtime's
+twirled-readout implementations — see
+`piastq_execution.mitigation.load_trex_twirl_instances()`). Both the
+execution scripts and `budget_planner.py`'s cost model (§7) read this same
+value, so the plan and the actual run always agree on TREx's cost.
+
+At evaluation time, `piastq_execution.mitigation.aggregate_trex_records()`
+groups a combo's TREx records by `(cluster_id, iteration_id, subproblem_id)`
+and undoes each group's twirls (`aggregate_trex_instances()` underneath),
+producing the per-circuit aggregated counts dict that
+`evaluate_single_objective_combo(method="trex", cluster_raw_counts=..., ...)`
+(§8) expects — `correct_counts("trex", ...)` then just normalizes it, the
+same as the raw baseline.
 
 Full Pauli twirling of the circuit itself (not just before measurement) is a
 materially larger follow-up and is not implemented here — see the module
@@ -355,9 +375,12 @@ bitstring. Alongside each combo's existing derived outputs (unchanged format:
 `*-raw_counts.jsonl` file is written with, per circuit per shot-batch: the
 full raw counts dict, circuit/cluster/(iteration+subproblem) id,
 algorithm/objective_mode/dataset, shots requested vs. returned, physical
-qubit mapping, backend name/version/timestamp, and wall-clock time. These
-`.jsonl` dumps are gitignored since they're large, per-run hardware
-artifacts, not authored content.
+qubit mapping, backend name/version/timestamp, and wall-clock time.
+Single-objective combos (both QAOA-TCS and IGDec-QAOA) also write a second,
+separate `*-trex-raw_counts.jsonl` (§5's TREx section) — same record shape,
+plus a populated `twirl_mask` field on every row. These `.jsonl` dumps are
+gitignored since they're large, per-run hardware artifacts, not authored
+content.
 
 ---
 
@@ -392,6 +415,21 @@ pools:
              gsdtsr_igdec_qaoa, iofrol_igdec_qaoa, paintcontrol_igdec_qaoa, elevator_o2_igdec_qaoa, elevator_o3_igdec_qaoa]
 ```
 
+> **This single-pool example will almost certainly drop TREx for every
+> combo.** Verified by actually running `budget_planner.py` against this
+> exact config with the real circuit inventory: at 15h total for all 14
+> combos, the planner reduces repetitions to 1, shots/circuit to the 200
+> floor, and still drops TREx everywhere just to fit (`trex_twirl_instances`
+> extra hardware passes per circuit, 32 by default, is expensive — see §5).
+> The 7-pool default is more forgiving (TREx survives for the QAOA-TCS
+> multi-objective pool and several IGDec-QAOA pools at 15h each) but still
+> drops it where a pool's circuit count is large relative to 15h (e.g.
+> `iofrol_igdec_qaoa`, `paintcontrol_igdec_qaoa` in the shipped config). If
+> you need TREx data for a specific combo, give it (or a small group of
+> combos) its own pool with a larger `total_hours`, or lower
+> `trex_twirl_instances` for that run — don't rely on a single small global
+> pool to preserve it.
+
 **Reconfiguring the plan**: edit `configs/execution_plan.yaml`.
 
 - `combos:` — one entry per combo: `algorithm` (`qaoa_tcs` | `igdec_qaoa`),
@@ -406,7 +444,10 @@ pools:
   go in which pool.
 - `seconds_per_batch`, `shots_per_batch_cap`, `target_shots_per_circuit`,
   `min_shots_per_circuit`, `target_repetitions`,
-  `calibration_shots_per_circuit` — top-level knobs shared by every pool.
+  `calibration_shots_per_circuit`, `trex_twirl_instances` — top-level knobs
+  shared by every pool (`trex_twirl_instances` is also read directly by the
+  execution scripts' TREx loop, see §5, so the plan and the actual run never
+  disagree on TREx's cost).
 
 Degradation priority when a pool's budget is too small for its target
 repetitions/shots/methods: **(1)** drop TREx if that alone is enough, else
@@ -415,8 +456,9 @@ repetitions, **(3)** reduce shots/circuit (floor: one 200-shot batch), **(4)**
 as a last resort, subsample circuits/clusters (reported explicitly, per
 circuit, with the reason). Full MEM/M3 calibration circuits are counted once
 per distinct circuit width used within a pool, shared across every
-combo/repetition using that width; TREx is always a full second hardware
-pass (see §5).
+combo/repetition using that width; TREx always costs `trex_twirl_instances`
+extra hardware passes per circuit, not one (see §5) — dropping it is
+correspondingly the single biggest lever the planner has.
 
 This only reads local `.qpy` files (pure deserialization) and writes to
 `execution_plan/` — no backend, no AQT, safe to run anywhere, including in an
@@ -480,8 +522,14 @@ module serves (QAOA-TCS single-objective, QAOA-TCS multi-objective,
 IGDec-QAOA single-objective). For TREx, pass in every twirl instance's
 `RawCountsRecord`, not just one per subproblem — the sum naturally reflects
 TREx's extra hardware passes. `mitigation_overhead` (`.total_shots`,
-`.calibration_circuits`) tracks the shot-based cost of mitigation itself
-(MEM/M3 calibration), separate from raw execution time;
+`.calibration_circuits`, `.calibration_wall_clock_seconds`) tracks the cost
+of mitigation itself (MEM/M3 calibration — zero for raw/TREx, which don't
+use a calibration record), separate from QAOA execution time.
+`calibration_wall_clock_seconds` is *measured*, not estimated: it comes
+straight from `CalibrationRecord.calibration_wall_clock_seconds`, which
+`run_calibration.py` fills in by timing every calibration circuit's actual
+`sampler.run()` call (§5) — this is what lets you compare mitigation methods
+by cost/benefit (RQ3b, below), not just by how much they improve quality.
 `classical_post_processing_seconds` is the (non-hardware) correction +
 metric-computation time.
 
@@ -525,13 +573,15 @@ for pair in comparison.pairwise:
 ```
 
 `extract_metric_samples(results, metric)` accepts dotted paths for nested
-fields too, e.g. `"mitigation_overhead.total_shots"`. Swap `"execution_time_seconds"`
-for `"execution_cost"` (single-objective only), `"qubo_energy"`,
-`"probability_of_optimal"`, `"hypervolume"`/`"igd"` (multi-objective only),
-etc. to compare on any other metric the same way. `compare_groups()` also
-works directly on plain `{group_name: [values]}` dicts if you're not going
-through evaluation results at all (2 groups: use `compare_two_groups(x, y)`
-instead for the two-sample special case).
+fields too, e.g. `"mitigation_overhead.total_shots"` or
+`"mitigation_overhead.calibration_wall_clock_seconds"` (the RQ3b metric —
+zero for raw/TREx groups, since they don't use a calibration record). Swap
+`"execution_time_seconds"` for `"execution_cost"` (single-objective only),
+`"qubo_energy"`, `"probability_of_optimal"`, `"hypervolume"`/`"igd"`
+(multi-objective only), etc. to compare on any other metric the same way.
+`compare_groups()` also works directly on plain `{group_name: [values]}`
+dicts if you're not going through evaluation results at all (2 groups: use
+`compare_two_groups(x, y)` instead for the two-sample special case).
 
 `comparison.normal` tells you which path was taken;
 `comparison.omnibus_test`/`.omnibus_statistic`/`.omnibus_p_value` is the
@@ -552,7 +602,7 @@ which path was taken.
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about a second (86 tests total).
+about a second (111 tests total).
 
 ---
 
@@ -564,7 +614,7 @@ about a second (86 tests total).
    `qiskit_env/` inside the project (matches §2's `python3.10 -m venv
    qiskit_env`). Then `pip install -r requirements.txt` in PyCharm's terminal.
 3. **Sanity check (safe anywhere)**: run `python -m unittest discover -s
-   tests` — should show 86 passing tests in ~1s.
+   tests` — should show 111 passing tests in ~1s.
 4. **Plan the budget (safe anywhere)**: edit `configs/execution_plan.yaml`
    (§7), then run `src/piastq_execution/budget_planner.py` to see the
    resulting repetitions/shots/methods per pool before spending any hardware
@@ -578,17 +628,29 @@ about a second (86 tests total).
       repo).
    c. `python single_obj.py` / `multi_obj.py` (§4.1) and the IGDec scripts'
       default mode (§4.2) — hardware execution, produces raw counts
-      (`*-raw_counts.jsonl`) and the existing derived outputs.
+      (`*-raw_counts.jsonl`) and the existing derived outputs. For the four
+      single-objective scripts (`single_obj.py` and the three
+      `loch_qaoa_*_extract_circuits.py`), this also automatically runs the
+      TREx twirl-instance pass (§5) and writes `*-trex-raw_counts.jsonl` —
+      no separate step needed, but budget for it (§7).
    d. `run_calibration.py` (§5) — MEM/M3 calibration, once per circuit
-      width in use, stored under `calibration/`.
+      width in use, stored under `calibration/`. Not needed for TREx (no
+      calibration step).
 
    > **Switching from the placeholder to real PIAST-Q**: every execution
-   > entry point connects the same way —
-   > `AQTProvider("ACCESS_TOKEN").get_backend("offline_simulator_no_noise")`
-   > — and this was deliberately left untouched throughout this package (no
-   > env vars/config plumbing was added for it). There is no single place to
-   > change it; it's a local `provider =` / `backend =` pair inside each
-   > script's execution function, repeated identically in **6 files**:
+   > entry point gets its API token and backend name from one place —
+   > `configs/backend.yaml`, read by `piastq_execution.backend_config
+   > .get_backend()` — so there is exactly **one file to edit**, not six:
+   > ```yaml
+   > api_token: <your real API key>
+   > backend_name: <piast-q backend name>
+   > ```
+   > (Alternatively, set the `PIASTQ_API_TOKEN` / `PIASTQ_BACKEND_NAME`
+   > environment variables — they take precedence over the YAML file, so a
+   > real token never has to be committed.)
+   >
+   > Every script that opens a backend calls `get_backend()` instead of
+   > constructing `AQTProvider(...)` itself:
    > - `src/qaoa_tcs/single_obj.py` (`run_hardware_execution()`)
    > - `src/qaoa_tcs/multi_obj.py` (`run_hardware_execution()`)
    > - `src/igdec_qaoa/loch_qaoa_tcm_extract_circuits.py` (`run_hardware_like_from_saved_circuits()`)
@@ -596,16 +658,6 @@ about a second (86 tests total).
    > - `src/igdec_qaoa/loch_qaoa_elev_three_extract_circuits.py` (`run_hardware_like_from_saved_circuits()`)
    > - `src/piastq_execution/run_calibration.py` (`run_calibration()`)
    >
-   > In each, replace:
-   > ```python
-   > provider = AQTProvider("ACCESS_TOKEN")
-   > backend = provider.get_backend("offline_simulator_no_noise")
-   > ```
-   > with your real API key and PIAST-Q backend name, e.g.:
-   > ```python
-   > provider = AQTProvider("<your real API key>")
-   > backend = provider.get_backend("<piast-q backend name>")
-   > ```
    > `sampler.set_transpile_options(optimization_level=3)` right below each
    > of these stays as-is. Training functions (`save_trained_circuits()` /
    > `save_trained_circuits_and_initial_solutions()`) don't touch AQT at
@@ -615,7 +667,11 @@ about a second (86 tests total).
    each combo, load its raw-counts + calibration, call
    `piastq_execution.evaluation.evaluate_single_objective_combo()` /
    `evaluate_multi_objective_combo()` (§8) once per method
-   (`raw`/`mem`/`m3`/`trex`) to get that combo's metrics.
+   (`raw`/`mem`/`m3`/`trex`) to get that combo's metrics. For `trex`, first
+   load `*-trex-raw_counts.jsonl` and run it through
+   `piastq_execution.mitigation.aggregate_trex_records()` to get the
+   twirl-undone per-circuit counts (§5) — `raw`/`mem`/`m3` instead pass the
+   plain `*-raw_counts.jsonl` counts straight to `evaluate_*_combo()`.
 7. **Compare (safe anywhere)**: feed the per-method metric samples from step
    6 into `piastq_execution.statistics.compare_groups()` (§8) to get the
    Shapiro-Wilk-gated significance test + effect size for whichever
@@ -631,10 +687,25 @@ about a second (86 tests total).
   diversity / passenger+distance, and its execution cost) for
   single-objective combos, or a better Pareto frontier (non-dominated count,
   HV, IGD) for multi-objective combos?
-- **RQ3 (mitigation cost/benefit)**: how much extra hardware time
-  (calibration circuits + shots + wall-clock) does each mitigation method
-  cost, and is that worth its quality improvement under a constrained
-  budget (§7)?
+- **RQ3a (mitigation vs. quality, cost-agnostic)**: among MEM, M3, and TREx,
+  which yields the largest quality improvement (QUBO energy,
+  probability-of-optimal, and downstream effectiveness/HV/IGD) over raw,
+  regardless of what it cost to get there? If MEM/M3 already recover most of
+  the lost performance and TREx adds only a marginal improvement on top,
+  that's evidence readout error (which MEM/M3 target directly) dominates
+  over other noise sources for these circuits — plausible if they're shallow
+  enough — rather than TREx's broader (twirling-based) error suppression
+  being needed.
+- **RQ3b (mitigation cost/benefit)**: normalizing RQ3a's quality improvement
+  by what it actually cost in measured hardware time — MEM/M3's
+  `mitigation_overhead.calibration_wall_clock_seconds` (timed per circuit in
+  `run_calibration.py`, not estimated) plus TREx's extra
+  `execution_time_seconds` from its dedicated twirl-instance pass (§5) — which
+  method delivers the best quality improvement *per second of hardware time
+  spent*? A method that wins RQ3a can still lose RQ3b if its overhead is
+  disproportionately large (full MEM's `2**n` calibration circuits or TREx's
+  `trex_twirl_instances` extra passes vs. M3's much cheaper `2*n` circuits),
+  which matters directly for planning a constrained budget (§7).
 - **RQ4 (QAOA-TCS vs. IGDec-QAOA)**: how do the two algorithms compare on
   the same dataset/metric, with and without mitigation, on real hardware --
   including quantum-hardware execution cost/time (`execution_time_seconds`),

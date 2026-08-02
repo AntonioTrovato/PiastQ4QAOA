@@ -179,6 +179,29 @@ class TestRunCircuitWithBatchingRecorded(unittest.TestCase):
         self.assertEqual(record.iteration_id, 1)
         self.assertEqual(record.subproblem_id, 0)
 
+    def test_twirl_mask_defaults_to_none(self):
+        sampler = FakeSampler([{"00": 1.0}])
+        circuit = TinyCircuit(num_qubits=2)
+
+        _counts, record = run_circuit_with_batching_recorded(
+            circuit, sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="toy_cluster0", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+        )
+        self.assertIsNone(record.twirl_mask)
+
+    def test_twirl_mask_is_recorded_when_given(self):
+        sampler = FakeSampler([{"00": 1.0}])
+        circuit = TinyCircuit(num_qubits=2)
+
+        _counts, record = run_circuit_with_batching_recorded(
+            circuit, sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="toy_cluster0_trex0", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+            twirl_mask=[1, 0],
+        )
+        self.assertEqual(record.twirl_mask, [1, 0])
+
 
 class TestPhysicalQubitMapping(unittest.TestCase):
     def test_mapping_covers_every_logical_qubit_on_local_simulator(self):

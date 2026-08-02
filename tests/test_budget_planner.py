@@ -12,10 +12,12 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.budget_planner import (
+    DEFAULT_TREX_TWIRL_INSTANCES,
     CircuitRecord,
     ComboInventory,
     CostModel,
     PoolSpec,
+    load_config,
     plan_pool,
 )
 
@@ -102,9 +104,27 @@ class TestPlanPoolNoDegradationNeeded(unittest.TestCase):
 
 
 class TestTrexDrop(unittest.TestCase):
+    def test_trex_cost_scales_with_configured_twirl_instances(self):
+        # 1 circuit, raw=15s. TREx must run trex_twirl_instances *separate*
+        # hardware passes over that same circuit (it can't reuse raw counts),
+        # so with 32 instances (the default) it costs 32*15s=480s, not 15s --
+        # this is the exact accounting bug the planner had before
+        # CostModel.trex_twirl_instances existed (it used to price TREx as a
+        # single extra pass regardless of how many twirl instances the
+        # execution scripts actually run).
+        inv = reusable_inventory("A", ["c1"], width=2)
+        pool = PoolSpec(name="p", total_hours=1000, combos=["A"])  # ample budget, no degradation
+        plan = plan_pool(
+            pool, {"A": inv}, {"A": ["raw", "trex"]}, STANDARD_COST_MODEL,
+            target_repetitions=1, target_shots_per_circuit=200, min_shots_per_circuit=200,
+        )
+        self.assertEqual(STANDARD_COST_MODEL.trex_twirl_instances, 32)
+        self.assertAlmostEqual(plan.estimated_seconds, 15.0 + 32 * 15.0)
+
     def test_drops_trex_when_that_alone_fits(self):
         inv = reusable_inventory("A", ["c1"], width=2)
-        # raw=15s, +trex=15s => 30s total; budget between 15 and 30 forces the drop.
+        # raw=15s, +trex(32 instances)=480s => 495s total; a budget that only
+        # fits the raw-only cost forces the drop.
         pool = PoolSpec(name="p", total_hours=20 / 3600, combos=["A"])
         plan = plan_pool(
             pool, {"A": inv}, {"A": ["raw", "trex"]}, STANDARD_COST_MODEL,
@@ -116,6 +136,19 @@ class TestTrexDrop(unittest.TestCase):
         self.assertEqual(plan.repetitions, 1)
         self.assertEqual(plan.shots_per_circuit, 200)
         self.assertAlmostEqual(plan.estimated_seconds, 15.0)
+
+    def test_custom_twirl_instances_count_changes_cost(self):
+        from piastq_execution.budget_planner import CostModel as _CostModel
+
+        custom_model = _CostModel(seconds_per_batch=15.0, shots_per_batch_cap=200,
+                                   calibration_shots_per_circuit=200, trex_twirl_instances=4)
+        inv = reusable_inventory("A", ["c1"], width=2)
+        pool = PoolSpec(name="p", total_hours=1000, combos=["A"])
+        plan = plan_pool(
+            pool, {"A": inv}, {"A": ["raw", "trex"]}, custom_model,
+            target_repetitions=1, target_shots_per_circuit=200, min_shots_per_circuit=200,
+        )
+        self.assertAlmostEqual(plan.estimated_seconds, 15.0 + 4 * 15.0)
 
 
 class TestRepetitionReduction(unittest.TestCase):
@@ -203,6 +236,38 @@ class TestCircuitSubsampling(unittest.TestCase):
         )
         self.assertFalse(plan.fits_budget)
         self.assertTrue(any("INFEASIBLE" in n for n in plan.notes))
+
+
+class TestLoadConfigTrexTwirlInstances(unittest.TestCase):
+    def test_reads_trex_twirl_instances_into_cost_model(self):
+        path = "/tmp/piastq_test_execution_plan.yaml"
+        with open(path, "w") as f:
+            f.write(
+                "seconds_per_batch: 15\n"
+                "shots_per_batch_cap: 200\n"
+                "calibration_shots_per_circuit: 200\n"
+                "trex_twirl_instances: 5\n"
+                "target_repetitions: 10\n"
+                "target_shots_per_circuit: 2048\n"
+                "min_shots_per_circuit: 200\n"
+                "combos: {}\n"
+                "pools: []\n"
+            )
+        try:
+            config = load_config(path)
+            self.assertEqual(config.cost_model.trex_twirl_instances, 5)
+        finally:
+            os.remove(path)
+
+    def test_missing_key_falls_back_to_default(self):
+        path = "/tmp/piastq_test_execution_plan_no_trex.yaml"
+        with open(path, "w") as f:
+            f.write("combos: {}\npools: []\n")
+        try:
+            config = load_config(path)
+            self.assertEqual(config.cost_model.trex_twirl_instances, DEFAULT_TREX_TWIRL_INSTANCES)
+        finally:
+            os.remove(path)
 
 
 class TestCalibrationSharing(unittest.TestCase):

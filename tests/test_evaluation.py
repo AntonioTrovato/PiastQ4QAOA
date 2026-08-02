@@ -145,6 +145,7 @@ class TestMitigationOverhead(unittest.TestCase):
         overhead = compute_mitigation_overhead(records)
         self.assertEqual(overhead.calibration_circuits, 0)
         self.assertEqual(overhead.total_shots, 160)
+        self.assertEqual(overhead.calibration_wall_clock_seconds, 0.0)
 
     def test_mem_calibration_adds_2n_circuits_worth_of_shots(self):
         from piastq_execution.mitigation import make_mem_calibration_record
@@ -152,12 +153,13 @@ class TestMitigationOverhead(unittest.TestCase):
 
         cal = make_mem_calibration_record(
             np.eye(4), physical_qubits=[0, 1], backend_name="b", backend_version="v",
-            shots_per_calibration_circuit=200,
+            shots_per_calibration_circuit=200, calibration_wall_clock_seconds=12.5,
         )
         records = [make_raw_record(80, 1.0)]
         overhead = compute_mitigation_overhead(records, calibration_record=cal, calibration_shots_per_circuit=200)
         self.assertEqual(overhead.calibration_circuits, 4)  # 2**2
         self.assertEqual(overhead.total_shots, 80 + 4 * 200)
+        self.assertEqual(overhead.calibration_wall_clock_seconds, 12.5)
 
 
 class TestEvaluateSingleObjectiveCombo(unittest.TestCase):
@@ -229,7 +231,7 @@ class TestEvaluateMultiObjectiveCombo(unittest.TestCase):
 
 
 def _make_single_objective_result(execution_time, total_shots, combo="toy", method="raw"):
-    overhead = MitigationOverhead(calibration_circuits=0, total_shots=total_shots)
+    overhead = MitigationOverhead(calibration_circuits=0, total_shots=total_shots, calibration_wall_clock_seconds=0.0)
     return SingleObjectiveEvaluation(
         combo=combo, method=method, qubo_energy=0.0, optimal_bitstring="0",
         probability_of_optimal=1.0, execution_cost=0.0, effectiveness={},

@@ -18,10 +18,11 @@ Given a pool's budget, this planner degrades a target execution profile
   3. only as a last resort, and with an explicit warning, subsample the
      circuit/cluster set -- reporting exactly which circuits get dropped and
      why.
-Before any of that, if TREx alone is what's blowing the budget (it requires a
-full second hardware pass over every raw circuit, since it cannot reuse raw
-counts), the planner checks whether dropping TREx for the pool is enough on
-its own, and flags that as the first, cheapest option.
+Before any of that, if TREx alone is what's blowing the budget (it requires
+`trex_twirl_instances` extra hardware passes over every raw circuit -- one
+per twirl instance -- since it cannot reuse raw counts), the planner checks
+whether dropping TREx for the pool is enough on its own, and flags that as
+the first, cheapest option.
 
 Full MEM/M3 calibration circuits are counted once per distinct circuit width
 actually used within a pool (reused across every circuit sharing that width,
@@ -39,9 +40,16 @@ import glob
 import json
 import math
 import os
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Set, Tuple
+
+# Matches the sys.path bootstrap every other execution script uses, so this
+# also works run standalone (`cd src/piastq_execution && python
+# budget_planner.py`, per the README) and not just imported as a package.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from piastq_execution.mitigation import DEFAULT_TREX_TWIRL_INSTANCES
 
 ALL_METHODS = ("raw", "mem", "m3", "trex")
 
@@ -158,6 +166,12 @@ class CostModel:
     seconds_per_batch: float = 15.0
     shots_per_batch_cap: int = 200
     calibration_shots_per_circuit: int = 200
+    # TREx runs this many independently-twirled hardware executions per
+    # circuit (see piastq_execution.mitigation.load_trex_twirl_instances) --
+    # kept in lockstep with configs/execution_plan.yaml's
+    # `trex_twirl_instances` by load_config() below, so the planner's TREx
+    # cost estimate always matches what the execution scripts actually run.
+    trex_twirl_instances: int = DEFAULT_TREX_TWIRL_INSTANCES
 
     def batches(self, shots: int) -> int:
         if shots <= 0:
@@ -263,7 +277,7 @@ def _pool_seconds(
 
         methods = methods_by_combo.get(combo, ["raw"])
         if "trex" in methods:
-            trex_seconds += n * per_circuit
+            trex_seconds += n * per_circuit * cost_model.trex_twirl_instances
         if n:
             widths = {c.num_qubits for c in circuits}
             if "mem" in methods:
@@ -321,7 +335,8 @@ def plan_pool(
         if seconds_no_trex <= budget_seconds:
             notes.append(
                 f"Dropped TREx for {trex_combos} to fit pool budget at target repetitions/shots "
-                f"(TREx requires a full second hardware pass and cannot reuse raw counts)."
+                f"(TREx requires {cost_model.trex_twirl_instances} extra hardware passes per circuit "
+                f"and cannot reuse raw counts)."
             )
             return PoolPlan(pool.name, pool.total_hours, target_repetitions, target_shots_per_circuit,
                              no_trex_methods, trex_combos, {}, seconds_no_trex, True, notes)
@@ -428,6 +443,7 @@ def load_config(path: str) -> PlannerConfig:
         seconds_per_batch=raw.get("seconds_per_batch", 15.0),
         shots_per_batch_cap=raw.get("shots_per_batch_cap", 200),
         calibration_shots_per_circuit=raw.get("calibration_shots_per_circuit", 200),
+        trex_twirl_instances=raw.get("trex_twirl_instances", DEFAULT_TREX_TWIRL_INSTANCES),
     )
 
     methods_by_combo = {}

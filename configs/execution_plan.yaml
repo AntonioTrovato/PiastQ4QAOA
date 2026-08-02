@@ -18,6 +18,12 @@ target_shots_per_circuit: 2048  # desired shots/circuit before any degradation
 min_shots_per_circuit: 200      # floor: never go below one batch
 target_repetitions: 10          # desired repetitions before any degradation
 calibration_shots_per_circuit: 200
+trex_twirl_instances: 32        # independent random-twirl hardware passes averaged per
+                                 # TREx circuit (see piastq_execution/mitigation.py's
+                                 # load_trex_twirl_instances() docstring for rationale).
+                                 # Read by both the budget planner's cost model and every
+                                 # execution script's actual TREx loop -- change it here
+                                 # once, not per script.
 
 combos:
   # ---- QAOA-TCS, single-objective (5) ----

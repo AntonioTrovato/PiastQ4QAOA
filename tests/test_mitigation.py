@@ -10,14 +10,18 @@ import random
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.mitigation import (
+    DEFAULT_TREX_TWIRL_INSTANCES,
     CalibrationStore,
+    _correct_counts_m3_reduced,
     aggregate_trex_instances,
+    aggregate_trex_records,
     build_confusion_matrix,
     build_m3_calibration_circuits,
     build_m3_single_qubit_cals,
@@ -27,6 +31,7 @@ from piastq_execution.mitigation import (
     correct_counts_m3,
     correct_counts_with_matrix,
     generate_random_twirl_mask,
+    load_trex_twirl_instances,
     make_m3_calibration_record,
     make_mem_calibration_record,
     undo_trex_twirl,
@@ -138,6 +143,67 @@ class TestM3Calibration(unittest.TestCase):
             self.assertAlmostEqual(m3_result.get(key, 0.0), matrix_result[key], places=3)
 
 
+class TestM3ReducedFallback(unittest.TestCase):
+    """_correct_counts_m3_reduced() is the fallback correct_counts_m3() uses
+    when `mthree` isn't installed -- unlike the old full-2**n-matrix
+    fallback it replaced, it must never build a matrix larger than the
+    number of distinct bitstrings actually observed."""
+
+    def test_matches_full_matrix_when_support_is_complete(self):
+        # With all 4 states observed, the reduced matrix IS the full matrix,
+        # so this must agree with correct_counts_with_matrix() exactly --
+        # same case the old full-matrix fallback was tested against.
+        cal0 = np.array([[0.9, 0.1], [0.1, 0.9]])
+        cal1 = np.array([[0.8, 0.2], [0.2, 0.8]])
+        raw_counts = {"00": 500, "01": 200, "10": 200, "11": 100}
+
+        reduced_result = _correct_counts_m3_reduced(raw_counts, [cal0, cal1], num_qubits=2)
+
+        full_matrix = np.kron(cal1, cal0)
+        matrix_result = correct_counts_with_matrix(raw_counts, full_matrix, num_qubits=2)
+
+        self.assertEqual(set(reduced_result.keys()) | {"__pad__"}, set(matrix_result.keys()) | {"__pad__"})
+        for key in matrix_result:
+            self.assertAlmostEqual(reduced_result.get(key, 0.0), matrix_result[key], places=3)
+
+    def test_restricts_to_observed_support_not_full_hilbert_space(self):
+        # 3 qubits = 8 possible bitstrings, but only 2 are observed -- the
+        # matrix built internally must be 2x2, not 8x8 (the whole point of
+        # this fallback vs. the full-matrix approach MEM uses).
+        cal = np.array([[0.95, 0.05], [0.05, 0.95]])
+        raw_counts = {"000": 800, "111": 200}
+
+        result = _correct_counts_m3_reduced(raw_counts, [cal, cal, cal], num_qubits=3)
+
+        self.assertLessEqual(set(result.keys()), {"000", "111"})
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=6)
+
+    def test_empty_counts_raises(self):
+        cal = np.array([[1.0, 0.0], [0.0, 1.0]])
+        with self.assertRaises(ValueError):
+            _correct_counts_m3_reduced({}, [cal], num_qubits=1)
+
+    def test_correct_counts_m3_falls_back_when_mthree_unavailable(self):
+        # Force the ImportError branch inside correct_counts_m3() without
+        # touching the real installed mthree package.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "mthree":
+                raise ImportError("forced for test")
+            return real_import(name, *args, **kwargs)
+
+        cal = np.array([[0.9, 0.1], [0.1, 0.9]])
+        raw_counts = {"0": 900, "1": 100}
+
+        with mock.patch("builtins.__import__", side_effect=fake_import):
+            result = correct_counts_m3(raw_counts, [cal], physical_qubits=[0])
+
+        self.assertAlmostEqual(sum(result.values()), 1.0, places=6)
+
+
 class TestTrex(unittest.TestCase):
     def test_build_trex_twirled_circuit_strips_old_measure_and_applies_mask(self):
         from qiskit import QuantumCircuit
@@ -183,12 +249,80 @@ class TestTrex(unittest.TestCase):
         self.assertTrue(all(b in (0, 1) for b in mask))
 
 
+class _FakeTrexRecord:
+    """Minimal stand-in for RawCountsRecord -- aggregate_trex_records() is
+    duck-typed on exactly these five attributes."""
+
+    def __init__(self, circuit_id, cluster_id, iteration_id, subproblem_id, twirl_mask, aggregated_counts):
+        self.circuit_id = circuit_id
+        self.cluster_id = cluster_id
+        self.iteration_id = iteration_id
+        self.subproblem_id = subproblem_id
+        self.twirl_mask = twirl_mask
+        self.aggregated_counts = aggregated_counts
+
+
+class TestLoadTrexTwirlInstances(unittest.TestCase):
+    def test_missing_file_falls_back_to_default(self):
+        self.assertEqual(load_trex_twirl_instances("/tmp/piastq_does_not_exist.yaml"), DEFAULT_TREX_TWIRL_INSTANCES)
+
+    def test_reads_configured_value(self):
+        path = "/tmp/piastq_test_trex_instances.yaml"
+        with open(path, "w") as f:
+            f.write("trex_twirl_instances: 7\n")
+        try:
+            self.assertEqual(load_trex_twirl_instances(path), 7)
+        finally:
+            os.remove(path)
+
+
+class TestAggregateTrexRecords(unittest.TestCase):
+    def test_groups_by_cluster_iteration_subproblem_and_undoes_twirl(self):
+        # Two twirl instances for circuit A (cluster=0, iteration=1), one for
+        # circuit B (cluster=1, iteration=1) -- same iteration_id, must not
+        # be merged together since cluster_id differs.
+        records = [
+            _FakeTrexRecord("A_trex0", cluster_id=0, iteration_id=1, subproblem_id=None,
+                             twirl_mask=[1, 0], aggregated_counts={"00": 10, "11": 5}),
+            _FakeTrexRecord("A_trex1", cluster_id=0, iteration_id=1, subproblem_id=None,
+                             twirl_mask=[0, 1], aggregated_counts={"01": 8, "10": 2}),
+            _FakeTrexRecord("B_trex0", cluster_id=1, iteration_id=1, subproblem_id=None,
+                             twirl_mask=[0, 0], aggregated_counts={"00": 3}),
+        ]
+        result = aggregate_trex_records(records)
+        self.assertEqual(set(result.keys()), {(0, 1, None), (1, 1, None)})
+        # matches test_aggregate_trex_instances_sums_undone_counts's hand-verified sum
+        self.assertEqual(result[(0, 1, None)], {"01": 10, "10": 5, "11": 8, "00": 2})
+        self.assertEqual(result[(1, 1, None)], {"00": 3})
+
+    def test_igdec_style_keys_use_subproblem_not_cluster(self):
+        # IGDec-QAOA never sets cluster_id (stays None); iteration+subproblem
+        # is what distinguishes circuits there.
+        records = [
+            _FakeTrexRecord("x_trex0", cluster_id=None, iteration_id=1, subproblem_id=0,
+                             twirl_mask=[1], aggregated_counts={"0": 5, "1": 5}),
+            _FakeTrexRecord("x_trex1", cluster_id=None, iteration_id=1, subproblem_id=1,
+                             twirl_mask=[1], aggregated_counts={"0": 5, "1": 5}),
+        ]
+        result = aggregate_trex_records(records)
+        self.assertEqual(set(result.keys()), {(None, 1, 0), (None, 1, 1)})
+
+    def test_record_without_twirl_mask_raises(self):
+        records = [
+            _FakeTrexRecord("not_trex", cluster_id=0, iteration_id=1, subproblem_id=None,
+                             twirl_mask=None, aggregated_counts={"0": 1}),
+        ]
+        with self.assertRaises(ValueError):
+            aggregate_trex_records(records)
+
+
 class TestCalibrationStore(unittest.TestCase):
     def test_save_and_load_round_trip_mem(self):
         matrix = np.array([[0.9, 0.2], [0.1, 0.8]])
         record = make_mem_calibration_record(
             matrix, physical_qubits=[3], backend_name="offline_simulator_no_noise",
             backend_version="1.0", shots_per_calibration_circuit=200,
+            calibration_wall_clock_seconds=1.5,
         )
         with tempfile.TemporaryDirectory() as tmp:
             store = CalibrationStore(base_dir=tmp)
@@ -210,6 +344,7 @@ class TestCalibrationStore(unittest.TestCase):
         record = make_m3_calibration_record(
             cals, physical_qubits=[0, 1], backend_name="offline_simulator_no_noise",
             backend_version="1.0", shots_per_calibration_circuit=200,
+            calibration_wall_clock_seconds=0.8,
         )
         with tempfile.TemporaryDirectory() as tmp:
             store = CalibrationStore(base_dir=tmp)
@@ -235,7 +370,7 @@ class TestCorrectCountsDispatch(unittest.TestCase):
         matrix = np.array([[0.9, 0.2], [0.1, 0.8]])
         record = make_mem_calibration_record(
             matrix, physical_qubits=[0], backend_name="b", backend_version="v",
-            shots_per_calibration_circuit=200,
+            shots_per_calibration_circuit=200, calibration_wall_clock_seconds=0.5,
         )
         result = correct_counts("mem", {"0": 900, "1": 100}, calibration_record=record, num_qubits=1)
         self.assertAlmostEqual(result.get("0", 0.0), 1.0, places=6)
@@ -243,6 +378,14 @@ class TestCorrectCountsDispatch(unittest.TestCase):
     def test_unknown_method_raises(self):
         with self.assertRaises(ValueError):
             correct_counts("bogus", {"0": 1}, calibration_record=None, num_qubits=1)
+
+    def test_trex_method_normalizes_already_aggregated_counts(self):
+        # "trex" counts arriving here are assumed already twirl-undone/
+        # aggregated (aggregate_trex_records()) -- correct_counts() only
+        # normalizes, same as "raw".
+        result = correct_counts("trex", {"0": 3, "1": 1}, calibration_record=None, num_qubits=1)
+        self.assertAlmostEqual(result["0"], 0.75)
+        self.assertAlmostEqual(result["1"], 0.25)
 
 
 if __name__ == "__main__":
