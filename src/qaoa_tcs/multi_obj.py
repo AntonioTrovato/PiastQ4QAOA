@@ -42,19 +42,19 @@ def json_keys_to_int(d):
         return d
 
 
-with open("../datasets/sir_programs/executed_lines_test_by_test.json", "r") as file:
+with open("../../datasets/sir_programs/executed_lines_test_by_test.json", "r") as file:
     #dictionary that, for each sir program, associates at each LINE of that program the LIST of TESTS COVERING it
     executed_lines_test_by_test = json_keys_to_int(json.load(file)) #{program1:{line:[tci,tcj,...,tck],line2:...}
-with open("../datasets/sir_programs/faults_dictionary.json", "r") as file:
+with open("../../datasets/sir_programs/faults_dictionary.json", "r") as file:
     #dictionary that associates at each SIR PROGRAM the LIST of PAST FAULT COVERAGE VALUES ORDERED BY TEST
     faults_dictionary = json.load(file) #{program1:[fault_cov_tc1,fault_cov_tc2,...,fault_cov_tcn],program2:...}
-with open("../datasets/sir_programs/test_coverage_line_by_line.json", "r") as file:
+with open("../../datasets/sir_programs/test_coverage_line_by_line.json", "r") as file:
     #dictionary that, for each sir program, associates at each TEST of that program the LIST of LINES COVERED by it
     test_coverage_line_by_line = json_keys_to_int(json.load(file)) #{program1:{tc1:[linei,linej,...,linek],tc2:...}
-with open("../datasets/sir_programs/test_cases_costs.json", "r") as file:
+with open("../../datasets/sir_programs/test_cases_costs.json", "r") as file:
     #dictionary that, for each sir program, associates at each TEST its EXECUTION COST
     test_cases_costs = json_keys_to_int(json.load(file)) #{program1:{tc1:ex_cost1,tc2:ex_cost2,...,tcn:ex_costn},program2:...}
-with open("../datasets/sir_programs/total_program_lines.json", "r") as file:
+with open("../../datasets/sir_programs/total_program_lines.json", "r") as file:
     #dictionary which associates at each SIR PROGRAM its size in terms of the NUMBER OF ITS LINES
     total_program_lines = json.load(file) #{program1:tot_lines_program1,program2:tot_lines_program2,program3:...}
 
@@ -337,7 +337,7 @@ sampling_sampler = AQTSampler(backend)
 
 sampling_sampler.set_transpile_options(optimization_level=3)
 
-base_results_dir = "results/selectqaoa/piastq"
+base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
 os.makedirs(base_results_dir, exist_ok=True)
 
 num_piast_experiments = 10
@@ -385,7 +385,9 @@ for sir_program in sir_programs:
 
                 filename = os.path.join(
                     "..",
+                    "..",
                     "trained_qaoa_circuits",
+                    "qaoa_tcs",
                     sir_program,
                     f"rep_{reps}",
                     f"{sir_program}_rep{reps}_cluster{cluster_idx}.qpy"

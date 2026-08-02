@@ -235,14 +235,14 @@ def save_trained_circuits_and_initial_solutions():
     + statevector sampler each), likely on the order of a few hours
     wall-clock depending on the machine.
     """
-    base_output_dir = os.path.join("..", "trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
+    base_output_dir = os.path.join("..", "..", "trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
     os.makedirs(base_output_dir, exist_ok=True)
 
     ideal_sampler = AerSampler()
     ideal_sampler.options.shots = None
 
     df = pd.read_csv(
-        f"../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
+        f"../../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
         dtype={"cost": float, "pcount": int, "dist": int}
     )
 
@@ -466,7 +466,7 @@ def save_trained_circuits_and_initial_solutions():
 # ============================================================
 
 def run_hardware_like_from_saved_circuits():
-    results_dir = os.path.join("results", "igdec_qaoa", "piastq")
+    results_dir = os.path.join("..", "..", "results", "igdec_qaoa")
     os.makedirs(results_dir, exist_ok=True)
 
     provider = AQTProvider("ACCESS_TOKEN")
@@ -477,12 +477,12 @@ def run_hardware_like_from_saved_circuits():
     sampling_sampler.set_transpile_options(optimization_level=3)
 
     df = pd.read_csv(
-        f"../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
+        f"../../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
         dtype={"cost": float, "pcount": int, "dist": int}
     )
 
     cost, pcount, dist = get_data(df)
-    base_input_dir = os.path.join("..", "trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
+    base_input_dir = os.path.join("..", "..", "trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
 
     program_results = {}
 

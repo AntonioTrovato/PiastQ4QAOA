@@ -299,7 +299,7 @@ def save_trained_circuits_and_initial_solutions():
     subproblem-solves (COBYLA(500) + statevector sampler each), likely on the
     order of a few hours wall-clock depending on the machine.
     """
-    base_output_dir = "trained_qaoa_circuits/igdec_qaoa"
+    base_output_dir = os.path.join("..", "..", "trained_qaoa_circuits", "igdec_qaoa")
     os.makedirs(base_output_dir, exist_ok=True)
 
     num_samplings = 10
@@ -314,7 +314,7 @@ def save_trained_circuits_and_initial_solutions():
         print(f"\n========== PROGRAM: {file_name} ==========")
 
         df = pd.read_csv(
-            "../datasets/quantum_sota_datasets/" + file_name + ".csv",
+            "../../datasets/quantum_sota_datasets/" + file_name + ".csv",
             dtype={"time": float, "rate": float}
         )
         # matches qaoa_tcs/single_obj.py's get_data() filtering logic
@@ -562,7 +562,7 @@ def run_hardware_like_from_saved_circuits():
     - the saved trained circuit for each solved subproblem
     and executing each circuit with 200-shot batching.
     """
-    results_dir = "results/igdec_qaoa/piastq"
+    results_dir = os.path.join("..", "..", "results", "igdec_qaoa")
     os.makedirs(results_dir, exist_ok=True)
 
     num_experiment = 10
@@ -579,7 +579,7 @@ def run_hardware_like_from_saved_circuits():
         print(f"\n========== HARDWARE-LIKE PROGRAM: {file_name} ==========")
 
         df = pd.read_csv(
-            "../datasets/quantum_sota_datasets/" + file_name + ".csv",
+            "../../datasets/quantum_sota_datasets/" + file_name + ".csv",
             dtype={"time": float, "rate": float}
         )
 
@@ -593,6 +593,7 @@ def run_hardware_like_from_saved_circuits():
             print(f"\n----- HARDWARE-LIKE SAMPLING #{sampling_id} -----")
 
             sampling_dir = os.path.join(
+                "..",
                 "..",
                 "trained_qaoa_circuits",
                 "igdec_qaoa",

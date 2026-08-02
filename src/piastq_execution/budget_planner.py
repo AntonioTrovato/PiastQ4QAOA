@@ -105,9 +105,9 @@ def discover_qaoa_tcs_inventory(
     objective_mode: str = "single_objective",
     rep_label: str = "rep_1",
 ) -> ComboInventory:
-    """Reads trained_qaoa_circuits/{combo}/{rep_label}/*.qpy -- the one
-    circuit set QAOA-TCS reuses across every repetition/experiment."""
-    circuit_dir = os.path.join(trained_circuits_dir, combo, rep_label)
+    """Reads trained_qaoa_circuits/qaoa_tcs/{combo}/{rep_label}/*.qpy -- the
+    one circuit set QAOA-TCS reuses across every repetition/experiment."""
+    circuit_dir = os.path.join(trained_circuits_dir, "qaoa_tcs", combo, rep_label)
     files = sorted(glob.glob(os.path.join(circuit_dir, "*.qpy")))
     records = [CircuitRecord(circuit_id=os.path.basename(f), num_qubits=_qpy_num_qubits(f)) for f in files]
     return ComboInventory(
@@ -528,9 +528,12 @@ def write_report(plans: List[PoolPlan], output_dir: str) -> Tuple[str, str]:
 
 
 if __name__ == "__main__":
+    # here = <repo_root>/src/piastq_execution -- everything else this reads
+    # from or writes to lives at <repo_root>, two levels up.
     here = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(here, "..", "configs", "execution_plan.yaml")
-    circuits_dir = os.path.join(here, "..", "trained_qaoa_circuits")
+    repo_root = os.path.join(here, "..", "..")
+    config_path = os.path.join(repo_root, "configs", "execution_plan.yaml")
+    circuits_dir = os.path.join(repo_root, "trained_qaoa_circuits")
 
     config = load_config(config_path)
     inventories = build_inventories_from_config(config_path, circuits_dir)
@@ -539,7 +542,9 @@ if __name__ == "__main__":
     report = render_report(plans)
     print(report)
 
-    output_dir = os.path.join(here, "..", "results", "execution_plan")
+    # Kept outside results/ on purpose: results/ is reserved for the
+    # qaoa_tcs/ and igdec_qaoa/ combo output subfolders.
+    output_dir = os.path.join(repo_root, "execution_plan")
     text_path, json_path = write_report(plans, output_dir)
     print(f"\nSaved report: {text_path}")
     print(f"Saved report: {json_path}")

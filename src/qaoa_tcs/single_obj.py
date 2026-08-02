@@ -41,11 +41,11 @@ experiments = 10
 def get_data(data_name):
     """Read the datasets"""
     if data_name == "elevator":
-        data = pd.read_csv("../datasets/quantum_sota_datasets/elevator.csv", dtype={"cost": int, "input_div": float})
+        data = pd.read_csv("../../datasets/quantum_sota_datasets/elevator.csv", dtype={"cost": int, "input_div": float})
     elif data_name == "elevator2":
-        data = pd.read_csv("../datasets/quantum_sota_datasets/elevator.csv", dtype={"cost": int, "pcount": int, "dist": int})
+        data = pd.read_csv("../../datasets/quantum_sota_datasets/elevator.csv", dtype={"cost": int, "pcount": int, "dist": int})
     else:
-        data = pd.read_csv("../datasets/quantum_sota_datasets/" + data_name + ".csv", dtype={"time": float, "rate": float})
+        data = pd.read_csv("../../datasets/quantum_sota_datasets/" + data_name + ".csv", dtype={"time": float, "rate": float})
         data = data[data['rate'] > 0]
     return data
 
@@ -294,7 +294,7 @@ sampling_sampler = AQTSampler(backend)
 
 sampling_sampler.set_transpile_options(optimization_level=3)
 
-base_results_dir = "results/selectqaoa/piastq"
+base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
 os.makedirs(base_results_dir, exist_ok=True)
 
 num_piast_experiments = 10
@@ -354,7 +354,9 @@ for bootqa_program in bootqa_programs:
             for cluster_idx, (cluster_id, cluster_tests) in enumerate(cluster_items):
                 filename = os.path.join(
                     "..",
+                    "..",
                     "trained_qaoa_circuits",
+                    "qaoa_tcs",
                     bootqa_program,
                     f"rep_{reps}",
                     f"{bootqa_program}_rep{reps}_cluster{cluster_idx}.qpy"

@@ -12,7 +12,7 @@ import json
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.raw_counts import (
     counts_from_quasi_probabilities,

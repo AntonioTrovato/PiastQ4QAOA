@@ -364,7 +364,13 @@ class CalibrationStore:
     physical qubit mapping) without rerunning hardware.
     """
 
-    def __init__(self, base_dir: str = "calibration"):
+    def __init__(self, base_dir: Optional[str] = None):
+        # Default resolves to <repo_root>/calibration regardless of the
+        # caller's current working directory (this file lives at
+        # <repo_root>/src/piastq_execution/mitigation.py).
+        if base_dir is None:
+            here = os.path.dirname(os.path.abspath(__file__))
+            base_dir = os.path.join(here, "..", "..", "calibration")
         self.base_dir = base_dir
 
     def _path(self, method: str, physical_qubits: Sequence[int]) -> str:
