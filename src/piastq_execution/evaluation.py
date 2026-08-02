@@ -6,10 +6,20 @@ the right metric set, per the study design:
     of the corrected/selected solution, probability of the optimal bitstring
     (brute-forced -- <=7-qubit subproblems are 128 states, trivial),
     execution cost and the dataset's effectiveness metric(s) of the final
-    merged suite, mitigation overhead, classical post-processing time.
+    merged suite, quantum-hardware execution time, mitigation overhead,
+    classical post-processing time.
   - multi-objective (flex/grep/gzip/sed): number of non-dominated solutions
     contributed to a reference Pareto frontier, Hypervolume, IGD, plus the
-    same mitigation-overhead and classical post-processing time metrics.
+    same execution-time/mitigation-overhead/classical-post-processing-time
+    metrics as single-objective.
+
+`execution_time_seconds` means the same thing, computed the same way, for
+every one of the three pipelines this module serves (QAOA-TCS single-
+objective, QAOA-TCS multi-objective, IGDec-QAOA single-objective): the sum,
+over one experiment repetition, of the wall-clock time spent executing each
+subproblem's QAOA circuit (one `RawCountsRecord` per subproblem/cluster).
+It's distinct from `execution_cost` (single-objective only -- the selected
+test suite's own dataset cost, not hardware time).
 
 Everything here is algorithm-agnostic pure computation over already-collected
 data (raw counts, calibration records, selected bitstrings) -- no AQTProvider/
@@ -148,14 +158,23 @@ def compute_single_objective_metrics(
 
 
 # ---------------------------------------------------------------------------
-# Mitigation overhead
+# Execution time (quantum-hardware wall-clock) and mitigation overhead
 # ---------------------------------------------------------------------------
+
+def compute_execution_time_seconds(raw_records: Sequence[RawCountsRecord]) -> float:
+    """Sum, over one experiment repetition, of the wall-clock time spent
+    executing each subproblem's QAOA circuit (one RawCountsRecord per
+    subproblem/cluster). Applies identically to raw and every mitigated
+    method -- for TREx, `raw_records` should include every twirl instance,
+    so this naturally captures TREx's extra hardware passes too.
+    """
+    return sum(r.total_wall_clock_seconds for r in raw_records)
+
 
 @dataclass
 class MitigationOverhead:
     calibration_circuits: int
     total_shots: int
-    wall_clock_seconds: float
 
 
 def compute_mitigation_overhead(
@@ -163,12 +182,12 @@ def compute_mitigation_overhead(
     calibration_record: Optional[CalibrationRecord] = None,
     calibration_shots_per_circuit: int = 0,
 ) -> MitigationOverhead:
-    """Aggregates hardware-time overhead: total shots and wall-clock time
-    spent on the raw circuit executions passed in, plus (if a calibration
-    record is supplied) the extra calibration circuits/shots it cost.
+    """Aggregates shot-based overhead: total shots spent on the raw circuit
+    executions passed in, plus (if a calibration record is supplied) the
+    extra calibration circuits/shots it cost. See compute_execution_time_seconds()
+    for the wall-clock-time counterpart.
     """
     total_shots = sum(r.total_shots_returned for r in raw_records)
-    wall_clock = sum(r.total_wall_clock_seconds for r in raw_records)
 
     calibration_circuits = 0
     if calibration_record is not None:
@@ -181,7 +200,6 @@ def compute_mitigation_overhead(
     return MitigationOverhead(
         calibration_circuits=calibration_circuits,
         total_shots=total_shots,
-        wall_clock_seconds=wall_clock,
     )
 
 
@@ -198,6 +216,7 @@ class SingleObjectiveEvaluation:
     probability_of_optimal: float
     execution_cost: float
     effectiveness: Dict[str, float]
+    execution_time_seconds: float
     mitigation_overhead: MitigationOverhead
     classical_post_processing_seconds: float
 
@@ -271,6 +290,7 @@ def evaluate_single_objective_combo(
         probability_of_optimal=mean_p_optimal,
         execution_cost=execution_cost,
         effectiveness=effectiveness_metrics,
+        execution_time_seconds=compute_execution_time_seconds(raw_records),
         mitigation_overhead=compute_mitigation_overhead(raw_records, calibration_record, calibration_shots_per_circuit),
         classical_post_processing_seconds=elapsed,
     )
@@ -287,6 +307,7 @@ class MultiObjectiveEvaluation:
     num_non_dominated: int
     hypervolume: float
     igd: float
+    execution_time_seconds: float
     mitigation_overhead: MitigationOverhead
     classical_post_processing_seconds: float
 
@@ -325,6 +346,7 @@ def evaluate_multi_objective_combo(
         num_non_dominated=num_non_dominated,
         hypervolume=hv,
         igd=igd,
+        execution_time_seconds=compute_execution_time_seconds(raw_records),
         mitigation_overhead=compute_mitigation_overhead(raw_records, calibration_record, calibration_shots_per_circuit),
         classical_post_processing_seconds=elapsed,
     )
@@ -343,3 +365,36 @@ def evaluate_combo(objective_mode: str, **kwargs):
     if objective_mode == "multi_objective":
         return evaluate_multi_objective_combo(**kwargs)
     raise ValueError(f"Unknown objective_mode '{objective_mode}'")
+
+
+# ---------------------------------------------------------------------------
+# Bridge to piastq_execution.statistics: turn a list of per-repetition
+# evaluation results into the plain float samples compare_groups()/
+# compare_two_groups() expect.
+# ---------------------------------------------------------------------------
+
+def extract_metric_samples(
+    results: Sequence[Any],
+    metric: str,
+) -> List[float]:
+    """Pulls one scalar metric out of a list of per-repetition
+    SingleObjectiveEvaluation/MultiObjectiveEvaluation results (one result
+    per repetition, e.g. everything evaluate_single_objective_combo() was
+    called with a given combo+method across repetitions), ready to hand to
+    piastq_execution.statistics.compare_groups()/compare_two_groups().
+
+    `metric` supports dotted paths into nested fields, e.g.
+    "mitigation_overhead.total_shots". Common choices: "qubo_energy",
+    "probability_of_optimal", "execution_cost" (single-objective only),
+    "execution_time_seconds" (both objective modes -- this is the one to use
+    for comparing algorithms/methods on quantum-hardware execution cost),
+    "hypervolume" / "igd" / "num_non_dominated" (multi-objective only),
+    "classical_post_processing_seconds".
+    """
+    samples = []
+    for result in results:
+        value: Any = result
+        for part in metric.split("."):
+            value = getattr(value, part)
+        samples.append(float(value))
+    return samples

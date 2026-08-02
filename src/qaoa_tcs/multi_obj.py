@@ -16,6 +16,8 @@ from qiskit import qpy
 from qiskit_optimization import QuadraticProgram
 from qiskit_aer.primitives import Sampler as AerSampler
 from qiskit_optimization.converters import QuadraticProgramToQubo
+from qiskit_algorithms import QAOA
+from qiskit_algorithms.optimizers import COBYLA
 
 from qiskit_aqt_provider import AQTProvider
 from qiskit_aqt_provider.primitives import AQTSampler
@@ -330,152 +332,236 @@ def build_pareto_front(sir_program, selected_tests):
 
     return pareto_front
 
-provider = AQTProvider("ACCESS_TOKEN")
-backend = provider.get_backend("offline_simulator_no_noise")
 
-sampling_sampler = AQTSampler(backend)
+# Only rep_1 is used by this replication package (matching the circuits
+# already ported and the execution loop below); add more values here (e.g.
+# 2, 4, 8, 16, matching the original SelectQAOA study) if you need them too.
+TRAINING_REPS = [1]
 
-sampling_sampler.set_transpile_options(optimization_level=3)
 
-base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
-os.makedirs(base_results_dir, exist_ok=True)
+def save_trained_circuits():
+    """
+    Train QAOA-TCS multi-objective circuits in ideal noiseless simulation
+    and save them under trained_qaoa_circuits/qaoa_tcs/<dataset>/rep_<reps>/.
 
-num_piast_experiments = 10
+    NOT executed by default (invoke via `python multi_obj.py train`) and
+    NOT run in an authoring/review session -- run this on the machine that
+    will actually spend the compute. Ported from SelectQAOA/
+    MOQ-Pipeline.ipynb's multi-objective circuit-training cell; reuses this
+    file's already-computed `qubos_dictionary` so cluster indices/ordering
+    exactly match what run_hardware_execution() expects to load.
+    """
+    base_output_dir = os.path.join("..", "..", "trained_qaoa_circuits", "qaoa_tcs")
+    os.makedirs(base_output_dir, exist_ok=True)
 
-for sir_program in sir_programs:
-    program_results_dir = os.path.join(base_results_dir, sir_program)
-    os.makedirs(program_results_dir, exist_ok=True)
+    ideal_sampler = AerSampler()
+    ideal_sampler.options.shots = None
 
-    # Only rep_1 circuits are shipped in trained_qaoa_circuits/ for this
-    # replication package (see README.md); the original SelectQAOA study
-    # additionally covers reps [2, 4, 8, 16].
-    for reps in [1]:
+    for sir_program in sir_programs:
+        print(f"\n=== PROGRAM: {sir_program} ===")
 
-        print(f"\n=== PROGRAM: {sir_program}, REPS: {reps} ===")
+        program_dir = os.path.join(base_output_dir, sir_program)
+        os.makedirs(program_dir, exist_ok=True)
 
-        file_path = os.path.join(
-            program_results_dir,
-            f"{sir_program}-rep-{reps}.json"
-        )
+        for reps in TRAINING_REPS:
+            print(f"\n--- REPS: {reps} ---")
 
-        subsuites_file_path = os.path.join(
-            program_results_dir,
-            f"{sir_program}-rep-{reps}-subsuites.json"
-        )
+            reps_dir = os.path.join(program_dir, f"rep_{reps}")
+            os.makedirs(reps_dir, exist_ok=True)
 
-        raw_counts_file_path = os.path.join(
-            program_results_dir,
-            f"{sir_program}-rep-{reps}-raw_counts.jsonl"
-        )
-
-        json_data = {}
-        subsuites_data = {}
-        qpu_run_times = []
-        pareto_fronts_building_times = []
-
-        raw_counts_writer = RawCountsWriter(raw_counts_file_path)
-
-        for exp_id in range(1, num_piast_experiments + 1):
-            print(f"\n--- Experiment {exp_id} ---")
-
-            final_selected_tests = []
-            experiment_cluster_assignments = []
+            qaoa = QAOA(
+                sampler=ideal_sampler,
+                optimizer=COBYLA(maxiter=500),
+                reps=reps
+            )
 
             for cluster_idx, qubo in enumerate(qubos_dictionary[sir_program]):
+                print(f"Training cluster {cluster_idx}")
 
+                operator, offset = qubo.to_ising()
+
+                # TRAINING
+                result = qaoa.compute_minimum_eigenvalue(operator)
+
+                # OPTIMAL CIRCUIT
+                optimal_params = result.optimal_point
+                ansatz = qaoa.ansatz
+                bound_circuit = ansatz.assign_parameters(optimal_params)
+
+                # SAVE
                 filename = os.path.join(
-                    "..",
-                    "..",
-                    "trained_qaoa_circuits",
-                    "qaoa_tcs",
-                    sir_program,
-                    f"rep_{reps}",
+                    reps_dir,
                     f"{sir_program}_rep{reps}_cluster{cluster_idx}.qpy"
                 )
 
-                with open(filename, "rb") as f:
-                    circuits = qpy.load(f)
+                with open(filename, "wb") as f:
+                    qpy.dump(bound_circuit, f)
 
-                circuit = circuits[0]
+                print(f"Saved: {filename}")
 
-                s = time.time()
-                counts, raw_record = run_circuit_with_batching_recorded(
-                    circuit,
-                    sampling_sampler,
-                    algorithm="qaoa_tcs",
-                    objective_mode="multi_objective",
-                    dataset=sir_program,
-                    circuit_id=f"{sir_program}_rep{reps}_cluster{cluster_idx}",
-                    backend=backend,
-                    cluster_id=cluster_idx,
-                    iteration_id=exp_id,
-                    shots_per_batch=80,
-                    num_batches=1,
-                )
-                e = time.time()
 
-                raw_counts_writer.write(raw_record)
+def run_hardware_execution():
+    """
+    Re-run QAOA-TCS multi-objective by loading the trained circuits and
+    executing each on the configured backend.
+    """
+    provider = AQTProvider("ACCESS_TOKEN")
+    backend = provider.get_backend("offline_simulator_no_noise")
 
-                qpu_run_times.append((e - s) * 1000)
+    sampling_sampler = AQTSampler(backend)
 
-                most_likely = max(counts.items(), key=lambda x: x[1])[0]
-                bitstring = [int(b) for b in most_likely[::-1]]
+    sampling_sampler.set_transpile_options(optimization_level=3)
 
-                indexes_selected_tests = [
-                    index for index, value in enumerate(bitstring) if value == 1
-                ]
+    base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
+    os.makedirs(base_results_dir, exist_ok=True)
 
-                cluster_tests = list(clusters_dictionary[sir_program].values())[cluster_idx]
-                selected_tests = []
+    num_piast_experiments = 10
 
-                for index in indexes_selected_tests:
-                    if index < len(cluster_tests):
-                        selected_tests.append(cluster_tests[index])
+    for sir_program in sir_programs:
+        program_results_dir = os.path.join(base_results_dir, sir_program)
+        os.makedirs(program_results_dir, exist_ok=True)
 
-                for test in selected_tests:
-                    if test not in final_selected_tests:
-                        final_selected_tests.append(test)
+        # Only rep_1 circuits are shipped in trained_qaoa_circuits/ for this
+        # replication package (see README.md); the original SelectQAOA study
+        # additionally covers reps [2, 4, 8, 16].
+        for reps in [1]:
 
-                # tracing cluster assignment for this experiment
-                experiment_cluster_assignments.append({
-                    "cluster_id": cluster_idx,
-                    "cluster_test_cases": list(cluster_tests),
-                    "bit_values": bitstring,
-                    "selected_test_indexes_in_cluster": indexes_selected_tests,
-                    "selected_tests_global_ids": selected_tests
-                })
+            print(f"\n=== PROGRAM: {sir_program}, REPS: {reps} ===")
 
-            start = time.time()
-            pareto_front = build_pareto_front(sir_program, final_selected_tests)
-            end = time.time()
+            file_path = os.path.join(
+                program_results_dir,
+                f"{sir_program}-rep-{reps}.json"
+            )
 
-            json_data[f"pareto_front_{exp_id}"] = pareto_front
-            pareto_fronts_building_times.append((end - start) * 1000)
+            subsuites_file_path = os.path.join(
+                program_results_dir,
+                f"{sir_program}-rep-{reps}-subsuites.json"
+            )
 
-            subsuites_data[f"experiment_{exp_id}"] = {
-                "final_selected_tests": sorted(final_selected_tests),
-                "cluster_assignments": experiment_cluster_assignments
-            }
+            raw_counts_file_path = os.path.join(
+                program_results_dir,
+                f"{sir_program}-rep-{reps}-raw_counts.jsonl"
+            )
 
-        json_data["mean_qpu_run_time(ms)"] = statistics.mean(qpu_run_times) if qpu_run_times else 0
-        json_data["stdev_qpu_run_time(ms)"] = statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0
-        json_data["all_qpu_run_times(ms)"] = qpu_run_times
-        json_data["mean_pareto_fronts_building_time(ms)"] = (
-            statistics.mean(pareto_fronts_building_times) if pareto_fronts_building_times else 0
-        )
-        json_data["stdev_pareto_fronts_building_time(ms)"] = (
-            statistics.stdev(pareto_fronts_building_times) if len(pareto_fronts_building_times) > 1 else 0
-        )
-        json_data["all_pareto_fronts_building_times(ms)"] = pareto_fronts_building_times
+            json_data = {}
+            subsuites_data = {}
+            qpu_run_times = []
+            pareto_fronts_building_times = []
 
-        with open(file_path, "w") as f:
-            json.dump(json_data, f, indent=2)
+            raw_counts_writer = RawCountsWriter(raw_counts_file_path)
 
-        with open(subsuites_file_path, "w") as f:
-            json.dump(subsuites_data, f, indent=2)
+            for exp_id in range(1, num_piast_experiments + 1):
+                print(f"\n--- Experiment {exp_id} ---")
 
-        raw_counts_writer.close()
+                final_selected_tests = []
+                experiment_cluster_assignments = []
 
-        print(f"Saved results: {file_path}")
-        print(f"Saved cluster assignments: {subsuites_file_path}")
-        print(f"Saved raw counts: {raw_counts_file_path}")
+                for cluster_idx, qubo in enumerate(qubos_dictionary[sir_program]):
+
+                    filename = os.path.join(
+                        "..",
+                        "..",
+                        "trained_qaoa_circuits",
+                        "qaoa_tcs",
+                        sir_program,
+                        f"rep_{reps}",
+                        f"{sir_program}_rep{reps}_cluster{cluster_idx}.qpy"
+                    )
+
+                    with open(filename, "rb") as f:
+                        circuits = qpy.load(f)
+
+                    circuit = circuits[0]
+
+                    s = time.time()
+                    counts, raw_record = run_circuit_with_batching_recorded(
+                        circuit,
+                        sampling_sampler,
+                        algorithm="qaoa_tcs",
+                        objective_mode="multi_objective",
+                        dataset=sir_program,
+                        circuit_id=f"{sir_program}_rep{reps}_cluster{cluster_idx}",
+                        backend=backend,
+                        cluster_id=cluster_idx,
+                        iteration_id=exp_id,
+                        shots_per_batch=80,
+                        num_batches=1,
+                    )
+                    e = time.time()
+
+                    raw_counts_writer.write(raw_record)
+
+                    qpu_run_times.append((e - s) * 1000)
+
+                    most_likely = max(counts.items(), key=lambda x: x[1])[0]
+                    bitstring = [int(b) for b in most_likely[::-1]]
+
+                    indexes_selected_tests = [
+                        index for index, value in enumerate(bitstring) if value == 1
+                    ]
+
+                    cluster_tests = list(clusters_dictionary[sir_program].values())[cluster_idx]
+                    selected_tests = []
+
+                    for index in indexes_selected_tests:
+                        if index < len(cluster_tests):
+                            selected_tests.append(cluster_tests[index])
+
+                    for test in selected_tests:
+                        if test not in final_selected_tests:
+                            final_selected_tests.append(test)
+
+                    # tracing cluster assignment for this experiment
+                    experiment_cluster_assignments.append({
+                        "cluster_id": cluster_idx,
+                        "cluster_test_cases": list(cluster_tests),
+                        "bit_values": bitstring,
+                        "selected_test_indexes_in_cluster": indexes_selected_tests,
+                        "selected_tests_global_ids": selected_tests
+                    })
+
+                start = time.time()
+                pareto_front = build_pareto_front(sir_program, final_selected_tests)
+                end = time.time()
+
+                json_data[f"pareto_front_{exp_id}"] = pareto_front
+                pareto_fronts_building_times.append((end - start) * 1000)
+
+                subsuites_data[f"experiment_{exp_id}"] = {
+                    "final_selected_tests": sorted(final_selected_tests),
+                    "cluster_assignments": experiment_cluster_assignments
+                }
+
+            json_data["mean_qpu_run_time(ms)"] = statistics.mean(qpu_run_times) if qpu_run_times else 0
+            json_data["stdev_qpu_run_time(ms)"] = statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0
+            json_data["all_qpu_run_times(ms)"] = qpu_run_times
+            json_data["mean_pareto_fronts_building_time(ms)"] = (
+                statistics.mean(pareto_fronts_building_times) if pareto_fronts_building_times else 0
+            )
+            json_data["stdev_pareto_fronts_building_time(ms)"] = (
+                statistics.stdev(pareto_fronts_building_times) if len(pareto_fronts_building_times) > 1 else 0
+            )
+            json_data["all_pareto_fronts_building_times(ms)"] = pareto_fronts_building_times
+
+            with open(file_path, "w") as f:
+                json.dump(json_data, f, indent=2)
+
+            with open(subsuites_file_path, "w") as f:
+                json.dump(subsuites_data, f, indent=2)
+
+            raw_counts_writer.close()
+
+            print(f"Saved results: {file_path}")
+            print(f"Saved cluster assignments: {subsuites_file_path}")
+            print(f"Saved raw counts: {raw_counts_file_path}")
+
+
+if __name__ == "__main__":
+    # `python multi_obj.py train` (re)trains QAOA-TCS multi-objective
+    # circuits on an ideal simulator -- this must run on the machine that
+    # does the actual training. Default mode executes already-trained
+    # circuits on hardware.
+    if len(sys.argv) > 1 and sys.argv[1] == "train":
+        save_trained_circuits()
+    else:
+        run_hardware_execution()

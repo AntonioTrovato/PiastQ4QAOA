@@ -310,15 +310,18 @@ def save_trained_circuits_and_initial_solutions():
     ideal_sampler = AerSampler()
     ideal_sampler.options.shots = None
 
-    for file_name in ["gsdtsr"]:
+    for file_name in ["gsdtsr","iofrol","paintcontrol"]:
         print(f"\n========== PROGRAM: {file_name} ==========")
 
         df = pd.read_csv(
             "../../datasets/quantum_sota_datasets/" + file_name + ".csv",
             dtype={"time": float, "rate": float}
         )
-        # matches qaoa_tcs/single_obj.py's get_data() filtering logic
-        df = df[df['rate'] > 0]
+        if file_name == "gsdtsr":
+            # matches qaoa_tcs/single_obj.py's get_data() filtering logic.
+            # iofrol/paintcontrol's existing trained circuits were produced
+            # from the full, unfiltered dataset -- do not filter those too.
+            df = df[df['rate'] > 0]
 
         length = len(df)
         times, frs = get_data(df)
@@ -575,13 +578,19 @@ def run_hardware_like_from_saved_circuits():
 
     sampling_sampler.set_transpile_options(optimization_level=3)
 
-    for file_name in ["iofrol"]:
+    for file_name in ["iofrol", "gsdtsr", "paintcontrol"]:
         print(f"\n========== HARDWARE-LIKE PROGRAM: {file_name} ==========")
 
         df = pd.read_csv(
             "../../datasets/quantum_sota_datasets/" + file_name + ".csv",
             dtype={"time": float, "rate": float}
         )
+        if file_name == "gsdtsr":
+            # must match the filter applied when gsdtsr was trained above --
+            # circuits_metadata.json's case_list indices and
+            # initial_random_solution.json are relative to the filtered
+            # (287-row) frame, not the full 5,555-row one.
+            df = df[df['rate'] > 0]
 
         times, frs = get_data(df)
         program_results = {}

@@ -13,16 +13,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from piastq_execution.evaluation import (
     ClusterAssignment,
     MitigationOverhead,
+    SingleObjectiveEvaluation,
     brute_force_optimal,
+    compute_execution_time_seconds,
     compute_mitigation_overhead,
     compute_single_objective_metrics,
     evaluate_multi_objective_combo,
     evaluate_single_objective_combo,
+    extract_metric_samples,
     merge_selected_tests,
     probability_of_optimal,
     qubo_energy,
     select_argmax_bitstring,
 )
+from piastq_execution.statistics import compare_groups
 from piastq_execution.raw_counts import RawCountsRecord, BatchRecord
 
 
@@ -118,13 +122,29 @@ class TestSingleObjectiveMetrics(unittest.TestCase):
             compute_single_objective_metrics("nope", [0], {"cost": [1]})
 
 
+class TestExecutionTimeSeconds(unittest.TestCase):
+    def test_sums_wall_clock_across_subproblem_records(self):
+        # one repetition = one RawCountsRecord per subproblem/cluster circuit
+        records = [make_raw_record(80, 1.0), make_raw_record(80, 1.5), make_raw_record(80, 0.25)]
+        self.assertAlmostEqual(compute_execution_time_seconds(records), 2.75)
+
+    def test_empty_records_is_zero(self):
+        self.assertAlmostEqual(compute_execution_time_seconds([]), 0.0)
+
+    def test_trex_twirl_instances_all_count_since_each_is_a_fresh_execution(self):
+        # TREx: several twirl-instance executions per subproblem, each its
+        # own RawCountsRecord -- all of them count towards execution time,
+        # unlike raw/MEM/M3 which have one record per subproblem.
+        twirl_instances = [make_raw_record(80, 0.5) for _ in range(4)]
+        self.assertAlmostEqual(compute_execution_time_seconds(twirl_instances), 2.0)
+
+
 class TestMitigationOverhead(unittest.TestCase):
-    def test_raw_only_sums_shots_and_time(self):
+    def test_raw_only_sums_shots(self):
         records = [make_raw_record(80, 1.0), make_raw_record(80, 1.5)]
         overhead = compute_mitigation_overhead(records)
         self.assertEqual(overhead.calibration_circuits, 0)
         self.assertEqual(overhead.total_shots, 160)
-        self.assertAlmostEqual(overhead.wall_clock_seconds, 2.5)
 
     def test_mem_calibration_adds_2n_circuits_worth_of_shots(self):
         from piastq_execution.mitigation import make_mem_calibration_record
@@ -165,6 +185,7 @@ class TestEvaluateSingleObjectiveCombo(unittest.TestCase):
             raw_records=records,
         )
 
+        self.assertAlmostEqual(result.execution_time_seconds, 0.5)
         self.assertAlmostEqual(result.probability_of_optimal, 1.0)
         self.assertAlmostEqual(result.qubo_energy, -2.0)
         # "10" -> bits=[0,1] -> selects cluster_test_cases[1]=43
@@ -199,6 +220,51 @@ class TestEvaluateMultiObjectiveCombo(unittest.TestCase):
         # raw's own front survives into the reference frontier.
         self.assertEqual(result.num_non_dominated, 1)
         self.assertGreater(result.igd, 0.0)  # raw's front doesn't cover (5,1) or (3,3)
+        self.assertAlmostEqual(result.execution_time_seconds, 1.0)
+
+
+def _make_single_objective_result(execution_time, total_shots, combo="toy", method="raw"):
+    overhead = MitigationOverhead(calibration_circuits=0, total_shots=total_shots)
+    return SingleObjectiveEvaluation(
+        combo=combo, method=method, qubo_energy=0.0, optimal_bitstring="0",
+        probability_of_optimal=1.0, execution_cost=0.0, effectiveness={},
+        execution_time_seconds=execution_time, mitigation_overhead=overhead,
+        classical_post_processing_seconds=0.0,
+    )
+
+
+class TestExtractMetricSamples(unittest.TestCase):
+    def test_extracts_top_level_field(self):
+        results = [_make_single_objective_result(1.0, 80), _make_single_objective_result(2.0, 80)]
+        samples = extract_metric_samples(results, "execution_time_seconds")
+        self.assertEqual(samples, [1.0, 2.0])
+
+    def test_extracts_nested_dotted_path(self):
+        results = [_make_single_objective_result(1.0, 80), _make_single_objective_result(2.0, 160)]
+        samples = extract_metric_samples(results, "mitigation_overhead.total_shots")
+        self.assertEqual(samples, [80.0, 160.0])
+
+    def test_end_to_end_compare_algorithms_on_execution_time(self):
+        # Demonstrates the exact workflow the README documents for comparing
+        # two algorithms' quantum-hardware execution time with statistical
+        # soundness: extract samples per group, then compare_groups().
+        qaoa_tcs_results = [_make_single_objective_result(t, 80) for t in [1.0, 1.1, 0.9, 1.05, 0.95]]
+        igdec_results = [_make_single_objective_result(t, 80) for t in [5.0, 5.2, 4.8, 5.1, 4.9]]
+
+        groups = {
+            "qaoa_tcs": extract_metric_samples(qaoa_tcs_results, "execution_time_seconds"),
+            "igdec_qaoa": extract_metric_samples(igdec_results, "execution_time_seconds"),
+        }
+        comparison = compare_groups(groups)
+
+        self.assertIn(comparison.omnibus_test, ("anova", "kruskal_wallis"))
+        self.assertEqual(len(comparison.pairwise), 1)
+        pair = comparison.pairwise[0]
+        # igdec_qaoa's execution times are all clearly larger than qaoa_tcs's
+        if pair.effect_size_name == "a12":
+            self.assertLess(pair.effect_size, 0.5)
+        else:
+            self.assertLess(pair.effect_size, 0.0)
 
 
 if __name__ == "__main__":

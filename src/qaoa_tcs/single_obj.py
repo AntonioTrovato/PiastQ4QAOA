@@ -36,6 +36,10 @@ from collections import defaultdict
 
 bootqa_programs = ["gsdtsr", "paintcontrol", "iofrol", "elevator", "elevator2"]
 bootqa_programs_rep_values = {"gsdtsr": 1, "paintcontrol": 1, "iofrol": 1, "elevator": 1, "elevator2": 1}
+# Per-dataset QUBO alpha (elevator2: alpha, beta, gamma) used when (re)training
+# circuits -- matches SelectQAOA/MOQ-Pipeline.ipynb's single-objective
+# training cell, i.e. what the already-ported circuits were trained with.
+bootqa_alphas = {"gsdtsr": 0, "paintcontrol": 0.45, "iofrol": 0.50, "elevator": 0.20, "elevator2": (0.1, 0.9, 0.9)}
 experiments = 10
 
 def get_data(data_name):
@@ -287,173 +291,293 @@ def bootstrap_confidence_interval(data, num_samples, confidence_alpha=0.95):
 
     return lower_bound, upper_bound
 
-provider = AQTProvider("ACCESS_TOKEN")
-backend = provider.get_backend("offline_simulator_no_noise")
 
-sampling_sampler = AQTSampler(backend)
+# Only rep_1 is used by this replication package (matching the circuits
+# already ported and the execution loop below); add more values here (e.g.
+# 2, 4, 8, 16, matching the original SelectQAOA study) if you need them too.
+TRAINING_REPS = [1]
 
-sampling_sampler.set_transpile_options(optimization_level=3)
 
-base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
-os.makedirs(base_results_dir, exist_ok=True)
+def save_trained_circuits():
+    """
+    Train QAOA-TCS single-objective circuits in ideal noiseless simulation
+    and save them under trained_qaoa_circuits/qaoa_tcs/<dataset>/rep_<reps>/.
 
-num_piast_experiments = 10
+    NOT executed by default (invoke via `python single_obj.py train`) and
+    NOT run in an authoring/review session -- run this on the machine that
+    will actually spend the compute. Ported from SelectQAOA/
+    MOQ-Pipeline.ipynb's single-objective circuit-training cell; reuses this
+    file's already-computed `bootqa_clusters` so cluster indices/ordering
+    exactly match what run_hardware_execution() expects to load.
+    """
+    base_output_dir = os.path.join("..", "..", "trained_qaoa_circuits", "qaoa_tcs")
+    os.makedirs(base_output_dir, exist_ok=True)
 
-for bootqa_program in bootqa_programs:
-    program_results_dir = os.path.join(base_results_dir, bootqa_program)
-    os.makedirs(program_results_dir, exist_ok=True)
+    ideal_sampler = AerSampler()
+    ideal_sampler.options.shots = None
 
-    data = get_data(bootqa_program)
+    for bootqa_program in bootqa_programs:
+        print(f"\n=== PROGRAM: {bootqa_program} ===")
 
-    if bootqa_program in ["elevator", "elevator2"]:
-        test_cases_costs = data["cost"].tolist()
-    else:
-        test_cases_costs = data["time"].tolist()
+        program_dir = os.path.join(base_output_dir, bootqa_program)
+        os.makedirs(program_dir, exist_ok=True)
 
-    if bootqa_program == "elevator":
-        test_cases_effectiveness = data["input_div"].tolist()
-    elif bootqa_program == "elevator2":
-        test_cases_pcount = data["pcount"].tolist()
-        test_cases_dist = data["dist"].tolist()
-    else:
-        test_cases_effectiveness = data["rate"].tolist()
+        data = get_data(bootqa_program)
 
-    for reps in [1]:
-        print(f"\n=== PROGRAM: {bootqa_program}, REPS: {reps} ===")
+        if bootqa_program in ["elevator", "elevator2"]:
+            test_cases_costs = data["cost"].tolist()
+        else:
+            test_cases_costs = data["time"].tolist()
 
-        file_path = os.path.join(
-            program_results_dir,
-            f"{bootqa_program}-rep-{reps}.json"
-        )
+        if bootqa_program == "elevator":
+            test_cases_effectiveness = data["input_div"].tolist()
+        elif bootqa_program == "elevator2":
+            test_cases_pcount = data["pcount"].tolist()
+            test_cases_dist = data["dist"].tolist()
+        else:
+            test_cases_effectiveness = data["rate"].tolist()
 
-        subsuites_file_path = os.path.join(
-            program_results_dir,
-            f"{bootqa_program}-rep-{reps}-subsuites.json"
-        )
+        for reps in TRAINING_REPS:
+            print(f"\n--- REPS: {reps} ---")
 
-        raw_counts_file_path = os.path.join(
-            program_results_dir,
-            f"{bootqa_program}-rep-{reps}-raw_counts.jsonl"
-        )
+            reps_dir = os.path.join(program_dir, f"rep_{reps}")
+            os.makedirs(reps_dir, exist_ok=True)
 
-        json_data = {}
-        solutions = {}
-        subsuites_data = {}
-        qpu_run_times = []
-
-        raw_counts_writer = RawCountsWriter(raw_counts_file_path)
-
-        for exp_id in range(1, num_piast_experiments + 1):
-            print(f"\n--- Experiment {exp_id} ---")
-
-            final_selected_tests = []
-            experiment_cluster_assignments = []
+            qaoa = QAOA(
+                sampler=ideal_sampler,
+                optimizer=COBYLA(maxiter=500),
+                reps=reps
+            )
 
             cluster_items = list(bootqa_clusters[bootqa_program].items())
 
-            for cluster_idx, (cluster_id, cluster_tests) in enumerate(cluster_items):
+            for cluster_idx, (cluster_id, cluster_test_cases) in enumerate(cluster_items):
+                print(f"Training cluster {cluster_idx} (cluster_id={cluster_id})")
+
+                if bootqa_program != "elevator2":
+                    linear_terms = make_linear_terms_bootqa(
+                        cluster_test_cases=cluster_test_cases,
+                        test_cases_costs=test_cases_costs,
+                        test_cases_rates=test_cases_effectiveness,
+                        alpha=bootqa_alphas[bootqa_program]
+                    )
+                else:
+                    linear_terms = make_linear_terms_bootqa2(
+                        cluster_test_cases=cluster_test_cases,
+                        test_cases_costs=test_cases_costs,
+                        pcount=test_cases_pcount,
+                        dist=test_cases_dist,
+                        alpha=bootqa_alphas[bootqa_program][0],
+                        beta=bootqa_alphas[bootqa_program][1],
+                        gamma=bootqa_alphas[bootqa_program][2]
+                    )
+
+                qubo = create_linear_qubo(linear_terms)
+                operator, offset = qubo.to_ising()
+
+                # TRAINING
+                result = qaoa.compute_minimum_eigenvalue(operator)
+
+                # OPTIMAL CIRCUIT
+                optimal_params = result.optimal_point
+                ansatz = qaoa.ansatz
+                bound_circuit = ansatz.assign_parameters(optimal_params)
+
+                # SAVE
                 filename = os.path.join(
-                    "..",
-                    "..",
-                    "trained_qaoa_circuits",
-                    "qaoa_tcs",
-                    bootqa_program,
-                    f"rep_{reps}",
+                    reps_dir,
                     f"{bootqa_program}_rep{reps}_cluster{cluster_idx}.qpy"
                 )
 
-                with open(filename, "rb") as f:
-                    circuits = qpy.load(f)
+                with open(filename, "wb") as f:
+                    qpy.dump(bound_circuit, f)
 
-                circuit = circuits[0]
+                print(f"Saved: {filename}")
 
-                s = time.time()
-                counts, raw_record = run_circuit_with_batching_recorded(
-                    circuit,
-                    sampling_sampler,
-                    algorithm="qaoa_tcs",
-                    objective_mode="single_objective",
-                    dataset=bootqa_program,
-                    circuit_id=f"{bootqa_program}_rep{reps}_cluster{cluster_idx}",
-                    backend=backend,
-                    cluster_id=int(cluster_id),
-                    iteration_id=exp_id,
-                    shots_per_batch=80,
-                    num_batches=1,
-                )
-                e = time.time()
 
-                raw_counts_writer.write(raw_record)
+def run_hardware_execution():
+    """
+    Re-run QAOA-TCS single-objective by loading the trained circuits and
+    executing each on the configured backend.
+    """
+    provider = AQTProvider("ACCESS_TOKEN")
+    backend = provider.get_backend("offline_simulator_no_noise")
 
-                qpu_run_times.append((e - s) * 1000)
+    sampling_sampler = AQTSampler(backend)
 
-                most_likely = max(counts.items(), key=lambda x: x[1])[0]
-                bitstring = [int(b) for b in most_likely[::-1]]
+    sampling_sampler.set_transpile_options(optimization_level=3)
 
-                indexes_selected_tests = [
-                    index for index, value in enumerate(bitstring) if value == 1
-                ]
+    base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
+    os.makedirs(base_results_dir, exist_ok=True)
 
-                selected_tests = []
-                for index in indexes_selected_tests:
-                    if index < len(cluster_tests):
-                        selected_tests.append(cluster_tests[index])
+    num_piast_experiments = 10
 
-                for test in selected_tests:
-                    if test not in final_selected_tests:
-                        final_selected_tests.append(test)
+    for bootqa_program in bootqa_programs:
+        program_results_dir = os.path.join(base_results_dir, bootqa_program)
+        os.makedirs(program_results_dir, exist_ok=True)
 
-                experiment_cluster_assignments.append({
-                    "cluster_id": int(cluster_id),
-                    "cluster_test_cases": list(cluster_tests),
-                    "bit_values": bitstring,
-                    "selected_test_indexes_in_cluster": indexes_selected_tests,
-                    "selected_tests_global_ids": selected_tests
-                })
+        data = get_data(bootqa_program)
 
-            final_selected_tests = sorted(final_selected_tests)
-            solutions[f"selected_test_suite_{exp_id}"] = final_selected_tests
+        if bootqa_program in ["elevator", "elevator2"]:
+            test_cases_costs = data["cost"].tolist()
+        else:
+            test_cases_costs = data["time"].tolist()
 
-            subsuites_data[f"experiment_{exp_id}"] = {
-                "final_selected_tests": final_selected_tests,
-                "cluster_assignments": experiment_cluster_assignments
-            }
+        if bootqa_program == "elevator":
+            test_cases_effectiveness = data["input_div"].tolist()
+        elif bootqa_program == "elevator2":
+            test_cases_pcount = data["pcount"].tolist()
+            test_cases_dist = data["dist"].tolist()
+        else:
+            test_cases_effectiveness = data["rate"].tolist()
 
-            if bootqa_program != "elevator2":
-                total_cost = sum(test_cases_costs[i] for i in final_selected_tests)
-                total_effectiveness = sum(test_cases_effectiveness[i] for i in final_selected_tests)
+        for reps in [1]:
+            print(f"\n=== PROGRAM: {bootqa_program}, REPS: {reps} ===")
 
-                solutions[f"metrics_{exp_id}"] = {
-                    "total_cost": total_cost,
-                    "total_effectiveness": total_effectiveness,
-                    "suite_size": len(final_selected_tests)
+            file_path = os.path.join(
+                program_results_dir,
+                f"{bootqa_program}-rep-{reps}.json"
+            )
+
+            subsuites_file_path = os.path.join(
+                program_results_dir,
+                f"{bootqa_program}-rep-{reps}-subsuites.json"
+            )
+
+            raw_counts_file_path = os.path.join(
+                program_results_dir,
+                f"{bootqa_program}-rep-{reps}-raw_counts.jsonl"
+            )
+
+            json_data = {}
+            solutions = {}
+            subsuites_data = {}
+            qpu_run_times = []
+
+            raw_counts_writer = RawCountsWriter(raw_counts_file_path)
+
+            for exp_id in range(1, num_piast_experiments + 1):
+                print(f"\n--- Experiment {exp_id} ---")
+
+                final_selected_tests = []
+                experiment_cluster_assignments = []
+
+                cluster_items = list(bootqa_clusters[bootqa_program].items())
+
+                for cluster_idx, (cluster_id, cluster_tests) in enumerate(cluster_items):
+                    filename = os.path.join(
+                        "..",
+                        "..",
+                        "trained_qaoa_circuits",
+                        "qaoa_tcs",
+                        bootqa_program,
+                        f"rep_{reps}",
+                        f"{bootqa_program}_rep{reps}_cluster{cluster_idx}.qpy"
+                    )
+
+                    with open(filename, "rb") as f:
+                        circuits = qpy.load(f)
+
+                    circuit = circuits[0]
+
+                    s = time.time()
+                    counts, raw_record = run_circuit_with_batching_recorded(
+                        circuit,
+                        sampling_sampler,
+                        algorithm="qaoa_tcs",
+                        objective_mode="single_objective",
+                        dataset=bootqa_program,
+                        circuit_id=f"{bootqa_program}_rep{reps}_cluster{cluster_idx}",
+                        backend=backend,
+                        cluster_id=int(cluster_id),
+                        iteration_id=exp_id,
+                        shots_per_batch=80,
+                        num_batches=1,
+                    )
+                    e = time.time()
+
+                    raw_counts_writer.write(raw_record)
+
+                    qpu_run_times.append((e - s) * 1000)
+
+                    most_likely = max(counts.items(), key=lambda x: x[1])[0]
+                    bitstring = [int(b) for b in most_likely[::-1]]
+
+                    indexes_selected_tests = [
+                        index for index, value in enumerate(bitstring) if value == 1
+                    ]
+
+                    selected_tests = []
+                    for index in indexes_selected_tests:
+                        if index < len(cluster_tests):
+                            selected_tests.append(cluster_tests[index])
+
+                    for test in selected_tests:
+                        if test not in final_selected_tests:
+                            final_selected_tests.append(test)
+
+                    experiment_cluster_assignments.append({
+                        "cluster_id": int(cluster_id),
+                        "cluster_test_cases": list(cluster_tests),
+                        "bit_values": bitstring,
+                        "selected_test_indexes_in_cluster": indexes_selected_tests,
+                        "selected_tests_global_ids": selected_tests
+                    })
+
+                final_selected_tests = sorted(final_selected_tests)
+                solutions[f"selected_test_suite_{exp_id}"] = final_selected_tests
+
+                subsuites_data[f"experiment_{exp_id}"] = {
+                    "final_selected_tests": final_selected_tests,
+                    "cluster_assignments": experiment_cluster_assignments
                 }
-            else:
-                total_cost = sum(test_cases_costs[i] for i in final_selected_tests)
-                total_pcount = sum(test_cases_pcount[i] for i in final_selected_tests)
-                total_dist = sum(test_cases_dist[i] for i in final_selected_tests)
 
-                solutions[f"metrics_{exp_id}"] = {
-                    "total_cost": total_cost,
-                    "total_pcount": total_pcount,
-                    "total_dist": total_dist,
-                    "suite_size": len(final_selected_tests)
-                }
+                if bootqa_program != "elevator2":
+                    total_cost = sum(test_cases_costs[i] for i in final_selected_tests)
+                    total_effectiveness = sum(test_cases_effectiveness[i] for i in final_selected_tests)
 
-        json_data.update(solutions)
-        json_data["mean_qpu_run_time(ms)"] = statistics.mean(qpu_run_times) if qpu_run_times else 0
-        json_data["stdev_qpu_run_time(ms)"] = statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0
-        json_data["all_qpu_run_times(ms)"] = qpu_run_times
+                    solutions[f"metrics_{exp_id}"] = {
+                        "total_cost": total_cost,
+                        "total_effectiveness": total_effectiveness,
+                        "suite_size": len(final_selected_tests)
+                    }
+                else:
+                    total_cost = sum(test_cases_costs[i] for i in final_selected_tests)
+                    total_pcount = sum(test_cases_pcount[i] for i in final_selected_tests)
+                    total_dist = sum(test_cases_dist[i] for i in final_selected_tests)
 
-        with open(file_path, "w") as f:
-            json.dump(json_data, f, indent=2)
+                    solutions[f"metrics_{exp_id}"] = {
+                        "total_cost": total_cost,
+                        "total_pcount": total_pcount,
+                        "total_dist": total_dist,
+                        "suite_size": len(final_selected_tests)
+                    }
 
-        with open(subsuites_file_path, "w") as f:
-            json.dump(subsuites_data, f, indent=2)
+            json_data.update(solutions)
+            json_data["mean_qpu_run_time(ms)"] = statistics.mean(qpu_run_times) if qpu_run_times else 0
+            json_data["stdev_qpu_run_time(ms)"] = statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0
+            json_data["all_qpu_run_times(ms)"] = qpu_run_times
 
-        raw_counts_writer.close()
+            with open(file_path, "w") as f:
+                json.dump(json_data, f, indent=2)
 
-        print(f"Saved results: {file_path}")
-        print(f"Saved cluster assignments: {subsuites_file_path}")
-        print(f"Saved raw counts: {raw_counts_file_path}")
+            with open(subsuites_file_path, "w") as f:
+                json.dump(subsuites_data, f, indent=2)
+
+            raw_counts_writer.close()
+
+            print(f"Saved results: {file_path}")
+            print(f"Saved cluster assignments: {subsuites_file_path}")
+            print(f"Saved raw counts: {raw_counts_file_path}")
+
+
+if __name__ == "__main__":
+    # `python single_obj.py train` (re)trains QAOA-TCS single-objective
+    # circuits on an ideal simulator -- this must run on the machine that
+    # does the actual training. Default mode executes already-trained
+    # circuits on hardware.
+    if len(sys.argv) > 1 and sys.argv[1] == "train":
+        save_trained_circuits()
+    else:
+        run_hardware_execution()
 
