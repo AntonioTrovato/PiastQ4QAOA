@@ -50,11 +50,22 @@ from piastq_execution.statistics import (
 
 # Which effectiveness metric(s) apply to each single-objective dataset, and
 # which column(s) of that dataset's per-test-case data they're summed from.
+#
+# Two naming conventions coexist in configs/execution_plan.yaml and must
+# both be registered here: QAOA-TCS's own dataset names (single_obj.py's
+# bootqa_programs: "elevator" uses input_div alone, "elevator2" uses
+# pcount+dist) and IGDec-QAOA's "elevator_o2"/"elevator_o3" (circuits_dir
+# "elevator_two"/"elevator_three" -- confirmed by diffing the two scripts to
+# use the IDENTICAL cost+pcount+dist QUBO formulation and weights; "_o3" is
+# just an independently-trained repetition of "_o2", not a different
+# objective set, so both get the same metric names here).
 EFFECTIVENESS_METRICS: Dict[str, List[str]] = {
     "gsdtsr": ["failure_rate"],
     "iofrol": ["failure_rate"],
     "paintcontrol": ["failure_rate"],
-    "elevator_o2": ["input_diversity"],
+    "elevator": ["input_diversity"],
+    "elevator2": ["passenger_count", "travel_distance"],
+    "elevator_o2": ["passenger_count", "travel_distance"],
     "elevator_o3": ["passenger_count", "travel_distance"],
 }
 
@@ -230,7 +241,7 @@ class SingleObjectiveEvaluation:
     qubo_energy: float
     optimal_bitstring: str
     probability_of_optimal: float
-    execution_cost: float
+    execution_cost: Optional[float]
     effectiveness: Dict[str, float]
     execution_time_seconds: float
     mitigation_overhead: MitigationOverhead
@@ -269,34 +280,78 @@ def evaluate_single_objective_combo(
     test_case_data: Dict[str, Sequence[float]],
     raw_records: Sequence[RawCountsRecord],
     calibration_record: Optional[CalibrationRecord] = None,
+    calibration_records: Optional[Sequence[Optional[CalibrationRecord]]] = None,
     calibration_shots_per_circuit: int = 0,
+    compute_final_suite_metrics: bool = True,
 ) -> SingleObjectiveEvaluation:
     """Full per-combo x per-method evaluation for one single-objective run:
     corrects every cluster's counts, merges into the final suite, and
     computes every metric in one pass.
+
+    `calibration_record` (singular) is broadcast to every cluster -- correct
+    when every cluster in this combo shares the same circuit width (a
+    common case, and what every existing caller/test uses). Pass
+    `calibration_records` (plural, one entry per cluster, same order as
+    `cluster_qubos`) instead when clusters have DIFFERENT widths -- QAOA-TCS
+    clusters range 1-7 qubits, and MEM/M3 calibration is stored per width
+    (piastq_execution.mitigation.CalibrationStore), so a single shared
+    calibration_record would silently mismatch dimensions for every cluster
+    not matching that one width. `calibration_records` takes precedence if
+    given.
+
+    `compute_final_suite_metrics` (default True) controls whether the
+    per-cluster selections get merged into a final test suite at all
+    (`execution_cost`/`effectiveness`). Set it False for algorithms whose
+    clusters/subproblems are NOT independent -- IGDec-QAOA's subproblems are
+    solved adaptively, each one's selection feeding into what the NEXT
+    subproblem even is, so merging a *corrected* (non-raw) method's
+    per-circuit selections via the same trained circuit sequence the raw run
+    happened to take does not represent a real re-run of IGDec-QAOA under
+    that correction method -- only `qubo_energy`/`probability_of_optimal`
+    (which don't depend on the merge, evaluated per circuit against its own
+    fixed QUBO) remain valid for such algorithms/methods.
+    `execution_cost` is None and `effectiveness` is `{}` when this is False.
+    QAOA-TCS's clusters ARE independent, so this should stay True there.
     """
     start = time.time()
+
+    if calibration_records is None:
+        calibration_records = [calibration_record] * len(cluster_qubos)
 
     selected_bitstrings = []
     total_qubo_energy = 0.0
     optimal_probabilities = []
 
-    for (linear, quadratic, num_qubits), raw_counts in zip(cluster_qubos, cluster_raw_counts):
+    for (linear, quadratic, num_qubits), raw_counts, cluster_calibration in zip(
+        cluster_qubos, cluster_raw_counts, calibration_records
+    ):
         selected, _distribution, p_optimal = evaluate_single_objective_cluster(
-            method, raw_counts, linear, quadratic, num_qubits, calibration_record,
+            method, raw_counts, linear, quadratic, num_qubits, cluster_calibration,
         )
         selected_bitstrings.append(selected)
         bits = [int(b) for b in selected[::-1]]
         total_qubo_energy += qubo_energy(bits, linear, quadratic)
         optimal_probabilities.append(p_optimal)
 
-    final_selected_tests = merge_selected_tests(cluster_assignments, selected_bitstrings)
-    effectiveness_metrics = compute_single_objective_metrics(dataset, final_selected_tests, test_case_data)
-    execution_cost = effectiveness_metrics.pop("execution_cost")
+    if compute_final_suite_metrics:
+        final_selected_tests = merge_selected_tests(cluster_assignments, selected_bitstrings)
+        effectiveness_metrics = compute_single_objective_metrics(dataset, final_selected_tests, test_case_data)
+        execution_cost = effectiveness_metrics.pop("execution_cost")
+    else:
+        effectiveness_metrics = {}
+        execution_cost = None
 
     elapsed = time.time() - start
 
     mean_p_optimal = sum(optimal_probabilities) / len(optimal_probabilities) if optimal_probabilities else 0.0
+
+    # Mitigation overhead bookkeeping only accepts one CalibrationRecord (it
+    # reports calibration circuit count/shots/wall-clock, not a per-cluster
+    # correction) -- when clusters had different calibration_records, this
+    # picks the first non-None one as representative for that bookkeeping,
+    # same width or not; the corrected counts themselves already used each
+    # cluster's own record correctly, in the loop above.
+    representative_calibration = next((c for c in calibration_records if c is not None), None)
 
     return SingleObjectiveEvaluation(
         combo=combo,
@@ -307,7 +362,9 @@ def evaluate_single_objective_combo(
         execution_cost=execution_cost,
         effectiveness=effectiveness_metrics,
         execution_time_seconds=compute_execution_time_seconds(raw_records),
-        mitigation_overhead=compute_mitigation_overhead(raw_records, calibration_record, calibration_shots_per_circuit),
+        mitigation_overhead=compute_mitigation_overhead(
+            raw_records, representative_calibration, calibration_shots_per_circuit
+        ),
         classical_post_processing_seconds=elapsed,
     )
 
@@ -412,7 +469,10 @@ def extract_metric_samples(
     "execution_time_seconds" (both objective modes -- this is the one to use
     for comparing algorithms/methods on quantum-hardware execution cost),
     "hypervolume" / "igd" / "num_non_dominated" (multi-objective only),
-    "classical_post_processing_seconds".
+    "classical_post_processing_seconds". Raises TypeError if `metric` is
+    "execution_cost"/"effectiveness.*" on results computed with
+    compute_final_suite_metrics=False (e.g. IGDec-QAOA's non-raw methods) --
+    those are None/{} by design, not meant to be compared.
     """
     samples = []
     for result in results:

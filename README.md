@@ -42,20 +42,29 @@ PiastQ4QAOA/
 │   └── piastq_execution/             # shared library, used by every script above
 │       ├── raw_counts.py             #   shot-batched execution + full raw-data capture
 │       ├── mitigation.py             #   full MEM / M3 / TREx
+│       ├── qubo_io.py                #   persisting/loading trained circuits' QUBO coefficients
+│       ├── sir_metrics.py            #   SIR static cost/fault/coverage data + Pareto fronts
+│       ├── seeding.py                #   deterministic seeds for IGDec-QAOA's random sampling
+│       ├── backend_config.py         #   single place to set the real PIAST-Q API token/backend
 │       ├── run_calibration.py        #   MEM/M3 calibration entry point (see §5)
 │       ├── budget_planner.py         #   hardware-time budget planning
 │       ├── evaluation.py             #   per-combo x per-method metrics
+│       ├── evaluate_all.py           #   runs evaluation.py across every combo x method (see §8)
+│       ├── compare_all.py            #   runs statistics.py across every combo, RQ-mapped report
 │       └── statistics.py             #   Shapiro-Wilk-gated statistical comparison
 ├── datasets/                         # input data (unchanged)
 ├── trained_qaoa_circuits/
-│   ├── qaoa_tcs/<dataset>/rep_1/*.qpy            # one reusable circuit set per dataset
-│   └── igdec_qaoa/<dataset>/sampling_N/*.qpy     # one circuit set per sampling run
+│   ├── qaoa_tcs/<dataset>/rep_1/*.qpy, *_qubos.json   # circuits + their QUBO coefficients
+│   └── igdec_qaoa/<dataset>/sampling_N/*.qpy, circuits_metadata.json  # + QUBO coefficients
 ├── results/
 │   ├── qaoa_tcs/<dataset>/...        # single_obj.py / multi_obj.py output
-│   └── igdec_qaoa/<dataset>/...      # IGDec-QAOA output
+│   ├── igdec_qaoa/<dataset>/...      # IGDec-QAOA output
+│   └── evaluation/                   # evaluate_all.py / compare_all.py output (gitignored)
 ├── calibration/                      # MEM/M3 calibration snapshots (run_calibration.py output)
 ├── execution_plan/                   # budget_planner.py output (regenerated on demand)
-├── configs/execution_plan.yaml       # budget planner configuration
+├── configs/
+│   ├── execution_plan.yaml           # budget planner + evaluate_all.py configuration
+│   └── backend.yaml                  # PIAST-Q API token/backend name (see §10 step 5)
 └── tests/                            # synthetic unit tests (no AQT, no real hardware)
 ```
 
@@ -227,6 +236,15 @@ Each subproblem-solve is a 7-qubit ideal-simulator QAOA optimization
 wall-clock total per script invocation, depending on the machine. **Do not
 run this training in an authoring/review session; run it on the machine
 that will actually spend that compute.**
+
+**Reproducible from a clean checkout**: each sampling's initial random
+solution and QAOA optimizer randomness are seeded deterministically from
+`(dataset, sampling_id)` via `piastq_execution.seeding.seed_for_sampling()`
+— re-running `... train` after deleting `trained_qaoa_circuits/igdec_qaoa/`
+reproduces the exact same 10 samplings every time. (This was not always
+true: an earlier version of these scripts had a `run_alg()` function that
+*looked* like it seeded things but was dead code, never called; the actual
+training path was fully unseeded. Fixed, and `run_alg()` removed.)
 
 Both `single_obj.py`/`multi_obj.py` and all three IGDec-QAOA scripts connect
 via `piastq_execution.backend_config.get_backend()`, which reads the API
@@ -479,9 +497,15 @@ authoring/review session.
 - **Single-objective**: QUBO energy of the corrected/selected solution,
   probability of the brute-forced optimal bitstring (<=7-qubit subproblems,
   128 states, trivial), execution cost + the dataset's effectiveness
-  metric(s) of the final merged suite (failure rate for
-  gsdtsr/iofrol/paintcontrol; input diversity for elevator_o2; passenger
-  count + travel distance for elevator_o3), quantum-hardware execution time,
+  metric(s) of the final merged suite (`EFFECTIVENESS_METRICS`: failure rate
+  for gsdtsr/iofrol/paintcontrol; input diversity for QAOA-TCS's own
+  `elevator`; passenger count + travel distance for QAOA-TCS's `elevator2`
+  *and* IGDec-QAOA's `elevator_o2`/`elevator_o3` alike — confirmed by diffing
+  the `elevator_two`/`elevator_three` scripts to use the identical
+  cost+pcount+dist QUBO formulation; `elevator_o2` was previously
+  mislabeled `input_diversity`, a dataset name mismatch that would have
+  raised `Unknown dataset` for QAOA-TCS's own `elevator`/`elevator2` too,
+  since neither was registered at all), quantum-hardware execution time,
   mitigation overhead, classical post-processing time.
 - **Multi-objective**: non-dominated solutions contributed to an a posteriori
   reference Pareto frontier (union of every compared method's non-dominated
@@ -538,33 +562,85 @@ by cost/benefit (RQ3b, below), not just by how much they improve quality.
 `classical_post_processing_seconds` is the (non-hardware) correction +
 metric-computation time.
 
-### Running statistical comparisons
+### IGDec-QAOA's final-suite metrics: raw only
 
-`src/piastq_execution/statistics.py` implements the same statistical-
-comparison approach used throughout `SelectQAOA/stat_tests/*.R`:
-Shapiro-Wilk normality check first, then ANOVA + Tukey HSD + Cohen's d
-(normal data) or Kruskal-Wallis + Bonferroni-adjusted Dunn's test +
-Vargha-Delaney A12 (non-normal data). This applies to **every** metric
-`evaluation.py` computes -- QUBO energy, probability of optimal,
-effectiveness, HV/IGD, and *execution cost/time* (both the single-objective
-`execution_cost` and the always-present `execution_time_seconds`) are all
-just numeric samples to it; nothing about the statistical machinery is
-metric-specific.
+`evaluate_single_objective_combo()`'s built-in merge
+(`merge_selected_tests()`, union across independent clusters) is correct for
+QAOA-TCS, whose clusters never share a test case. IGDec-QAOA's subproblems
+are **adaptive** instead: `solution[case_list[i]] = bitstring[i]` overwrites
+specific positions of an evolving global solution, and which subproblem gets
+solved next depends on that evolving solution — a saved circuit sequence
+only reflects the *one* trajectory the raw hardware run actually took.
+Feeding a corrected (MEM/M3/TREx) method's per-circuit selections through
+the same trajectory would silently pretend IGDec-QAOA made the same
+adaptive decisions under a different correction method, which isn't true
+and isn't verified anywhere.
 
-The workflow, end to end: run `evaluate_single_objective_combo()` /
-`evaluate_multi_objective_combo()` (§8, above) once per repetition to get a
-list of per-repetition results for each group you're comparing (e.g. one
-list per algorithm, or one list per mitigation method), pull out the metric
-you want with `extract_metric_samples()`, then hand the groups to
-`compare_groups()`:
+So for IGDec-QAOA combos: `execution_cost`/`effectiveness` are only ever
+computed for `raw` (via `evaluate_all.py`'s `merge_igdec_solution()`, which
+replays the real last-write-wins update rule instead of
+`merge_selected_tests()`'s union) — MEM/M3/TREx get `execution_cost=None`,
+`effectiveness={}`. `qubo_energy`/`probability_of_optimal` remain valid for
+every method regardless (they're scored per circuit against its own fixed
+QUBO, independent of the merge).
+
+### Running the evaluation + comparisons
+
+**Automatic, across every combo** (the intended way to run this):
+
+```bash
+cd src/piastq_execution
+python evaluate_all.py   # -> ../../results/evaluation/<combo>.json
+python compare_all.py    # -> ../../results/evaluation/comparison_report.{txt,json}
+```
+
+`evaluate_all.py` reads `configs/execution_plan.yaml`'s `combos:` section
+(the same combo list `budget_planner.py` uses) and, for every combo x method
+x repetition, assembles everything `evaluate_single_objective_combo()` /
+`evaluate_multi_objective_combo()` needs — trained circuits' persisted QUBO
+coefficients (`*_qubos.json` / extended `circuits_metadata.json`, §4),
+`*-raw_counts.jsonl` / `*-trex-raw_counts.jsonl`, `*-subsuites.json`, and
+calibration (looked up per circuit width, §5) — and writes one JSON file per
+combo. `compare_all.py` reads those files and runs `compare_groups()` for
+every combo (method vs `raw`) and, for datasets with both a QAOA-TCS and an
+IGDec-QAOA combo (gsdtsr/iofrol/paintcontrol — the elevator variants use
+different naming per algorithm and aren't auto-paired), QAOA-TCS vs
+IGDec-QAOA — writing an RQ-mapped report:
+
+```
+Combo: gsdtsr_qaoa_tcs
+  RQ1/RQ3a (quality, cost-agnostic):
+    qubo_energy:
+      normal=False, omnibus=kruskal_wallis, p=...
+        mem vs raw: p_adj=..., a12=...
+  RQ2 (effectiveness):
+    execution_cost: ...
+  RQ3b (cost):
+    execution_time_seconds: ...
+    mitigation_overhead.calibration_wall_clock_seconds: ...
+
+RQ4: QAOA-TCS vs IGDec-QAOA
+  gsdtsr (gsdtsr_qaoa_tcs vs gsdtsr_igdec_qaoa), metric=execution_time_seconds:
+    method=raw: ...
+```
+
+Both scripts only read already-collected files and do classical
+post-processing — no backend, no AQT, safe to run anywhere once Phase 4
+(calibration) and Phase 5 (hardware execution) data exists (§10).
+
+**Manual, one comparison at a time** (if you want more control, or aren't
+going through `configs/execution_plan.yaml`'s combo list): call
+`evaluate_single_objective_combo()` / `evaluate_multi_objective_combo()`
+yourself per repetition, pull out the metric you want with
+`piastq_execution.evaluation.extract_metric_samples()` (accepts dotted paths
+like `"mitigation_overhead.calibration_wall_clock_seconds"`), and hand the
+groups to `piastq_execution.statistics.compare_groups()` — this is exactly
+what `evaluate_all.py`/`compare_all.py` do internally, just wired up by hand:
 
 ```python
 from piastq_execution.evaluation import extract_metric_samples
 from piastq_execution.statistics import compare_groups
 
-# qaoa_tcs_results / igdec_results: one SingleObjectiveEvaluation per
-# repetition, from repeated evaluate_single_objective_combo() calls for the
-# same dataset+method under each algorithm.
 groups = {
     "qaoa_tcs": extract_metric_samples(qaoa_tcs_results, "execution_time_seconds"),
     "igdec_qaoa": extract_metric_samples(igdec_results, "execution_time_seconds"),
@@ -577,24 +653,15 @@ for pair in comparison.pairwise:
           pair.effect_size_name, "=", pair.effect_size)
 ```
 
-`extract_metric_samples(results, metric)` accepts dotted paths for nested
-fields too, e.g. `"mitigation_overhead.total_shots"` or
-`"mitigation_overhead.calibration_wall_clock_seconds"` (the RQ3b metric —
-zero for raw/TREx groups, since they don't use a calibration record). Swap
-`"execution_time_seconds"` for `"execution_cost"` (single-objective only),
-`"qubo_energy"`, `"probability_of_optimal"`, `"hypervolume"`/`"igd"`
-(multi-objective only), etc. to compare on any other metric the same way.
-`compare_groups()` also works directly on plain `{group_name: [values]}`
-dicts if you're not going through evaluation results at all (2 groups: use
-`compare_two_groups(x, y)` instead for the two-sample special case).
-
-`comparison.normal` tells you which path was taken;
+`comparison.normal` tells you which path was taken (Shapiro-Wilk gated);
 `comparison.omnibus_test`/`.omnibus_statistic`/`.omnibus_p_value` is the
 ANOVA/Kruskal-Wallis result; `comparison.pairwise` is a list of
 `PairwiseComparison(group_a, group_b, p_value, p_adjusted, effect_size,
 effect_size_name)` — one entry per pair of groups, already
 Tukey/Bonferroni-adjusted, with Cohen's d or Vargha-Delaney A12 depending on
-which path was taken.
+which path was taken. `compare_groups()` also works directly on plain
+`{group_name: [values]}` dicts (2 groups: use `compare_two_groups(x, y)`
+instead for the two-sample special case).
 
 ---
 
@@ -607,7 +674,7 @@ which path was taken.
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about a second (111 tests total).
+about a second (151 tests total).
 
 ---
 
@@ -619,7 +686,7 @@ about a second (111 tests total).
    `qiskit_env/` inside the project (matches §2's `python3.10 -m venv
    qiskit_env`). Then `pip install -r requirements.txt` in PyCharm's terminal.
 3. **Sanity check (safe anywhere)**: run `python -m unittest discover -s
-   tests` — should show 111 passing tests in ~1s.
+   tests` — should show 151 passing tests in ~1s.
 4. **Plan the budget (safe anywhere)**: edit `configs/execution_plan.yaml`
    (§7), then run `src/piastq_execution/budget_planner.py` to see the
    resulting repetitions/shots/methods per pool before spending any hardware
@@ -668,19 +735,24 @@ about a second (111 tests total).
    > `save_trained_circuits_and_initial_solutions()`) don't touch AQT at
    > all — they always use a local ideal `AerSampler`, so nothing there
    > needs to change.
-6. **Mitigate + evaluate (safe anywhere, once step 5's data exists)**: for
-   each combo, load its raw-counts + calibration, call
-   `piastq_execution.evaluation.evaluate_single_objective_combo()` /
-   `evaluate_multi_objective_combo()` (§8) once per method
-   (`raw`/`mem`/`m3`/`trex`) to get that combo's metrics. For `trex`, first
-   load `*-trex-raw_counts.jsonl` and run it through
-   `piastq_execution.mitigation.aggregate_trex_records()` to get the
-   twirl-undone per-circuit counts (§5) — `raw`/`mem`/`m3` instead pass the
-   plain `*-raw_counts.jsonl` counts straight to `evaluate_*_combo()`.
-7. **Compare (safe anywhere)**: feed the per-method metric samples from step
-   6 into `piastq_execution.statistics.compare_groups()` (§8) to get the
-   Shapiro-Wilk-gated significance test + effect size for whichever
-   comparison you're making (e.g. raw vs. MEM, or QAOA-TCS vs. IGDec-QAOA).
+6. **Evaluate (safe anywhere, once step 5's data exists)**:
+   ```bash
+   cd src/piastq_execution
+   python evaluate_all.py
+   # -> ../../results/evaluation/<combo>.json, one per combo in
+   #    configs/execution_plan.yaml, {method: [per-repetition metrics, ...]}
+   ```
+   Reads every combo's raw-counts + calibration + persisted QUBOs and
+   computes every metric (§8) once per combo x method x repetition — no
+   manual per-combo wiring needed.
+7. **Compare (safe anywhere)**:
+   ```bash
+   python compare_all.py
+   # -> ../../results/evaluation/comparison_report.{txt,json}
+   ```
+   Runs `compare_groups()` (§8) for every combo (method vs. `raw`) and, for
+   datasets present under both algorithms, QAOA-TCS vs. IGDec-QAOA —
+   producing the RQ1/RQ2/RQ3a/RQ3b/RQ4-mapped report below directly.
 
 **Research questions this package is built to answer:**
 

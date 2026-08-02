@@ -196,6 +196,74 @@ class TestEvaluateSingleObjectiveCombo(unittest.TestCase):
         self.assertEqual(result.mitigation_overhead.total_shots, 100)
         self.assertGreaterEqual(result.classical_post_processing_seconds, 0.0)
 
+    def test_compute_final_suite_metrics_false_skips_merge(self):
+        # Per-circuit metrics (qubo_energy, probability_of_optimal) must
+        # still be correct -- only execution_cost/effectiveness are skipped.
+        linear = [1, -2]
+        quadratic = {(0, 1): 3}
+        raw_counts = {"10": 100}
+        assignments = [ClusterAssignment(cluster_id=0, cluster_test_cases=[0, 1])]
+        test_case_data = {"cost": [5.0, 7.0], "failure_rate": [0.1, 0.9]}
+        records = [make_raw_record(100, 0.5)]
+
+        result = evaluate_single_objective_combo(
+            combo="toy_igdec_qaoa",
+            method="raw",
+            dataset="iofrol",
+            cluster_assignments=assignments,
+            cluster_raw_counts=[raw_counts],
+            cluster_qubos=[(linear, quadratic, 2)],
+            test_case_data=test_case_data,
+            raw_records=records,
+            compute_final_suite_metrics=False,
+        )
+
+        self.assertAlmostEqual(result.qubo_energy, -2.0)
+        self.assertAlmostEqual(result.probability_of_optimal, 1.0)
+        self.assertIsNone(result.execution_cost)
+        self.assertEqual(result.effectiveness, {})
+
+    def test_calibration_records_plural_handles_mixed_cluster_widths(self):
+        # Two clusters of DIFFERENT widths (1 and 2 qubits) -- a single
+        # shared calibration_record would dimension-mismatch on at least
+        # one of them; calibration_records (one per cluster) must not.
+        import numpy as np
+
+        from piastq_execution.mitigation import make_mem_calibration_record
+
+        cal_1q = make_mem_calibration_record(
+            np.eye(2), physical_qubits=[0], backend_name="b", backend_version="v",
+            shots_per_calibration_circuit=200, calibration_wall_clock_seconds=1.0,
+        )
+        cal_2q = make_mem_calibration_record(
+            np.eye(4), physical_qubits=[0, 1], backend_name="b", backend_version="v",
+            shots_per_calibration_circuit=200, calibration_wall_clock_seconds=1.0,
+        )
+
+        assignments = [
+            ClusterAssignment(cluster_id=0, cluster_test_cases=[0]),
+            ClusterAssignment(cluster_id=1, cluster_test_cases=[1, 2]),
+        ]
+        cluster_qubos = [([1.0], {}, 1), ([1.0, -1.0], {}, 2)]
+        cluster_raw_counts = [{"0": 100}, {"01": 100}]
+        test_case_data = {"cost": [1.0, 2.0, 3.0], "failure_rate": [0.1, 0.2, 0.3]}
+        records = [make_raw_record(100, 0.1)]
+
+        result = evaluate_single_objective_combo(
+            combo="toy_mixed_width",
+            method="mem",
+            dataset="iofrol",
+            cluster_assignments=assignments,
+            cluster_raw_counts=cluster_raw_counts,
+            cluster_qubos=cluster_qubos,
+            test_case_data=test_case_data,
+            raw_records=records,
+            calibration_records=[cal_1q, cal_2q],
+        )
+
+        # Both clusters corrected without a dimension mismatch/crash.
+        self.assertIsNotNone(result.qubo_energy)
+
 
 class TestEvaluateMultiObjectiveCombo(unittest.TestCase):
     def test_hand_verified_hv_and_igd_three_objectives(self):

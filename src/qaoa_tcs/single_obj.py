@@ -13,6 +13,7 @@ from piastq_execution.mitigation import (
     generate_random_twirl_mask,
     load_trex_twirl_instances,
 )
+from piastq_execution.qubo_io import qubo_to_json_dict
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -355,6 +356,7 @@ def save_trained_circuits():
             )
 
             cluster_items = list(bootqa_clusters[bootqa_program].items())
+            cluster_qubos_json = []
 
             for cluster_idx, (cluster_id, cluster_test_cases) in enumerate(cluster_items):
                 print(f"Training cluster {cluster_idx} (cluster_id={cluster_id})")
@@ -398,6 +400,21 @@ def save_trained_circuits():
                     qpy.dump(bound_circuit, f)
 
                 print(f"Saved: {filename}")
+
+                cluster_qubos_json.append({
+                    "cluster_idx": cluster_idx,
+                    "cluster_id": int(cluster_id),
+                    **qubo_to_json_dict(qubo),
+                })
+
+            # Persisted once per rep so evaluation (piastq_execution.evaluate_all)
+            # can recompute qubo_energy()/probability_of_optimal() against the
+            # exact QUBO each circuit was trained to solve, without reloading
+            # datasets or re-deriving cluster QUBOs.
+            qubos_filename = os.path.join(reps_dir, f"{bootqa_program}_rep{reps}_qubos.json")
+            with open(qubos_filename, "w") as f:
+                json.dump(cluster_qubos_json, f, indent=2)
+            print(f"Saved: {qubos_filename}")
 
 
 def run_hardware_execution():

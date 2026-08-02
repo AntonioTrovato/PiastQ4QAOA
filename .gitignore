@@ -22,3 +22,8 @@ calibration/*.json
 # on demand from configs/execution_plan.yaml + trained_qaoa_circuits/. Kept
 # outside results/ on purpose: results/ is reserved for qaoa_tcs/igdec_qaoa.
 execution_plan/
+
+# evaluate_all.py / compare_all.py output -- regenerated on demand from
+# already-tracked raw_counts/subsuites/qubos/calibration data, same as
+# execution_plan/ above.
+results/evaluation/

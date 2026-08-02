@@ -32,6 +32,8 @@ from piastq_execution.mitigation import (
     generate_random_twirl_mask,
     load_trex_twirl_instances,
 )
+from piastq_execution.seeding import seed_for_sampling
+from piastq_execution.qubo_io import qubo_to_json_dict
 
 
 # ============================================================
@@ -189,24 +191,6 @@ def OrderByImpactNum(best_solution, df, best_energy):
     return sorted_indices
 
 
-def run_alg(qubo, reps):
-    seed = random.randint(1, 9999999)
-    algorithm_globals.random_seed = seed
-
-    optimizer = COBYLA(500)
-    ideal_sampler = AerSampler()
-    ideal_sampler.options.shots = None
-
-    qaoa = QAOA(sampler=ideal_sampler, optimizer=optimizer, reps=reps)
-    operator, offset = qubo.to_ising()
-
-    begin = time.time()
-    qaoa_result = qaoa.compute_minimum_eigenvalue(operator)
-    end = time.time()
-
-    exe_time = end - begin
-    return qaoa_result, exe_time
-
 
 def get_initial_fval(length, df):
     initial_values = [random.choice([0, 1]) for _ in range(length)]
@@ -256,6 +240,15 @@ def save_trained_circuits_and_initial_solutions():
 
     for sampling_id in range(1, NUM_EXPERIMENT + 1):
         print(f"\n----- {RUN_LABEL} | RANDOM INITIAL SAMPLING #{sampling_id} -----")
+
+        # Deterministic per (dataset, sampling_id): re-running `... train`
+        # after deleting trained_qaoa_circuits/ reproduces this exact
+        # sampling's initial solution and QAOA optimization trajectory (the
+        # seed stays in effect for every subproblem solved below, not just
+        # this call) -- see piastq_execution.seeding.
+        seed = seed_for_sampling(RUN_LABEL, sampling_id)
+        random.seed(seed)
+        algorithm_globals.random_seed = seed
 
         sampling_dir = os.path.join(base_output_dir, f"sampling_{sampling_id}")
         os.makedirs(sampling_dir, exist_ok=True)
@@ -331,7 +324,8 @@ def save_trained_circuits_and_initial_solutions():
                         "iteration": itr_num,
                         "subproblem_index": 1,
                         "case_list": [int(x) for x in case_list],
-                        "qpy_file": circuit_filename
+                        "qpy_file": circuit_filename,
+                        **qubo_to_json_dict(qubo),
                     }
                 )
 
@@ -389,7 +383,8 @@ def save_trained_circuits_and_initial_solutions():
                             "iteration": itr_num,
                             "subproblem_index": subproblem_idx,
                             "case_list": [int(x) for x in case_list],
-                            "qpy_file": circuit_filename
+                            "qpy_file": circuit_filename,
+                            **qubo_to_json_dict(qubo),
                         }
                     )
 
