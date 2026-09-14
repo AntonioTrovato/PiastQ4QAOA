@@ -81,14 +81,35 @@ def get_backend_identity(backend) -> Dict[str, str]:
     }
 
 
+def physical_qubit_mapping_from_layout(circuit, initial_layout: List[int]) -> Dict[int, int]:
+    """Return {logical_qubit_index: physical_qubit_index} directly from a
+    pinned `initial_layout` (see piastq_execution.qubit_layout), with no
+    transpile call needed: since the layout was pinned before submission (see
+    `run_circuit_with_batching_recorded`), it's already known by construction,
+    not something to reverse-engineer afterwards.
+    """
+    if len(initial_layout) != circuit.num_qubits:
+        raise ValueError(
+            f"initial_layout has {len(initial_layout)} qubits but circuit has "
+            f"{circuit.num_qubits} -- they must match so calibration and "
+            f"execution provably share the same physical qubits."
+        )
+    return {i: int(initial_layout[i]) for i in range(circuit.num_qubits)}
+
+
 def get_physical_qubit_mapping(circuit, backend, optimization_level: int = 3) -> Dict[int, int]:
     """Return {logical_qubit_index: physical_qubit_index} for `circuit` on `backend`.
 
-    Transpiles `circuit` for `backend` at the given optimization level (matching
-    the optimization_level every script already passes to
-    `sampler.set_transpile_options`) purely to recover the layout for
-    record-keeping; the circuit actually submitted through the sampler is
-    untouched by this call.
+    Fallback used only when no `initial_layout` was pinned for this
+    execution (see `run_circuit_with_batching_recorded`): transpiles
+    `circuit` for `backend` at the given optimization level purely to
+    *guess* the layout the transpiler would pick, for record-keeping. This is
+    an independent, best-effort transpile call, separate from whatever
+    transpilation the sampler itself performs for the actual submitted
+    circuit -- it is not guaranteed to agree with it. Prefer pinning
+    `initial_layout` (piastq_execution.qubit_layout.physical_layout_for_width)
+    and using `physical_qubit_mapping_from_layout` instead, which has no such
+    gap.
     """
     from qiskit import transpile
 
@@ -158,6 +179,7 @@ def run_circuit_with_batching_recorded(
     optimization_level: int = 3,
     record_qubit_mapping: bool = True,
     twirl_mask: Optional[List[int]] = None,
+    initial_layout: Optional[List[int]] = None,
 ):
     """Shot-batched circuit execution with full raw-data capture.
 
@@ -176,7 +198,22 @@ def run_circuit_with_batching_recorded(
     persisted record and can be undone later with
     piastq_execution.mitigation.aggregate_trex_records(). Leave as None for
     every non-TREx (raw/MEM/M3) execution.
+
+    `initial_layout`: the pinned physical qubits this circuit must run on
+    (see piastq_execution.qubit_layout.physical_layout_for_width) -- pass this
+    on every call so the *same* physical qubits are used for the real QAOA/
+    TREx circuit and for the MEM/M3 calibration circuits of the same width
+    (run_calibration.py). When given, it is applied to `sampler` via
+    `set_transpile_options` before this circuit is submitted, and the
+    recorded `physical_qubit_mapping` is derived directly from it (no guess
+    -- see `physical_qubit_mapping_from_layout`). When left as None, the
+    transpiler picks a layout automatically and the recorded mapping is only
+    a best-effort guess (`get_physical_qubit_mapping`) -- kept for backward
+    compatibility, not recommended for new call sites.
     """
+    if initial_layout is not None:
+        sampler.set_transpile_options(optimization_level=optimization_level, initial_layout=list(initial_layout))
+
     batch_records: List[BatchRecord] = []
 
     for batch_index in range(num_batches):
@@ -191,11 +228,12 @@ def run_circuit_with_batching_recorded(
             total_counts[bitstring] += count
 
     backend_identity = get_backend_identity(backend)
-    qubit_mapping = (
-        get_physical_qubit_mapping(circuit, backend, optimization_level=optimization_level)
-        if record_qubit_mapping
-        else {i: i for i in range(circuit.num_qubits)}
-    )
+    if not record_qubit_mapping:
+        qubit_mapping = {i: i for i in range(circuit.num_qubits)}
+    elif initial_layout is not None:
+        qubit_mapping = physical_qubit_mapping_from_layout(circuit, initial_layout)
+    else:
+        qubit_mapping = get_physical_qubit_mapping(circuit, backend, optimization_level=optimization_level)
 
     record = RawCountsRecord(
         algorithm=algorithm,

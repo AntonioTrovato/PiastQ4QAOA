@@ -495,6 +495,84 @@ def build_inventories_from_config(path: str, trained_circuits_dir: str) -> Dict[
 
 
 # ---------------------------------------------------------------------------
+# Resolving a combo's actual execution settings (for execution scripts)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ComboExecutionSettings:
+    """What an execution script should actually run for one combo, resolved
+    from the plan that already covers it -- so hardware execution always
+    matches whatever the budget planner most recently decided, instead of
+    a hardcoded placeholder (shots_per_batch=80, num_piast_experiments=10)
+    that silently ignores the plan.
+    """
+    combo: str
+    pool_name: str
+    repetitions: int
+    shots_per_circuit: int
+    methods: List[str]
+    num_batches: int
+    shots_per_batch: int
+    remainder_shots: int
+
+    @property
+    def trex_enabled(self) -> bool:
+        return "trex" in self.methods
+
+
+def _shots_to_batches(shots_per_circuit: int, shots_per_batch_cap: int) -> Tuple[int, int, int]:
+    """Splits a target shot count into (num_batches, shots_per_batch,
+    remainder_shots) -- the "N x 200 + remainder" pattern every execution
+    script already batches with (see raw_counts.run_circuit_with_batching_recorded).
+    """
+    if shots_per_circuit <= 0:
+        return 0, shots_per_batch_cap, 0
+    num_batches = shots_per_circuit // shots_per_batch_cap
+    remainder = shots_per_circuit % shots_per_batch_cap
+    return num_batches, shots_per_batch_cap, remainder
+
+
+def resolve_all_combo_settings(
+    config_path: Optional[str] = None,
+    trained_circuits_dir: Optional[str] = None,
+) -> Dict[str, ComboExecutionSettings]:
+    """Runs the full planner once (against the real, current circuit
+    inventory) and returns every combo's resolved settings, keyed by combo
+    name -- call this ONCE per script invocation (not once per dataset in a
+    loop), since it re-scans every combo's circuits on disk.
+
+    Defaults to configs/execution_plan.yaml and trained_qaoa_circuits/ at the
+    repo root, matching every other entry point in this package.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.join(here, "..", "..")
+    config_path = config_path or os.path.join(repo_root, "configs", "execution_plan.yaml")
+    trained_circuits_dir = trained_circuits_dir or os.path.join(repo_root, "trained_qaoa_circuits")
+
+    config = load_config(config_path)
+    inventories = build_inventories_from_config(config_path, trained_circuits_dir)
+    plans = plan_all(config, inventories)
+
+    settings: Dict[str, ComboExecutionSettings] = {}
+    for plan in plans:
+        num_batches, shots_per_batch, remainder = _shots_to_batches(
+            plan.shots_per_circuit, config.cost_model.shots_per_batch_cap
+        )
+        for combo, methods in plan.methods_by_combo.items():
+            settings[combo] = ComboExecutionSettings(
+                combo=combo,
+                pool_name=plan.pool,
+                repetitions=plan.repetitions,
+                shots_per_circuit=plan.shots_per_circuit,
+                methods=list(methods),
+                num_batches=num_batches,
+                shots_per_batch=shots_per_batch,
+                remainder_shots=remainder,
+            )
+    return settings
+
+
+# ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
 

@@ -14,3 +14,13 @@
 
 api_token: ACCESS_TOKEN
 backend_name: offline_simulator_no_noise
+
+# Ordered list of physical PIAST-Q qubits every circuit gets transpiled onto,
+# read by piastq_execution.qubit_layout. A width-`w` circuit always uses the
+# first `w` entries of this list -- real QAOA/TREx execution AND MEM/M3
+# calibration circuits alike -- so calibration is guaranteed to be built from
+# the *same* physical qubits the real circuits actually ran on, not merely
+# assumed to match. Defaults to [0, 1, 2, 3, 4, 5, 6] if this key is absent.
+# Update this list (not the code) if PIAST-Q's real qubit numbering, or which
+# specific physical qubits you want to dedicate to this study, changes.
+physical_qubits: [0, 1, 2, 3, 4, 5, 6]

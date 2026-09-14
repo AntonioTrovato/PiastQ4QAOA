@@ -2,11 +2,14 @@
 
 All inventories here are tiny, hand-built (1-3 circuits, 2 qubits) so every
 expected cost can be verified by hand. Nothing touches trained_qaoa_circuits/
-on disk or any backend.
+on disk or any backend -- except TestResolveAllComboSettings, which builds a
+tiny real (temp-dir) circuits-on-disk + YAML config layout, since
+resolve_all_combo_settings() exercises the real file-reading path end to end.
 """
 
 import os
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -19,6 +22,8 @@ from piastq_execution.budget_planner import (
     PoolSpec,
     load_config,
     plan_pool,
+    _shots_to_batches,
+    resolve_all_combo_settings,
 )
 
 
@@ -301,6 +306,118 @@ class TestCalibrationSharing(unittest.TestCase):
         # each pool pays its own calibration: 15s (raw) + 60s (mem, width=2) = 75s
         self.assertAlmostEqual(plan_a.estimated_seconds, 75.0)
         self.assertAlmostEqual(plan_b.estimated_seconds, 75.0)
+
+
+class TestShotsToBatches(unittest.TestCase):
+    def test_exact_multiple_of_cap_is_one_batch_no_remainder(self):
+        self.assertEqual(_shots_to_batches(200, 200), (1, 200, 0))
+
+    def test_below_cap_is_zero_full_batches_plus_remainder(self):
+        self.assertEqual(_shots_to_batches(80, 200), (0, 200, 80))
+
+    def test_matches_the_2048_shot_pattern_from_the_original_study(self):
+        # 2048 shots at 200/batch = 10 full batches + 48-shot remainder.
+        self.assertEqual(_shots_to_batches(2048, 200), (10, 200, 48))
+
+    def test_zero_shots_is_zero_batches_zero_remainder(self):
+        self.assertEqual(_shots_to_batches(0, 200), (0, 200, 0))
+
+
+class TestResolveAllComboSettings(unittest.TestCase):
+    """Builds a tiny real (temp-dir) trained_qaoa_circuits/ + execution_plan.yaml
+    layout -- mirroring exactly what the real repo's files look like -- and
+    exercises resolve_all_combo_settings() end to end, no mocking of the
+    planner itself."""
+
+    def _write_qpy(self, path, num_qubits):
+        from qiskit import QuantumCircuit, qpy
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        qc = QuantumCircuit(num_qubits)
+        qc.measure_all()
+        with open(path, "wb") as f:
+            qpy.dump([qc], f)
+
+    def test_resolves_repetitions_shots_batches_and_methods_per_combo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            circuits_dir = os.path.join(tmp, "trained_qaoa_circuits")
+            # QAOA-TCS combo: 2 reusable circuits, width 2.
+            self._write_qpy(os.path.join(circuits_dir, "qaoa_tcs", "toy", "rep_1", "toy_rep1_cluster0.qpy"), 2)
+            self._write_qpy(os.path.join(circuits_dir, "qaoa_tcs", "toy", "rep_1", "toy_rep1_cluster1.qpy"), 2)
+
+            config_path = os.path.join(tmp, "execution_plan.yaml")
+            with open(config_path, "w") as f:
+                f.write(
+                    "seconds_per_batch: 15\n"
+                    "shots_per_batch_cap: 200\n"
+                    "target_shots_per_circuit: 2048\n"
+                    "min_shots_per_circuit: 200\n"
+                    "target_repetitions: 10\n"
+                    "calibration_shots_per_circuit: 200\n"
+                    "trex_twirl_instances: 32\n"
+                    "combos:\n"
+                    "  toy_qaoa_tcs:\n"
+                    "    algorithm: qaoa_tcs\n"
+                    "    objective_mode: single_objective\n"
+                    "    dataset: toy\n"
+                    "    circuits_dir: toy\n"
+                    "    methods: [raw, mem, m3, trex]\n"
+                    "pools:\n"
+                    "  - name: toy_pool\n"
+                    "    total_hours: 15\n"
+                    "    combos: [toy_qaoa_tcs]\n"
+                )
+
+            settings = resolve_all_combo_settings(config_path=config_path, trained_circuits_dir=circuits_dir)
+
+            self.assertIn("toy_qaoa_tcs", settings)
+            s = settings["toy_qaoa_tcs"]
+            self.assertEqual(s.pool_name, "toy_pool")
+            # 2 circuits x 10 reps x 2048 shots comfortably fits 15h for
+            # raw+mem+m3 alone (~1h), but TREx's 32x multiplier alone pushes
+            # it to ~30h -- so reps/shots stay at target and only TREx gets
+            # dropped (matches plan_pool's phase-2 "drop TREx first" order).
+            self.assertEqual(s.repetitions, 10)
+            self.assertEqual(s.shots_per_circuit, 2048)
+            self.assertEqual((s.num_batches, s.shots_per_batch, s.remainder_shots), (10, 200, 48))
+            self.assertEqual(s.methods, ["raw", "mem", "m3"])
+            self.assertFalse(s.trex_enabled)
+
+    def test_degraded_combo_has_trex_disabled_and_reduced_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            circuits_dir = os.path.join(tmp, "trained_qaoa_circuits")
+            # A deliberately large reusable inventory so a tiny pool budget
+            # forces real degradation.
+            for i in range(50):
+                self._write_qpy(os.path.join(circuits_dir, "qaoa_tcs", "big", "rep_1", f"big_rep1_cluster{i}.qpy"), 7)
+
+            config_path = os.path.join(tmp, "execution_plan.yaml")
+            with open(config_path, "w") as f:
+                f.write(
+                    "seconds_per_batch: 15\n"
+                    "shots_per_batch_cap: 200\n"
+                    "target_shots_per_circuit: 2048\n"
+                    "min_shots_per_circuit: 200\n"
+                    "target_repetitions: 10\n"
+                    "calibration_shots_per_circuit: 200\n"
+                    "trex_twirl_instances: 32\n"
+                    "combos:\n"
+                    "  big_qaoa_tcs:\n"
+                    "    algorithm: qaoa_tcs\n"
+                    "    objective_mode: single_objective\n"
+                    "    dataset: big\n"
+                    "    circuits_dir: big\n"
+                    "    methods: [raw, mem, m3, trex]\n"
+                    "pools:\n"
+                    "  - name: tiny_pool\n"
+                    "    total_hours: 0.05\n"  # ~3 minutes -- forces heavy degradation
+                    "    combos: [big_qaoa_tcs]\n"
+                )
+
+            settings = resolve_all_combo_settings(config_path=config_path, trained_circuits_dir=circuits_dir)
+            s = settings["big_qaoa_tcs"]
+            self.assertFalse(s.trex_enabled, "TREx must be dropped in the resolved settings, not just the plan")
+            self.assertNotIn("trex", s.methods)
 
 
 if __name__ == "__main__":

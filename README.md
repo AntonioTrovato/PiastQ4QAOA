@@ -46,6 +46,8 @@ PiastQ4QAOA/
 │       ├── sir_metrics.py            #   SIR static cost/fault/coverage data + Pareto fronts
 │       ├── seeding.py                #   deterministic seeds for IGDec-QAOA's random sampling
 │       ├── backend_config.py         #   single place to set the real PIAST-Q API token/backend
+│       ├── qubit_layout.py           #   which physical qubits a width-w circuit uses (see §5)
+│       ├── backend_calibration_snapshot.py #   T1/T2/etc. snapshot, once per session (see §5)
 │       ├── run_calibration.py        #   MEM/M3 calibration entry point (see §5)
 │       ├── budget_planner.py         #   hardware-time budget planning
 │       ├── evaluation.py             #   per-combo x per-method metrics
@@ -60,7 +62,7 @@ PiastQ4QAOA/
 │   ├── qaoa_tcs/<dataset>/...        # single_obj.py / multi_obj.py output
 │   ├── igdec_qaoa/<dataset>/...      # IGDec-QAOA output
 │   └── evaluation/                   # evaluate_all.py / compare_all.py output (gitignored)
-├── calibration/                      # MEM/M3 calibration snapshots (run_calibration.py output)
+├── calibration/                      # MEM/M3 calibration + backend_snapshots/ (T1/T2/etc.)
 ├── execution_plan/                   # budget_planner.py output (regenerated on demand)
 ├── configs/
 │   ├── execution_plan.yaml           # budget planner + evaluate_all.py configuration
@@ -338,19 +340,25 @@ MEM/M3 — it's actually wired into every execution script, not just available
 as library functions: `single_obj.py` and `multi_obj.py`'s
 `run_hardware_execution()`, and the three IGDec-QAOA single-objective
 scripts' `run_hardware_like_from_saved_circuits()`, each run a second,
-dedicated hardware pass per circuit, right after the raw pass:
+dedicated hardware pass per circuit, right after the raw pass — **but only
+if the resolved plan for that combo actually kept TREx** (see §7's
+`resolve_all_combo_settings()`); if the plan dropped it, the loop below is
+skipped entirely rather than silently running anyway and blowing past the
+budget it was computed for:
 
 ```python
-for twirl_idx in range(trex_twirl_instances):
-    twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
-    twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
-    _trex_counts, trex_record = run_circuit_with_batching_recorded(
-        twirled_circuit, sampling_sampler, algorithm=..., objective_mode=..., dataset=...,
-        circuit_id=f"{circuit_id}_trex{twirl_idx}", backend=backend,
-        cluster_id=..., iteration_id=..., shots_per_batch=80, num_batches=1,
-        twirl_mask=twirl_mask,
-    )
-    trex_counts_writer.write(trex_record)
+if settings.trex_enabled:
+    for twirl_idx in range(trex_twirl_instances):
+        twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+        twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+        _trex_counts, trex_record = run_circuit_with_batching_recorded(
+            twirled_circuit, sampling_sampler, algorithm=..., objective_mode=..., dataset=...,
+            circuit_id=f"{circuit_id}_trex{twirl_idx}", backend=backend,
+            cluster_id=..., iteration_id=...,
+            shots_per_batch=settings.shots_per_batch, num_batches=settings.num_batches,
+            remainder_shots=settings.remainder_shots, twirl_mask=twirl_mask,
+        )
+        trex_counts_writer.write(trex_record)
 ```
 
 Each twirl instance is a distinct hardware execution — this is what "TREx
@@ -380,6 +388,67 @@ same as the raw baseline.
 Full Pauli twirling of the circuit itself (not just before measurement) is a
 materially larger follow-up and is not implemented here — see the module
 docstring in `mitigation.py`.
+
+### Physical qubit layout: pinned, and shared by calibration and execution
+
+Before this round, neither the real QAOA/TREx circuit execution
+(`raw_counts.run_circuit_with_batching_recorded`) nor the MEM/M3 calibration
+circuits (`run_calibration.py`) pinned an explicit transpiler layout — both
+let the transpiler pick physical qubits automatically
+(`optimization_level=3`, no `initial_layout`), independently of each other.
+Nothing guaranteed a calibration built from one set of physical qubits would
+ever be applied to counts collected from the *same* physical qubits.
+`run_calibration.py`'s own former docstring flagged this explicitly as a
+known simplification, not a guarantee.
+
+Fixed via `piastq_execution/qubit_layout.py`: a width-`w` circuit always uses
+`configs/backend.yaml`'s `physical_qubits` list, sliced to its first `w`
+entries (`physical_layout_for_width(w)`) — the exact same physical qubits,
+every time, from every caller:
+
+- `raw_counts.run_circuit_with_batching_recorded()` now accepts an
+  `initial_layout` argument, applies it to the sampler via
+  `set_transpile_options(initial_layout=..., optimization_level=...)`
+  *before* the circuit is submitted (not just recorded afterwards), and
+  derives the recorded `physical_qubit_mapping` directly from it
+  (`physical_qubit_mapping_from_layout`) — no transpile-based guess
+  involved anymore when a layout is pinned. All five execution scripts' raw
+  and TREx-twirl passes now pass
+  `initial_layout=physical_layout_for_width(circuit.num_qubits)`.
+- `run_calibration.py`'s `calibrate_mem`/`calibrate_m3` pin the identical
+  layout for every calibration circuit of a given width, instead of the
+  previous `list(range(width))` placeholder.
+
+Verified end-to-end against the real `AQTSampler`/`offline_simulator_no_noise`
+stack (not just synthetic tests): a real execution and a real MEM/M3
+calibration circuit, both pinned to a deliberately non-trivial layout
+(`[3, 4]` on a 20-qubit backend), land on exactly the same physical qubits —
+confirmed both from the recorded metadata and independently from the
+transpiler's own resulting layout.
+
+To point this at PIAST-Q's real qubit numbering (or dedicate specific
+physical qubits to this study), edit only `configs/backend.yaml`'s
+`physical_qubits` list — defaults to `[0, 1, 2, 3, 4, 5, 6]` if absent.
+
+### Backend calibration snapshots (T1/T2/etc.)
+
+Distinct from the MEM/M3 calibration above (which we measure ourselves from
+shots we run), `piastq_execution/backend_calibration_snapshot.py` captures
+whatever the *provider itself* reports about its qubits — T1, T2,
+frequency, via the standard `BackendV2.qubit_properties` hook (AQT's
+`AQTResource` exposes this; exactly how much PIAST-Q populates it isn't
+knowable until real hardware is used, so every field is extracted
+defensively and recorded as `None` when unavailable, never raised).
+
+`save_backend_calibration_snapshot(backend)` is called automatically, once
+per script invocation, at the top of every hardware-execution entry point
+(all five execution scripts' hardware-execution function, plus
+`run_calibration.py`) — right after `get_backend()`, before anything else
+happens. Each call writes its own new, timestamped file under
+`calibration/backend_snapshots/` (never overwrites a previous one), so
+calibration drift across however many real-hardware sessions the full data
+collection ends up taking can be checked after the fact, without anyone
+having to remember to trigger it by hand.
 
 ---
 
@@ -414,6 +483,46 @@ cd src/piastq_execution
 python budget_planner.py
 # -> prints a report and writes it to ../../execution_plan/
 ```
+
+**The plan is actually wired into execution, not just printed.**
+`resolve_all_combo_settings()` (same module) runs the full planner once and
+returns, per combo, exactly what a hardware-execution script should run:
+`repetitions`, `shots_per_circuit` (already split into
+`num_batches`/`shots_per_batch`/`remainder_shots` — the "N x 200 +
+remainder" pattern every circuit is actually submitted in), `methods`, and
+`trex_enabled`. Every one of the five execution scripts calls this once at
+the top of its hardware-execution function and uses the resolved values
+instead of a hardcoded placeholder:
+
+```python
+combo_settings = resolve_all_combo_settings()
+...
+settings = combo_settings[f"{dataset}_qaoa_tcs"]   # (or _igdec_qaoa)
+num_piast_experiments = settings.repetitions
+...
+counts, raw_record = run_circuit_with_batching_recorded(
+    circuit, sampling_sampler, ...,
+    shots_per_batch=settings.shots_per_batch,
+    num_batches=settings.num_batches,
+    remainder_shots=settings.remainder_shots,
+)
+...
+if settings.trex_enabled:
+    for twirl_idx in range(trex_twirl_instances):
+        ...
+```
+
+Before this, every script hardcoded `shots_per_batch=80, num_batches=1` at
+every call site and always ran the TREx loop regardless of what the plan
+said — a real disconnect between the plan and what would actually execute.
+Fixed now: whatever `budget_planner.py` decides for a pool is exactly what
+the corresponding execution script runs, including dropping TREx entirely
+for a combo (not just computing that it *should* be dropped). Note this
+doesn't touch the QAOA circuit-depth `p` parameter (`TRAINING_REPS`/`reps`
+in the training loop) or the impact-reordering iteration count in IGDec-QAOA
+(`NUM_ITERATIONS`/`num_impact_iterations`) — both stay exactly as inherited
+from the original study; only the hardware-execution repetition count and
+shot batching are resolved from the plan.
 
 **Default configuration is *not* one global 15h run.** The shipped
 `configs/execution_plan.yaml` defines **7 pools x 15h = 105h total budget**:
@@ -483,9 +592,99 @@ combo/repetition using that width; TREx always costs `trex_twirl_instances`
 extra hardware passes per circuit, not one (see §5) — dropping it is
 correspondingly the single biggest lever the planner has.
 
+**The underlying cost model, in one formula**: every circuit costs
+`ceil(shots / 200) × 15 seconds` — 201 shots costs exactly as much as 400,
+since it rounds up to a second whole 200-shot batch. Raw cost for a combo =
+(circuits × repetitions) × per-circuit cost; TREx cost = that same raw cost
+again, × `trex_twirl_instances`; MEM/M3 calibration is charged once per
+distinct circuit width present in the pool, shared across every combo using
+it, never per combo. Everything above is degradation applied to fit that sum
+under a pool's hours.
+
+**Is there a "no-TREx" mode?** No dedicated toggle — TREx inclusion is
+controlled entirely by whether `"trex"` appears in each combo's `methods:`
+list in `configs/execution_plan.yaml` (every combo lists it by default). The
+planner always attempts whatever's listed at full target quality first and
+automatically drops TREx — before touching repetitions or shots — if the
+pool can't afford it, so in practice it already behaves as "always included,
+shut off automatically once over budget." Forcing "no TREx everywhere" in
+one shot means editing every combo's `methods:` list by hand; there's no
+flag for it today.
+
 This only reads local `.qpy` files (pure deserialization) and writes to
 `execution_plan/` — no backend, no AQT, safe to run anywhere, including in an
 authoring/review session.
+
+### TREx timing: what a conference-scope subset actually costs
+
+TREx is comfortably the most expensive method in this whole pipeline —
+every included combo needs `trex_twirl_instances` (32 by default) *extra*
+hardware passes per circuit on top of the raw baseline, since it cannot
+reuse already-collected counts (§5). The example above already shows this in
+practice: the shipped 7-pool config drops TREx for every pool that actually
+has trained circuits, even after cutting repetitions to 1 and shots to the
+floor.
+
+To make an informed decision about where TREx is actually worth spending
+real machine time on, here is the *real*, code-computed cost (via
+`budget_planner._pool_seconds`, not hand arithmetic) of a full TREx pass per
+combo — one repetition, the 200-shot floor, `trex_twirl_instances=32` — for
+every combo that currently has trained circuits:
+
+| Combo | Circuits (rep=1) | Hours (TREx incl., floor shots) | Hours (TREx incl., target 2048 shots) |
+|---|---|---|---|
+| paintcontrol (QAOA-TCS) | 24 | 3.3h | 36.3h |
+| paintcontrol (IGDec-QAOA) | 30 | 4.1h | 45.4h |
+| elevator2 (QAOA-TCS) | 56 | 7.7h | 84.7h |
+| gzip (multi-obj) | 61 | 8.4h | 92.3h |
+| sed (multi-obj) | 77 | 10.6h | 116.5h |
+| gsdtsr (QAOA-TCS) | 79 | 10.9h | 119.5h |
+| flex (multi-obj) | 105 | 14.4h | 158.8h |
+| grep (multi-obj) | 139 | 19.1h | 210.2h |
+| iofrol (QAOA-TCS) | 443 | 60.9h | 670.0h |
+| elevator (QAOA-TCS) | 881 | 121.1h | 1332.5h |
+| iofrol (IGDec-QAOA) | 1230 | 169.1h | 1860.4h |
+
+**Reading this**: at the shot floor, six combos fit a full TREx pass inside
+a single ~15h overnight session each (paintcontrol ×2, elevator2, gzip,
+gsdtsr, sed — roughly 45h combined), `grep` is borderline (~19h, just over
+one night), and the three large combos (`iofrol` under both algorithms,
+`elevator`) are not realistic for TREx without either many dedicated
+overnight sessions or a substantially reduced `trex_twirl_instances`.
+
+**A realistic conference-scope TREx subset**, given this: the six
+comfortably-fitting combos above, run as their own dedicated pool(s) in
+`configs/execution_plan.yaml` with enough hours to actually keep TREx
+(rather than the shipped default, which spreads a fixed 15h thin across
+every combo and drops TREx everywhere real circuits exist). `iofrol` and
+`elevator` remain a journal-scale ask: either several dedicated overnight
+sessions, or cutting `trex_twirl_instances` well below 32 for those combos
+specifically (e.g. 8 instead of 32 would roughly quarter these numbers, at
+the cost of a noisier average over fewer twirl instances).
+
+**One more thing worth knowing before committing to a subset**: while
+wiring up the qubit-layout fix above, we found that `paintcontrol`'s path
+through `loch_qaoa_tcm_extract_circuits.py` (the "small dataset"
+decomposition branch, `problem_size <= 0.15 * len(df)`) never runs a TREx
+pass at all — only the "large dataset" branch does. `iofrol` and `gsdtsr` go
+through the large-dataset branch and are unaffected; `paintcontrol` is the
+only tcm dataset that hits the small-dataset branch, so **IGDec-QAOA's
+`paintcontrol` combo cannot produce TREx data today, regardless of budget**,
+until that gap is closed. Not fixed as part of this round (out of scope for
+the qubit-layout/calibration-snapshot work above) — worth deciding on
+separately before relying on it for the subset.
+
+No code changes were made for this section — it's planning information
+only, using the real, already-implemented cost model.
+
+**One more data point, computed the same way**: all 11 combos *together*,
+at 1 repetition and the 200-shot floor with no TREx anywhere, cost only
+14.31h — comfortably under one night, with nothing needing to be dropped.
+The real constraint within a 15h or 24h budget isn't which combos fit, it's
+how much of that budget is left over to spend on TREx for a few of the
+cheapest ones — see `EXPLAINATION.md` §10.2/§10.3 for the full breakdown
+(every single combo and every meaningful combination's full-target hours,
+plus the exact 15h/24h answer).
 
 ---
 
@@ -674,7 +873,7 @@ instead for the two-sample special case).
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about a second (151 tests total).
+about a second (173 tests total).
 
 ---
 
@@ -686,7 +885,7 @@ about a second (151 tests total).
    `qiskit_env/` inside the project (matches §2's `python3.10 -m venv
    qiskit_env`). Then `pip install -r requirements.txt` in PyCharm's terminal.
 3. **Sanity check (safe anywhere)**: run `python -m unittest discover -s
-   tests` — should show 151 passing tests in ~1s.
+   tests` — should show 173 passing tests in ~1s.
 4. **Plan the budget (safe anywhere)**: edit `configs/execution_plan.yaml`
    (§7), then run `src/piastq_execution/budget_planner.py` to see the
    resulting repetitions/shots/methods per pool before spending any hardware
@@ -787,5 +986,50 @@ about a second (151 tests total).
   the same dataset/metric, with and without mitigation, on real hardware --
   including quantum-hardware execution cost/time (`execution_time_seconds`),
   not just solution quality/effectiveness?
+
+---
+
+## 11. Every parameter, and why it has that value
+
+Organized by where the value actually comes from, verified against the code
+and the paper rather than assumed.
+
+**A. Given by the PIAST-Q team (hardware constraints, not a choice):**
+
+| Parameter | Value | Source |
+|---|---|---|
+| `shots_per_batch_cap` | 200 | Machine operators: "there is a constraint of 200 shots per run" |
+| `seconds_per_batch` | 15 | Machine operators: "200 shots... take around 15 seconds" |
+
+**B. Inherited from the original QAOA-TCS/IGDec-QAOA paper (grounded there, not re-derived here):**
+
+| Parameter | Value | Source |
+|---|---|---|
+| Max cluster/subproblem size | 7 qubits | Paper: chosen "consistently with the prior work on IGDec-QAOA (Wang et al., 2024a)" |
+| QAOA circuit depth `p` (`TRAINING_REPS`) | 1 | Paper's RQ1 finding: depth doesn't significantly affect quality, so `p=1` minimizes cost without compromising it -- a tested result, not a guess |
+| Repetitions per algorithm (paper's own convention) | 10 | Paper: "we ran all stochastic algorithms ten times, consistent with Wang et al. (2024b); Trovato et al. (2024)" |
+| IGDec-QAOA decomposition window threshold | `problem_size > 0.15 × len(df)` | Inherited from the original SelectQAOA implementation; not found derived or explained in the paper text -- an implementation-level heuristic, provenance beyond that unverified |
+| Per-dataset QUBO weight `alpha` (e.g. paintcontrol=0.45, iofrol=0.50, gsdtsr=0, elevator=0.20) | dataset-specific | Paper: output of an Optuna hyperparameter search over these weights; the paper doesn't tabulate the final numbers, so *how* they were chosen is confirmed but each specific value isn't independently verifiable against a published table |
+| Per-dataset Ward-clustering target cluster count (elevator=800, iofrol=324, gsdtsr=60, paintcontrol=16, SIR programs=50) | dataset-specific | Not explained in code or paper; empirically tuned per dataset, not a documented formula |
+| `COBYLA(maxiter=500)` | 500 | Not discussed in the paper or code comments; an unremarkable, common default for COBYLA-based QAOA training, inherited as-is |
+
+**C. Decided for this replication package, with modest justification:**
+
+| Parameter | Value | Reasoning |
+|---|---|---|
+| `min_shots_per_circuit` | 200 | Matches the hardware floor -- one full batch, can't go lower |
+| `target_shots_per_circuit` | 2048 | Traced to the original SelectQAOA script's own comment ("Total target shots = 2048 x 30 = 61,440") -- inherited from that pre-hardware-constrained design's own target, not newly derived |
+| `target_repetitions` | 10 | Matches item B's paper convention, reused as the planner's "ideal" target |
+| `calibration_shots_per_circuit` | 200 | Same floor logic as `min_shots_per_circuit` |
+| `physical_qubits` default | `[0,1,2,3,4,5,6]` | Arbitrary identity-mapping placeholder until real PIAST-Q qubit numbers are known -- documented as such in `configs/backend.yaml` |
+| `optimization_level=3` | 3 | Qiskit's own highest built-in transpiler optimization level -- standard practice for real hardware |
+
+**D. Still not rigorously justified:**
+
+| Parameter | Value | Status |
+|---|---|---|
+| `trex_twirl_instances` | 32 | The code comment claims a documented rationale exists (`load_trex_twirl_instances()`'s docstring) -- it doesn't; that docstring only explains why the value is centralized, not why 32. The value does appear as an example configuration in TREx tutorial code (e.g. Mitiq's own TREx docs use `num_randomizations=32`), but is **not** actually "the Qiskit Runtime default" as previously documented here -- Qiskit Runtime's real default is `"auto"` = `max(64, ceil(shots/32))`, a different parameter being conflated with this one. Treat 32 as a reasonable, precedented-in-examples starting point, not a validated choice. |
+
+**What used to be a placeholder and is now fixed**: `shots_per_batch=80` was hardcoded at every one of the 15 hardware-execution call sites across all 5 scripts, completely disconnected from what `budget_planner.py` actually recommended -- running any script would have used 80 shots/circuit regardless of the plan. Fixed via `resolve_all_combo_settings()` (§7): every script now resolves and uses the plan's actual `shots_per_circuit`/`repetitions`/`trex_enabled` per combo.
 
 

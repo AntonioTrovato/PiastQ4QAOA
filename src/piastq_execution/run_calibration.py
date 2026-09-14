@@ -16,14 +16,18 @@ session:
     python run_calibration.py               # calibrates widths 1..7
     python run_calibration.py 2 7            # calibrates only widths 2 and 7
 
-Calibrates by circuit width using logical qubit indices 0..width-1 as the
-physical qubit list -- the simplification a standalone calibration pass
-needs to make. If you need calibration keyed to a *specific* physical qubit
-mapping (e.g. exactly the qubits a given cluster's circuit actually gets
-transpiled onto -- see piastq_execution.raw_counts.get_physical_qubit_mapping),
-call build_mem_calibration_circuits()/build_m3_calibration_circuits() and
-CalibrationStore.save() directly with that mapping instead of running this
-script as-is.
+Calibrates by circuit width, pinned to the *same* physical qubits every real
+QAOA/TREx execution uses for that width --
+piastq_execution.qubit_layout.physical_layout_for_width(width), configured
+once in configs/backend.yaml's `physical_qubits` list. This is what makes a
+calibration built here safe to apply to counts collected by
+raw_counts.run_circuit_with_batching_recorded() elsewhere: both pin the same
+explicit `initial_layout` rather than each independently letting the
+transpiler pick one, which offered no such guarantee.
+
+Also saves a timestamped snapshot of the backend's own reported qubit
+calibration (T1/T2/etc., see backend_calibration_snapshot.py) before running
+anything -- distinct from the MEM/M3 calibration this script measures itself.
 """
 
 import os
@@ -34,6 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from qiskit_aqt_provider.primitives import AQTSampler
 
+from piastq_execution.backend_calibration_snapshot import save_backend_calibration_snapshot
 from piastq_execution.backend_config import get_backend
 from piastq_execution.mitigation import (
     CalibrationStore,
@@ -44,16 +49,25 @@ from piastq_execution.mitigation import (
     make_m3_calibration_record,
     make_mem_calibration_record,
 )
+from piastq_execution.qubit_layout import physical_layout_for_width
 from piastq_execution.raw_counts import get_backend_identity
 
 CALIBRATION_SHOTS = 200  # one 200-shot batch per calibration circuit
 
 
-def _run_and_count(circuit, sampler, shots=CALIBRATION_SHOTS):
+def _run_and_count(circuit, sampler, initial_layout, shots=CALIBRATION_SHOTS):
     """Returns (counts, elapsed_seconds) -- elapsed_seconds is the measured
     wall-clock time of this one circuit's sampler.run() call, summed by the
     caller across every calibration circuit to get
-    CalibrationRecord.calibration_wall_clock_seconds."""
+    CalibrationRecord.calibration_wall_clock_seconds.
+
+    `initial_layout` pins this calibration circuit to the same physical
+    qubits a real QAOA circuit of this width would use (see module
+    docstring) -- applied before every run() call since a differently-sized
+    circuit may have been submitted through the same sampler since the last
+    call.
+    """
+    sampler.set_transpile_options(optimization_level=3, initial_layout=list(initial_layout))
     sampler.options.shots = shots
     start = time.time()
     result = sampler.run([circuit]).result()
@@ -64,15 +78,15 @@ def _run_and_count(circuit, sampler, shots=CALIBRATION_SHOTS):
 
 
 def calibrate_mem(width, sampler, backend, store):
+    physical_qubits = physical_layout_for_width(width)
     calibration_counts = {}
     total_wall_clock_seconds = 0.0
     for bitstring, circuit in build_mem_calibration_circuits(width):
-        counts, elapsed = _run_and_count(circuit, sampler)
+        counts, elapsed = _run_and_count(circuit, sampler, physical_qubits)
         calibration_counts[bitstring] = counts
         total_wall_clock_seconds += elapsed
 
     matrix = build_confusion_matrix(calibration_counts, width)
-    physical_qubits = list(range(width))
     backend_identity = get_backend_identity(backend)
     record = make_mem_calibration_record(
         matrix, physical_qubits,
@@ -85,15 +99,15 @@ def calibrate_mem(width, sampler, backend, store):
 
 
 def calibrate_m3(width, sampler, backend, store):
+    physical_qubits = physical_layout_for_width(width)
     calibration_counts = {}
     total_wall_clock_seconds = 0.0
     for qubit, prepared_bit, circuit in build_m3_calibration_circuits(width):
-        counts, elapsed = _run_and_count(circuit, sampler)
+        counts, elapsed = _run_and_count(circuit, sampler, physical_qubits)
         calibration_counts[(qubit, prepared_bit)] = counts
         total_wall_clock_seconds += elapsed
 
     single_qubit_cals = build_m3_single_qubit_cals(calibration_counts, width)
-    physical_qubits = list(range(width))
     backend_identity = get_backend_identity(backend)
     record = make_m3_calibration_record(
         single_qubit_cals, physical_qubits,
@@ -107,6 +121,9 @@ def calibrate_m3(width, sampler, backend, store):
 
 def run_calibration(widths):
     backend = get_backend()
+    snapshot_path = save_backend_calibration_snapshot(backend)
+    print(f"Saved backend calibration snapshot: {snapshot_path}")
+
     sampler = AQTSampler(backend)
     sampler.set_transpile_options(optimization_level=3)
 

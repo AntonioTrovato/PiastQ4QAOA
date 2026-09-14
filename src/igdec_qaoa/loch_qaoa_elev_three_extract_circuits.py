@@ -26,7 +26,10 @@ from qiskit_aqt_provider.primitives import AQTSampler
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
+from piastq_execution.backend_calibration_snapshot import save_backend_calibration_snapshot
 from piastq_execution.backend_config import get_backend
+from piastq_execution.budget_planner import resolve_all_combo_settings
+from piastq_execution.qubit_layout import physical_layout_for_width
 from piastq_execution.mitigation import (
     build_trex_twirled_circuit,
     generate_random_twirl_mask,
@@ -470,6 +473,7 @@ def run_hardware_like_from_saved_circuits():
     os.makedirs(results_dir, exist_ok=True)
 
     backend = get_backend()
+    save_backend_calibration_snapshot(backend)
 
     sampling_sampler = AQTSampler(backend)
 
@@ -491,13 +495,22 @@ def run_hardware_like_from_saved_circuits():
     trex_raw_counts_path = os.path.join(results_dir, f"{RUN_LABEL}-trex-raw_counts.jsonl")
     trex_counts_writer = RawCountsWriter(trex_raw_counts_path)
 
+    # Resolved once from the real budget planner (see
+    # piastq_execution.budget_planner.resolve_all_combo_settings): this
+    # combo's repetitions/shots-per-circuit/methods come from whichever pool
+    # in configs/execution_plan.yaml actually covers it, not a hardcoded
+    # placeholder that could silently disagree with the plan.
+    settings = resolve_all_combo_settings()["elevator_o3_igdec_qaoa"]
+
     # TREx: number of independently-twirled hardware passes per circuit, read
     # from configs/execution_plan.yaml so it matches what budget_planner.py
     # priced (see piastq_execution.mitigation.load_trex_twirl_instances).
+    # Whether TREx runs *at all* is decided by settings.trex_enabled below,
+    # since the plan may have dropped it.
     trex_twirl_instances = load_trex_twirl_instances()
     trex_rng = random.Random()
 
-    for sampling_id in range(1, NUM_EXPERIMENT + 1):
+    for sampling_id in range(1, settings.repetitions + 1):
         print(f"\n----- HARDWARE-LIKE {RUN_LABEL} | SAMPLING #{sampling_id} -----")
 
         sampling_dir = os.path.join(base_input_dir, f"sampling_{sampling_id}")
@@ -554,8 +567,10 @@ def run_hardware_like_from_saved_circuits():
                     backend=backend,
                     iteration_id=meta["iteration"],
                     subproblem_id=meta["subproblem_index"],
-                    shots_per_batch=80,
-                    num_batches=1,
+                    shots_per_batch=settings.shots_per_batch,
+                    num_batches=settings.num_batches,
+                    remainder_shots=settings.remainder_shots,
+                    initial_layout=physical_layout_for_width(circuit.num_qubits),
                 )
                 end_qpu = time.time()
                 raw_counts_writer.write(raw_record)
@@ -565,24 +580,28 @@ def run_hardware_like_from_saved_circuits():
                 # since it's mitigation data, not the raw baseline;
                 # evaluation-time undoing/aggregation is
                 # piastq_execution.mitigation.aggregate_trex_records().
-                for twirl_idx in range(trex_twirl_instances):
-                    twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
-                    twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
-                    _trex_counts, trex_record = run_circuit_with_batching_recorded(
-                        twirled_circuit,
-                        sampling_sampler,
-                        algorithm="igdec_qaoa",
-                        objective_mode="single_objective",
-                        dataset=RUN_LABEL,
-                        circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
-                        backend=backend,
-                        iteration_id=meta["iteration"],
-                        subproblem_id=meta["subproblem_index"],
-                        shots_per_batch=80,
-                        num_batches=1,
-                        twirl_mask=twirl_mask,
-                    )
-                    trex_counts_writer.write(trex_record)
+                # Skipped entirely if the plan dropped TREx for this combo.
+                if settings.trex_enabled:
+                    for twirl_idx in range(trex_twirl_instances):
+                        twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                        twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                        _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                            twirled_circuit,
+                            sampling_sampler,
+                            algorithm="igdec_qaoa",
+                            objective_mode="single_objective",
+                            dataset=RUN_LABEL,
+                            circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
+                            backend=backend,
+                            iteration_id=meta["iteration"],
+                            subproblem_id=meta["subproblem_index"],
+                            shots_per_batch=settings.shots_per_batch,
+                            num_batches=settings.num_batches,
+                            remainder_shots=settings.remainder_shots,
+                            twirl_mask=twirl_mask,
+                            initial_layout=physical_layout_for_width(twirled_circuit.num_qubits),
+                        )
+                        trex_counts_writer.write(trex_record)
 
                 qpu_time = end_qpu - start_qpu
                 qaoa_time_total += qpu_time
@@ -622,8 +641,10 @@ def run_hardware_like_from_saved_circuits():
                         backend=backend,
                         iteration_id=meta["iteration"],
                         subproblem_id=meta["subproblem_index"],
-                        shots_per_batch=80,
-                        num_batches=1,
+                        shots_per_batch=settings.shots_per_batch,
+                        num_batches=settings.num_batches,
+                        remainder_shots=settings.remainder_shots,
+                        initial_layout=physical_layout_for_width(circuit.num_qubits),
                     )
                     end_qpu = time.time()
                     raw_counts_writer.write(raw_record)
@@ -633,24 +654,28 @@ def run_hardware_like_from_saved_circuits():
                     # separate file since it's mitigation data, not the raw
                     # baseline; evaluation-time undoing/aggregation is
                     # piastq_execution.mitigation.aggregate_trex_records().
-                    for twirl_idx in range(trex_twirl_instances):
-                        twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
-                        twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
-                        _trex_counts, trex_record = run_circuit_with_batching_recorded(
-                            twirled_circuit,
-                            sampling_sampler,
-                            algorithm="igdec_qaoa",
-                            objective_mode="single_objective",
-                            dataset=RUN_LABEL,
-                            circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
-                            backend=backend,
-                            iteration_id=meta["iteration"],
-                            subproblem_id=meta["subproblem_index"],
-                            shots_per_batch=80,
-                            num_batches=1,
-                            twirl_mask=twirl_mask,
-                        )
-                        trex_counts_writer.write(trex_record)
+                    # Skipped entirely if the plan dropped TREx for this combo.
+                    if settings.trex_enabled:
+                        for twirl_idx in range(trex_twirl_instances):
+                            twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                            twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                            _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                                twirled_circuit,
+                                sampling_sampler,
+                                algorithm="igdec_qaoa",
+                                objective_mode="single_objective",
+                                dataset=RUN_LABEL,
+                                circuit_id=f"{RUN_LABEL}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
+                                backend=backend,
+                                iteration_id=meta["iteration"],
+                                subproblem_id=meta["subproblem_index"],
+                                shots_per_batch=settings.shots_per_batch,
+                                num_batches=settings.num_batches,
+                                remainder_shots=settings.remainder_shots,
+                                twirl_mask=twirl_mask,
+                                initial_layout=physical_layout_for_width(twirled_circuit.num_qubits),
+                            )
+                            trex_counts_writer.write(trex_record)
 
                     qpu_time = end_qpu - start_qpu
                     qaoa_time_total += qpu_time

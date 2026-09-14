@@ -13,6 +13,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.mitigation import CalibrationStore
+from piastq_execution.qubit_layout import physical_layout_for_width
 from piastq_execution.run_calibration import calibrate_m3, calibrate_mem
 
 
@@ -37,11 +38,17 @@ class FakeSampler:
     """Scripted responses, one per call, in the exact order the calibration
     circuits are submitted: for width=1, build_mem_calibration_circuits(1)
     yields "0" then "1"; build_m3_calibration_circuits(1) yields
-    (0,0) then (0,1)."""
+    (0,0) then (0,1). Also records every set_transpile_options(...) call so
+    tests can verify the pinned qubit layout (see qubit_layout.py) is applied
+    identically to every calibration circuit, not just assumed."""
 
     def __init__(self, probabilities_per_call):
         self.options = FakeSamplerOptions()
         self._responses = list(probabilities_per_call)
+        self.transpile_options_calls = []
+
+    def set_transpile_options(self, **fields):
+        self.transpile_options_calls.append(dict(fields))
 
     def run(self, circuits):
         probabilities = self._responses.pop(0)
@@ -81,6 +88,15 @@ class TestCalibrateMem(unittest.TestCase):
             self.assertIsInstance(record.calibration_wall_clock_seconds, float)
             self.assertGreaterEqual(record.calibration_wall_clock_seconds, 0.0)
 
+            # Every calibration circuit must be pinned to the same physical
+            # qubits a real width-1 QAOA circuit would use -- not left to the
+            # transpiler's automatic layout selection.
+            expected_layout = physical_layout_for_width(1)
+            self.assertEqual(len(sampler.transpile_options_calls), 2)
+            for call in sampler.transpile_options_calls:
+                self.assertEqual(call.get("initial_layout"), expected_layout)
+                self.assertEqual(call.get("optimization_level"), 3)
+
 
 class TestCalibrateM3(unittest.TestCase):
     def test_width_1_perfect_readout_round_trips(self):
@@ -100,6 +116,12 @@ class TestCalibrateM3(unittest.TestCase):
             self.assertAlmostEqual(cals[0][1, 1], 1.0)
             self.assertIsInstance(record.calibration_wall_clock_seconds, float)
             self.assertGreaterEqual(record.calibration_wall_clock_seconds, 0.0)
+
+            expected_layout = physical_layout_for_width(1)
+            self.assertEqual(len(sampler.transpile_options_calls), 2)
+            for call in sampler.transpile_options_calls:
+                self.assertEqual(call.get("initial_layout"), expected_layout)
+                self.assertEqual(call.get("optimization_level"), 3)
 
 
 if __name__ == "__main__":

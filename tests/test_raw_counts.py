@@ -18,6 +18,7 @@ from piastq_execution.raw_counts import (
     counts_from_quasi_probabilities,
     run_circuit_with_batching_recorded,
     get_physical_qubit_mapping,
+    physical_qubit_mapping_from_layout,
     RawCountsWriter,
 )
 
@@ -41,12 +42,19 @@ class FakeSamplerOptions:
 
 class FakeSampler:
     """Stands in for AQTSampler: returns a scripted quasi-distribution per call,
-    tracking exactly what shots value it was asked to run with."""
+    tracking exactly what shots value it was asked to run with, and every
+    set_transpile_options(...) call (so tests can verify a pinned
+    initial_layout is actually applied before submission, not just recorded
+    after the fact)."""
 
     def __init__(self, probabilities_per_call):
         self.options = FakeSamplerOptions()
         self._probabilities_per_call = list(probabilities_per_call)
         self.calls = []
+        self.transpile_options_calls = []
+
+    def set_transpile_options(self, **fields):
+        self.transpile_options_calls.append(dict(fields))
 
     def run(self, circuits):
         self.calls.append(self.options.shots)
@@ -201,6 +209,56 @@ class TestRunCircuitWithBatchingRecorded(unittest.TestCase):
             twirl_mask=[1, 0],
         )
         self.assertEqual(record.twirl_mask, [1, 0])
+
+    def test_initial_layout_is_applied_to_sampler_and_recorded_directly(self):
+        """When initial_layout is given, it must (a) actually be pushed to the
+        sampler before submission -- so calibration circuits run under
+        run_calibration.py's *same* pinned layout are provably comparable --
+        and (b) be used directly to build physical_qubit_mapping, with no
+        extra transpile-based guess involved."""
+        sampler = FakeSampler([{"00": 1.0}])
+        circuit = TinyCircuit(num_qubits=2)
+
+        _counts, record = run_circuit_with_batching_recorded(
+            circuit, sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="toy_cluster0", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1,
+            initial_layout=[3, 5],
+        )
+
+        self.assertEqual(sampler.transpile_options_calls, [
+            {"optimization_level": 3, "initial_layout": [3, 5]}
+        ])
+        self.assertEqual(record.physical_qubit_mapping, {0: 3, 1: 5})
+
+    def test_no_initial_layout_falls_back_to_transpile_guess(self):
+        """Backward-compatible default: without initial_layout, no
+        set_transpile_options call is made here (existing call sites that
+        haven't been updated keep their previous behavior), and the
+        best-effort transpile-based guess is used instead."""
+        sampler = FakeSampler([{"00": 1.0}])
+        circuit = TinyCircuit(num_qubits=2)
+
+        _counts, record = run_circuit_with_batching_recorded(
+            circuit, sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="toy_cluster0", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+        )
+
+        self.assertEqual(sampler.transpile_options_calls, [])
+        self.assertEqual(record.physical_qubit_mapping, {0: 0, 1: 1})
+
+
+class TestPhysicalQubitMappingFromLayout(unittest.TestCase):
+    def test_maps_logical_to_pinned_physical_qubits_in_order(self):
+        circuit = TinyCircuit(num_qubits=3)
+        mapping = physical_qubit_mapping_from_layout(circuit, [4, 5, 6])
+        self.assertEqual(mapping, {0: 4, 1: 5, 2: 6})
+
+    def test_raises_on_width_mismatch(self):
+        circuit = TinyCircuit(num_qubits=3)
+        with self.assertRaises(ValueError):
+            physical_qubit_mapping_from_layout(circuit, [4, 5])
 
 
 class TestPhysicalQubitMapping(unittest.TestCase):
