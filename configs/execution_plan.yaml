@@ -14,11 +14,11 @@
 
 seconds_per_batch: 15          # wall-clock per <=200-shot batch on PIAST-Q
 shots_per_batch_cap: 200        # hardware constraint: max shots per run
-target_shots_per_circuit: 2048  # desired shots/circuit before any degradation
+target_shots_per_circuit: 200   # reduced-scope run: one 200-shot batch per circuit (hardware floor)
 min_shots_per_circuit: 200      # floor: never go below one batch
-target_repetitions: 10          # desired repetitions before any degradation
+target_repetitions: 6           # reduced-scope run: 6 repetitions (paper convention is 10; not affordable in 25 QPU-h)
 calibration_shots_per_circuit: 200
-trex_twirl_instances: 32        # independent random-twirl hardware passes averaged per
+trex_twirl_instances: 2         # independent random-twirl hardware passes averaged per
                                  # TREx circuit (see piastq_execution/mitigation.py's
                                  # load_trex_twirl_instances() docstring for rationale).
                                  # Read by both the budget planner's cost model and every
@@ -116,31 +116,15 @@ combos:
     circuits_dir: elevator_three
     methods: [raw, mem, m3, trex]
 
+# Reduced-scope run (25 QPU-hours available, results needed by 6 Nov):
+# ONE pool, four QAOA-TCS combos (2 multi-objective: gzip, flex; 2 single-
+# objective: paintcontrol, gsdtsr), all four methods (raw+MEM+M3+TREx),
+# 6 repetitions, 200 shots/circuit, 2 TREx twirls. IGDec-QAOA is not part of
+# this run. Estimated 21.5h (+0.23h end-of-session drift check = 21.7h,
+# 5,208 batches x 15s); total_hours is set to 23 so ~3h of the 25h stays
+# unplanned as a reserve for failed jobs/queue. Any combo NOT listed here is
+# skipped by the execution scripts and by evaluation.
 pools:
-  - name: qaoa_tcs_single_objective
-    total_hours: 15
-    combos: [gsdtsr_qaoa_tcs, iofrol_qaoa_tcs, paintcontrol_qaoa_tcs, elevator_qaoa_tcs, elevator2_qaoa_tcs]
-
-  - name: qaoa_tcs_multi_objective
-    total_hours: 15
-    combos: [flex_qaoa_tcs, grep_qaoa_tcs, gzip_qaoa_tcs, sed_qaoa_tcs]
-
-  - name: igdec_qaoa_gsdtsr
-    total_hours: 15
-    combos: [gsdtsr_igdec_qaoa]
-
-  - name: igdec_qaoa_iofrol
-    total_hours: 15
-    combos: [iofrol_igdec_qaoa]
-
-  - name: igdec_qaoa_paintcontrol
-    total_hours: 15
-    combos: [paintcontrol_igdec_qaoa]
-
-  - name: igdec_qaoa_elevator_o2
-    total_hours: 15
-    combos: [elevator_o2_igdec_qaoa]
-
-  - name: igdec_qaoa_elevator_o3
-    total_hours: 15
-    combos: [elevator_o3_igdec_qaoa]
+  - name: reduced_scope_run
+    total_hours: 23
+    combos: [gzip_qaoa_tcs, flex_qaoa_tcs, paintcontrol_qaoa_tcs, gsdtsr_qaoa_tcs]

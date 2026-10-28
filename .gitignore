@@ -27,3 +27,7 @@ execution_plan/
 # already-tracked raw_counts/subsuites/qubos/calibration data, same as
 # execution_plan/ above.
 results/evaluation/
+
+# run_all.py logs
+logs/
+results/_archive_*/

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.mitigation import CalibrationStore
 from piastq_execution.qubit_layout import physical_layout_for_width
-from piastq_execution.run_calibration import calibrate_m3, calibrate_mem
+from piastq_execution.run_calibration import calibrate_m3, calibrate_mem, compare_m3_calibrations
 
 
 class FakeQuasiDist:
@@ -122,6 +122,21 @@ class TestCalibrateM3(unittest.TestCase):
             for call in sampler.transpile_options_calls:
                 self.assertEqual(call.get("initial_layout"), expected_layout)
                 self.assertEqual(call.get("optimization_level"), 3)
+
+
+
+
+class TestCompareM3Calibrations(unittest.TestCase):
+    def test_reports_max_change_per_qubit(self):
+        import numpy as np
+        from piastq_execution.mitigation import make_m3_calibration_record
+
+        a = make_m3_calibration_record([np.array([[0.99, 0.02], [0.01, 0.98]])], [0], "b", "v", 200, 1.0)
+        b = make_m3_calibration_record([np.array([[0.97, 0.02], [0.03, 0.98]])], [0], "b", "v", 200, 1.0)
+        report = compare_m3_calibrations(a, b)
+        self.assertAlmostEqual(report["max_abs_change"], 0.02)
+        self.assertEqual(len(report["max_abs_change_per_qubit"]), 1)
+        self.assertEqual(report["width"], 1)
 
 
 if __name__ == "__main__":

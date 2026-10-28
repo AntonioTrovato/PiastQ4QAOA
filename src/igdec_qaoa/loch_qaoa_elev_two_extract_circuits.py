@@ -54,24 +54,27 @@ NUM_ITERATIONS = 10  # impact-reordering decomposition rounds per sampling
 # PROBLEM DEFINITION
 # ============================================================
 
-class TestCaseOptimizationThree(OptimizationApplication):
+# Two-objective formulation (cost + input diversity), as in SelectQAOA's
+# igdec_qaoa/loch_qaoa_elev_two.py. The weights are that file's (tuned) values.
+# (elevator_three is the different, three-objective cost+pcount+dist problem.)
+W_COST = 0.020584494295802447
+W_DIV = 0.9699098521619943
+
+
+class TestCaseOptimizationTwo(OptimizationApplication):
     def __init__(
         self,
         cost: List[float],
-        pcount: List[float],
-        dist: List[float],
+        div: List[float],
         w1: float,
         w2: float,
-        w3: float,
         sample: List[int],
         solution: List[int]
     ) -> None:
         self._cost = cost
-        self._pcount = pcount
-        self._dist = dist
+        self._div = div
         self._w1 = w1
         self._w2 = w2
-        self._w3 = w3
         self._sample = sample
         self._solution = solution
 
@@ -80,28 +83,23 @@ class TestCaseOptimizationThree(OptimizationApplication):
         x = {i: mdl.binary_var(name=f"x_{i}") for i in self._sample}
 
         obj_cost = 0
-        obj_pcount = 0
-        obj_dist = 0
+        obj_div = 0
 
         for i in range(len(self._solution)):
             if i in self._sample:
                 obj_cost += self._cost[i] * x[i]
-                obj_pcount += self._pcount[i] * x[i]
-                obj_dist += self._dist[i] * x[i]
+                obj_div += self._div[i] * x[i]
             else:
                 obj_cost += self._cost[i] * self._solution[i]
-                obj_pcount += self._pcount[i] * self._solution[i]
-                obj_dist += self._dist[i] * self._solution[i]
+                obj_div += self._div[i] * self._solution[i]
 
         cost_sum = sum(self._cost)
-        pcount_sum = sum(self._pcount)
-        dist_sum = sum(self._dist)
+        div_sum = sum(self._div)
 
         obj_cost = pow(obj_cost / cost_sum, 2)
-        obj_pcount = pow((obj_pcount - pcount_sum) / pcount_sum, 2)
-        obj_dist = pow((obj_dist - dist_sum) / dist_sum, 2)
+        obj_div = pow((obj_div - div_sum) / div_sum, 2)
 
-        obj = self._w1 * obj_cost + self._w2 * obj_pcount + self._w3 * obj_dist
+        obj = self._w1 * obj_cost + self._w2 * obj_div
         mdl.minimize(obj)
 
         op = from_docplex_mp(mdl)
@@ -112,34 +110,30 @@ class TestCaseOptimizationThree(OptimizationApplication):
         return [i for i, value in enumerate(x) if value]
 
 
-def create_qubo(cost, pcount, dist, w1, w2, w3, sample, solution):
-    testcase = TestCaseOptimizationThree(cost, pcount, dist, w1, w2, w3, sample, solution)
+def create_qubo(cost, div, w1, w2, sample, solution):
+    testcase = TestCaseOptimizationTwo(cost, div, w1, w2, sample, solution)
     prob = testcase.to_quadratic_program()
     return prob, testcase
 
 
 def get_data(data):
     cost = data["cost"].values.tolist()
-    p_count = data["pcount"].values.tolist()
-    dist = data["dist"].values.tolist()
-    return cost, p_count, dist
+    div = data["input_div"].values.tolist()
+    return cost, div
 
 
 def print_diet(sample, data):
     cost_list = []
-    pcount_list = []
-    dist_list = []
+    div_list = []
 
     for t in range(len(sample)):
         if sample[t] == 1:
             cost_list.append(data.iloc[t]["cost"])
-            pcount_list.append(data.iloc[t]["pcount"])
-            dist_list.append(data.iloc[t]["dist"])
+            div_list.append(data.iloc[t]["input_div"])
 
     fval = (
-        (1 / 3) * pow(sum(cost_list) / sum(data["cost"]), 2)
-        + (1 / 3) * pow((sum(pcount_list) - sum(data["pcount"])) / sum(data["pcount"]), 2)
-        + (1 / 3) * pow((sum(dist_list) - sum(data["dist"])) / sum(data["dist"]), 2)
+        W_COST * pow(sum(cost_list) / sum(data["cost"]), 2)
+        + W_DIV * pow((sum(div_list) - sum(data["input_div"])) / sum(data["input_div"]), 2)
     )
     return fval
 
@@ -164,29 +158,24 @@ def OrderByImpact(best_solution, df, best_energy):
 def OrderByImpactNum(best_solution, df, best_energy):
     num = len(best_solution)
     cost_array = list(df["cost"])
-    pcount_array = list(df["pcount"])
-    dist_array = list(df["dist"])
+    div_array = list(df["input_div"])
 
     cost_matrix = np.array(cost_array).reshape(-1, 1)
-    pcount_matrix = np.array(pcount_array).reshape(-1, 1)
-    dist_matrix = np.array(dist_array).reshape(-1, 1)
+    div_matrix = np.array(div_array).reshape(-1, 1)
 
     matrix = np.array([best_solution] * len(best_solution))
     for i in range(num):
         matrix[i][i] = 1 - matrix[i][i]
 
     cost_sum = sum(cost_array)
-    pcount_sum = sum(pcount_array)
-    dist_sum = sum(dist_array)
+    div_sum = sum(div_array)
 
     cost_obj = matrix.dot(cost_matrix)
-    pcount_obj = matrix.dot(pcount_matrix) - pcount_sum
-    dist_obj = matrix.dot(dist_matrix) - dist_sum
+    div_obj = matrix.dot(div_matrix) - div_sum
 
     obj = (
-        (1 / 3) * (cost_obj / cost_sum) ** 2
-        + (1 / 3) * (pcount_obj / pcount_sum) ** 2
-        + (1 / 3) * (dist_obj / dist_sum) ** 2
+        W_COST * (cost_obj / cost_sum) ** 2
+        + W_DIV * (div_obj / div_sum) ** 2
         - best_energy
     )
 
@@ -209,8 +198,8 @@ def get_initial_fval(length, df):
 def save_trained_circuits_and_initial_solutions():
     """
     Train IGDec-QAOA in ideal noiseless simulation and save the elevator_two
-    (2-objective: cost + input diversity, formulated here via pcount/dist QUBO
-    weights matching the SelectQAOA original) circuits and initial solutions.
+    (2-objective: cost + input diversity, as in SelectQAOA's loch_qaoa_elev_two.py)
+    circuits and initial solutions.
 
     NOT executed automatically (run
     `python loch_qaoa_elev_two_extract_circuits.py train` on the machine that
@@ -233,11 +222,11 @@ def save_trained_circuits_and_initial_solutions():
 
     df = pd.read_csv(
         f"../../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
-        dtype={"cost": float, "pcount": int, "dist": int}
+        dtype={"cost": float, "input_div": float}
     )
 
     length = len(df)
-    cost, pcount, dist = get_data(df)
+    cost, div = get_data(df)
 
     for sampling_id in range(1, NUM_EXPERIMENT + 1):
         print(f"\n----- {RUN_LABEL} | RANDOM INITIAL SAMPLING #{sampling_id} -----")
@@ -283,8 +272,7 @@ def save_trained_circuits_and_initial_solutions():
         total_impact = 0
         execution_times = []
         best_itr_costs = []
-        best_itr_pcounts = []
-        best_itr_dists = []
+        best_itr_input_divs = []
 
         circuits_metadata = []
 
@@ -296,7 +284,7 @@ def save_trained_circuits_and_initial_solutions():
 
             if PROBLEM_SIZE > 0.15 * len(df):
                 case_list = impact_order[index_begin:index_end]
-                qubo, testcase = create_qubo(cost, pcount, dist, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+                qubo, testcase = create_qubo(cost, div, W_COST, W_DIV, case_list, solution)
 
                 qaoa = QAOA(
                     sampler=ideal_sampler,
@@ -355,7 +343,7 @@ def save_trained_circuits_and_initial_solutions():
                 while index_end <= 0.15 * len(df):
                     subproblem_idx += 1
                     case_list = impact_order[index_begin:index_end]
-                    qubo, testcase = create_qubo(cost, pcount, dist, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+                    qubo, testcase = create_qubo(cost, div, W_COST, W_DIV, case_list, solution)
 
                     qaoa = QAOA(
                         sampler=ideal_sampler,
@@ -425,8 +413,7 @@ def save_trained_circuits_and_initial_solutions():
             total_impact += impact_time
 
             best_itr_costs.append(float(df.loc[np.array(best_solution) == 1, "cost"].sum()))
-            best_itr_pcounts.append(float(df.loc[np.array(best_solution) == 1, "pcount"].sum()))
-            best_itr_dists.append(float(df.loc[np.array(best_solution) == 1, "dist"].sum()))
+            best_itr_input_divs.append(float(df.loc[np.array(best_solution) == 1, "input_div"].sum()))
 
             start_impact = time.time()
             impact_order = OrderByImpactNum(solution, df, energy)
@@ -452,8 +439,7 @@ def save_trained_circuits_and_initial_solutions():
                     "total_exe": total_exe,
                     "execution_times": execution_times,
                     "final_test_suite_costs": best_itr_costs,
-                    "final_suite_pcounts": best_itr_pcounts,
-                    "final_suite_dists": best_itr_dists
+                    "final_suite_input_divs": best_itr_input_divs
                 },
                 f,
                 indent=2
@@ -479,10 +465,10 @@ def run_hardware_like_from_saved_circuits():
 
     df = pd.read_csv(
         f"../../datasets/quantum_sota_datasets/{DATASET_FILENAME}.csv",
-        dtype={"cost": float, "pcount": int, "dist": int}
+        dtype={"cost": float, "input_div": float}
     )
 
-    cost, pcount, dist = get_data(df)
+    cost, div = get_data(df)
     base_input_dir = os.path.join("..", "..", "trained_qaoa_circuits", "igdec_qaoa", RUN_LABEL)
 
     program_results = {}
@@ -544,10 +530,14 @@ def run_hardware_like_from_saved_circuits():
             itr_num += 1
 
             if PROBLEM_SIZE > 0.15 * len(df):
-                case_list = impact_order[index_begin:index_end]
-
                 meta = circuits_metadata[metadata_index]
                 metadata_index += 1
+                # The trained circuit is only valid for the exact test cases (and
+                # QUBO) it was trained on: take them from its own metadata rather
+                # than recomputing an impact ordering from the hardware solution,
+                # which diverges from the training trajectory and would write this
+                # circuit's bits onto the wrong test cases.
+                case_list = meta["case_list"]
 
                 circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                 with open(circuit_path, "rb") as f:
@@ -611,17 +601,21 @@ def run_hardware_like_from_saved_circuits():
                 for case_index in range(len(case_list)):
                     solution[case_list[case_index]] = bitstring[case_index]
 
-                qubo, testcase = create_qubo(cost, pcount, dist, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+                qubo, testcase = create_qubo(cost, div, W_COST, W_DIV, case_list, solution)
                 result_fval = qubo.objective.evaluate(bitstring)
 
             else:
                 result_fval = None
 
                 while index_end <= 0.15 * len(df):
-                    case_list = impact_order[index_begin:index_end]
-
                     meta = circuits_metadata[metadata_index]
                     metadata_index += 1
+                    # The trained circuit is only valid for the exact test cases (and
+                    # QUBO) it was trained on: take them from its own metadata rather
+                    # than recomputing an impact ordering from the hardware solution,
+                    # which diverges from the training trajectory and would write this
+                    # circuit's bits onto the wrong test cases.
+                    case_list = meta["case_list"]
 
                     circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                     with open(circuit_path, "rb") as f:
@@ -685,7 +679,7 @@ def run_hardware_like_from_saved_circuits():
                     for case_index in range(len(case_list)):
                         solution[case_list[case_index]] = bitstring[case_index]
 
-                    qubo, testcase = create_qubo(cost, pcount, dist, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+                    qubo, testcase = create_qubo(cost, div, W_COST, W_DIV, case_list, solution)
                     result_fval = qubo.objective.evaluate(bitstring)
 
                     index_begin += PROBLEM_SIZE
@@ -711,8 +705,7 @@ def run_hardware_like_from_saved_circuits():
             index_end = PROBLEM_SIZE
 
         final_test_suite_cost = float(df.loc[np.array(best_solution) == 1, "cost"].sum())
-        final_suite_pcount = float(df.loc[np.array(best_solution) == 1, "pcount"].sum())
-        final_suite_dist = float(df.loc[np.array(best_solution) == 1, "dist"].sum())
+        final_suite_input_div = float(df.loc[np.array(best_solution) == 1, "input_div"].sum())
 
         program_results[f"sampling_{sampling_id}"] = {
             "initial_solution": init_data["initial_solution"],
@@ -720,8 +713,7 @@ def run_hardware_like_from_saved_circuits():
             "best_solution": best_solution,
             "best_energy": best_energy,
             "final_test_suite_cost": final_test_suite_cost,
-            "final_suite_pcount": final_suite_pcount,
-            "final_suite_dist": final_suite_dist,
+            "final_suite_input_div": final_suite_input_div,
             "all_qpu_run_times(ms)": qpu_run_times,
             "mean_qpu_run_time(ms)": statistics.mean(qpu_run_times) if len(qpu_run_times) > 0 else 0,
             "stdev_qpu_run_time(ms)": statistics.stdev(qpu_run_times) if len(qpu_run_times) > 1 else 0,

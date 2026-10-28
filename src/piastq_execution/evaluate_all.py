@@ -14,14 +14,15 @@ already-collected files and does classical post-processing, safe to run
 anywhere, including in an authoring/review session, once Phase 5 (hardware
 execution) and Phase 4 (calibration) data exists.
 
-IGDec-QAOA's non-raw methods (mem/m3/trex) are evaluated with
-`compute_final_suite_metrics=False` (see evaluate_single_objective_combo()'s
-docstring): its subproblems are solved adaptively, so only per-circuit
-metrics (qubo_energy, probability_of_optimal) are valid for a *corrected*
-method -- the final-suite cost/effectiveness reported for IGDec-QAOA combos
-is only ever raw's, since raw is the trajectory that was actually executed.
+IGDec-QAOA's subproblem sequence (each circuit's `case_list`) is fixed by
+training, and the hardware scripts execute exactly that sequence. So every
+method (raw/mem/m3/trex) gets a real final suite by replaying that sequence
+with its own per-circuit bitstrings. Caveat for the paper: each circuit's
+QUBO was conditioned on the ideal-simulator solution at training time, so
+the hardware run is "ideal trajectory, hardware-filled bits", not a fully
+adaptive re-ranking on hardware.
 
-IGDec-QAOA's raw final suite is ALSO not computed via
+IGDec-QAOA's final suites are ALSO not computed via
 evaluate_single_objective_combo()'s built-in merge_selected_tests()
 (union/first-cluster-wins) -- that's correct for QAOA-TCS's genuinely
 disjoint clusters, but wrong for IGDec-QAOA, whose subproblems can revisit
@@ -83,6 +84,19 @@ def load_combo_definitions(execution_plan_path: str) -> Dict[str, Dict[str, Any]
             "methods": list(combo_cfg.get("methods", ["raw"])),
         }
     return combos
+
+
+def planned_combo_names(execution_plan_path: str) -> Optional[set]:
+    """Combos covered by a pool in the plan (the ones this run executes), or
+    None if the plan has no pools (then every defined combo is evaluated).
+    Evaluating combos the run never executed would only hit stale or
+    incomplete files from earlier work."""
+    import yaml
+
+    with open(execution_plan_path) as f:
+        raw = yaml.safe_load(f)
+    names = {c for pool in (raw.get("pools") or []) for c in pool.get("combos", [])}
+    return names or None
 
 
 # ---------------------------------------------------------------------------
@@ -346,28 +360,34 @@ def evaluate_qaoa_tcs_multi_objective_combo(
 # IGDec-QAOA single-objective
 # ---------------------------------------------------------------------------
 
-def load_qaoa_tcs_style_dataset(dataset: str, datasets_dir: str) -> Dict[str, List[float]]:
-    """IGDec-QAOA's tcm script (gsdtsr/iofrol/paintcontrol) uses the same
-    cost/rate CSV shape as QAOA-TCS's own bootqa datasets. elevator_two/
-    elevator_three route through elevator.csv's cost/pcount/dist instead --
-    see load_igdec_elevator_test_case_data()."""
-    return load_qaoa_tcs_test_case_data(dataset, datasets_dir)
-
-
 def merge_igdec_solution(
-    circuits_metadata: Sequence[Dict[str, Any]], selected_bitstrings: Sequence[str]
+    circuits_metadata: Sequence[Dict[str, Any]],
+    selected_bitstrings: Sequence[str],
+    initial_solution: Optional[Sequence[int]] = None,
 ) -> List[int]:
-    """Replays IGDec-QAOA's actual solution-update rule -- last write wins,
+    """Replays IGDec-QAOA's solution-update rule -- last write wins,
     chronological iteration order -- instead of
     evaluate_single_objective_combo()'s built-in merge_selected_tests()
     (union/first-cluster-wins), which assumes QAOA-TCS's disjoint-cluster
-    semantics and does NOT match IGDec-QAOA: `case_list` can revisit the
-    same test case across iterations, and the real algorithm always takes
-    the MOST RECENT decision (`solution[case_list[i]] = bitstring[i]`,
-    exactly mirrored here), not the first one. `circuits_metadata` must
-    already be in chronological (iteration) order, as persisted.
+    semantics: `case_list` can revisit the same test case across iterations,
+    and the most RECENT decision wins (`solution[case_list[i]] = bitstring[i]`).
+    `circuits_metadata` must already be in chronological (iteration) order,
+    as persisted.
+
+    `initial_solution` is the sampling's initial random solution
+    (initial_random_solution.json): test cases that no subproblem ever
+    touches keep their initial value, exactly as in the real algorithm. Omit
+    it to start from an all-zero background.
+
+    The subproblem sequence (`case_list` per circuit) is fixed by training,
+    and the hardware run uses exactly that sequence (the execution scripts
+    read `case_list` from the metadata), so the same replay is valid for
+    every method: each one only supplies its own bitstring per circuit.
     """
-    solution: Dict[int, int] = {}
+    if initial_solution is not None:
+        solution: Dict[int, int] = {i: int(b) for i, b in enumerate(initial_solution)}
+    else:
+        solution = {}
     for meta, bitstring in zip(circuits_metadata, selected_bitstrings):
         bits = [int(b) for b in bitstring[::-1]]
         for case_index, test_id in enumerate(meta["case_list"]):
@@ -376,15 +396,32 @@ def merge_igdec_solution(
     return sorted(test_id for test_id, bit in solution.items() if bit == 1)
 
 
-def load_igdec_elevator_test_case_data(datasets_dir: str) -> Dict[str, List[float]]:
+def load_igdec_elevator_test_case_data(datasets_dir: str, circuits_dir: str = "elevator_three") -> Dict[str, List[float]]:
+    """elevator_two: cost + input diversity; elevator_three: cost + passenger
+    count + travel distance (see evaluation.EFFECTIVENESS_METRICS)."""
     import pandas as pd
 
+    if circuits_dir == "elevator_two":
+        data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "input_div": float})
+        return {"cost": data["cost"].tolist(), "input_diversity": data["input_div"].tolist()}
     data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "pcount": int, "dist": int})
     return {
         "cost": data["cost"].tolist(),
         "passenger_count": data["pcount"].tolist(),
         "travel_distance": data["dist"].tolist(),
     }
+
+
+def load_igdec_tcm_dataset(dataset: str, datasets_dir: str) -> Dict[str, List[float]]:
+    """IGDec-QAOA's gsdtsr/iofrol/paintcontrol data. Only gsdtsr was trained on
+    the rate > 0 subset; iofrol and paintcontrol circuits were trained on the
+    full, unfiltered frame, so their indices refer to the full frame."""
+    import pandas as pd
+
+    data = pd.read_csv(os.path.join(datasets_dir, f"{dataset}.csv"), dtype={"time": float, "rate": float})
+    if dataset == "gsdtsr":
+        data = data[data["rate"] > 0]
+    return {"cost": data["time"].tolist(), "failure_rate": data["rate"].tolist()}
 
 
 def evaluate_igdec_qaoa_single_objective_combo(
@@ -399,13 +436,13 @@ def evaluate_igdec_qaoa_single_objective_combo(
 
     raw_records = load_raw_records(os.path.join(results_dir, f"{circuits_dir}-raw_counts.jsonl"))
     trex_records = load_raw_records(os.path.join(results_dir, f"{circuits_dir}-trex-raw_counts.jsonl"))
-    raw_index = index_raw_records_by_key(raw_records)
-    trex_aggregated = aggregate_trex_records(trex_records) if trex_records else {}
 
     if circuits_dir in ("elevator_two", "elevator_three"):
-        test_case_data = load_igdec_elevator_test_case_data(os.path.join(root, "datasets", "quantum_sota_datasets"))
+        test_case_data = load_igdec_elevator_test_case_data(
+            os.path.join(root, "datasets", "quantum_sota_datasets"), circuits_dir
+        )
     else:
-        test_case_data = load_qaoa_tcs_style_dataset(dataset, os.path.join(root, "datasets", "quantum_sota_datasets"))
+        test_case_data = load_igdec_tcm_dataset(dataset, os.path.join(root, "datasets", "quantum_sota_datasets"))
 
     results_by_method: Dict[str, List[Any]] = defaultdict(list)
 
@@ -418,8 +455,23 @@ def evaluate_igdec_qaoa_single_objective_combo(
         metadata_path = os.path.join(circuits_base_dir, sampling_dir_name, "circuits_metadata.json")
         if not os.path.exists(metadata_path):
             continue
+        # Records of all samplings share one file and the same
+        # (iteration, subproblem) keys, so each sampling's records are
+        # selected by the sampling id embedded in circuit_id
+        # ("..._sampling<N>_itr<I>_sub<S>[_trex<K>]"). A sampling that was
+        # not executed (fewer repetitions than trained samplings) is skipped.
+        sampling_tag = f"_{sampling_dir_name.replace('_', '')}_"
+        sampling_raw = [r for r in raw_records if sampling_tag in r.circuit_id]
+        sampling_trex = [r for r in trex_records if sampling_tag in r.circuit_id]
+        if not sampling_raw:
+            continue
+        raw_index = index_raw_records_by_key(sampling_raw)
+        trex_aggregated = aggregate_trex_records(sampling_trex) if sampling_trex else {}
+
         with open(metadata_path) as f:
             circuits_metadata = json.load(f)
+        with open(os.path.join(circuits_base_dir, sampling_dir_name, "initial_random_solution.json")) as f:
+            initial_solution = json.load(f)["initial_solution"]
 
         assignments = [
             ClusterAssignment(cluster_id=None, cluster_test_cases=m["case_list"])
@@ -435,9 +487,7 @@ def evaluate_igdec_qaoa_single_objective_combo(
             cluster_raw_counts = [
                 cluster_counts_for_method(method, key, raw_index, trex_aggregated) for key in keys
             ]
-            method_records_pool = trex_records if method == "trex" else raw_records
-            sampling_iterations = {m["iteration"] for m in circuits_metadata}
-            exp_records = [r for r in method_records_pool if r.iteration_id in sampling_iterations]
+            exp_records = sampling_trex if method == "trex" else sampling_raw
 
             calibration_records = [
                 load_calibration_for_width(calibration_store, method, num_qubits)
@@ -457,20 +507,18 @@ def evaluate_igdec_qaoa_single_objective_combo(
                 calibration_shots_per_circuit=200,
                 # Never let evaluate_single_objective_combo() do its own
                 # merge_selected_tests() -- that's the wrong (union/
-                # first-wins) semantics for IGDec-QAOA. raw's final suite is
-                # computed correctly below via merge_igdec_solution()
-                # instead; corrected methods stay at execution_cost=None
-                # (see module docstring).
+                # first-wins) semantics for IGDec-QAOA. Every method's final
+                # suite is computed below via merge_igdec_solution() over
+                # the (training-fixed) subproblem sequence instead.
                 compute_final_suite_metrics=False,
             )
-            if method == "raw":
-                selected_bitstrings = result.optimal_bitstring.split("+")
-                final_selected_tests = merge_igdec_solution(circuits_metadata, selected_bitstrings)
-                effectiveness_metrics = compute_single_objective_metrics(
-                    dataset, final_selected_tests, test_case_data
-                )
-                result.execution_cost = effectiveness_metrics.pop("execution_cost")
-                result.effectiveness = effectiveness_metrics
+            selected_bitstrings = result.optimal_bitstring.split("+")
+            final_selected_tests = merge_igdec_solution(circuits_metadata, selected_bitstrings, initial_solution)
+            effectiveness_metrics = compute_single_objective_metrics(
+                dataset, final_selected_tests, test_case_data
+            )
+            result.execution_cost = effectiveness_metrics.pop("execution_cost")
+            result.effectiveness = effectiveness_metrics
             results_by_method[method].append(result)
 
     return results_by_method
@@ -488,6 +536,9 @@ def _to_json_dict(result: Any) -> Dict[str, Any]:
 def evaluate_all(execution_plan_path: str, root: Optional[str] = None) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     root = root or repo_root()
     combos = load_combo_definitions(execution_plan_path)
+    planned = planned_combo_names(execution_plan_path)
+    if planned is not None:
+        combos = {name: cfg for name, cfg in combos.items() if name in planned}
     calibration_store = CalibrationStore(base_dir=os.path.join(root, "calibration"))
 
     all_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}

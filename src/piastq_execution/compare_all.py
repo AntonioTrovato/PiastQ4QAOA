@@ -5,9 +5,13 @@ research questions (README.md's Quickstart section):
   RQ1/RQ3a (mitigation vs. quality, cost-agnostic): per combo, method vs
     raw on qubo_energy / probability_of_optimal (single-objective) or
     hypervolume / igd / num_non_dominated (multi-objective).
-  RQ2: per combo, method vs raw on execution_cost / effectiveness.*
+  RQ2: per combo, method vs raw on execution_cost and every
+    effectiveness.<name> the combo recorded (failure_rate, input_diversity,
+    passenger_count, travel_distance -- discovered from the data)
     (single-objective) or hypervolume / igd (multi-objective) -- same
-    machinery as RQ1, different metric selection.
+    machinery as RQ1, different metric selection. IGDec-QAOA combos get
+    them for every method (training-fixed subproblem sequence, see
+    evaluate_all.merge_igdec_solution).
   RQ3b (mitigation cost/benefit): per combo, method vs raw on
     execution_time_seconds and mitigation_overhead.calibration_wall_clock_seconds
     -- reported alongside RQ1/RQ3a's quality numbers so the two can be
@@ -17,7 +21,11 @@ research questions (README.md's Quickstart section):
     across algorithms (gsdtsr/iofrol/paintcontrol pair automatically;
     elevator variants use different naming per algorithm and are not
     auto-paired -- see module docstring in evaluation.py's
-    EFFECTIVENESS_METRICS), same-method comparison on execution_time_seconds.
+    EFFECTIVENESS_METRICS), same-method comparison on RQ4_METRICS:
+    execution_time_seconds (cost), probability_of_optimal (quality), and,
+    where both sides have it, execution_cost and effectiveness.failure_rate of the final
+    suite. qubo_energy is deliberately NOT compared across algorithms: it is
+    a sum over each algorithm's own, differently-sized subproblem QUBOs.
 
 Reads results/evaluation/*.json (evaluate_all.py's output) and
 configs/execution_plan.yaml (for RQ4's algorithm/dataset pairing). Pure
@@ -112,6 +120,25 @@ SINGLE_OBJECTIVE_QUALITY_METRICS = ["qubo_energy", "probability_of_optimal"]
 SINGLE_OBJECTIVE_EFFECTIVENESS_METRICS = ["execution_cost"]
 MULTI_OBJECTIVE_QUALITY_METRICS = ["hypervolume", "igd", "num_non_dominated"]
 COST_METRICS = ["execution_time_seconds", "mitigation_overhead.calibration_wall_clock_seconds"]
+RQ4_METRICS = [
+    "execution_time_seconds",
+    "probability_of_optimal",
+    "execution_cost",
+    "effectiveness.failure_rate",
+]
+
+
+def _effectiveness_metric_paths(combo_results: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+    """`effectiveness.<name>` for every effectiveness metric any record of
+    this combo actually has (the set differs per dataset)."""
+    names: List[str] = []
+    for records in combo_results.values():
+        for record in records:
+            for name in (record.get("effectiveness") or {}):
+                path = f"effectiveness.{name}"
+                if path not in names:
+                    names.append(path)
+    return names
 
 
 def _is_multi_objective_combo(combo_results: Dict[str, List[Dict[str, Any]]]) -> bool:
@@ -133,7 +160,7 @@ def compare_combo(combo_name: str, combo_results: Dict[str, List[Dict[str, Any]]
             report["rq1_rq3a_quality"][metric] = result
 
     if not _is_multi_objective_combo(combo_results):
-        for metric in SINGLE_OBJECTIVE_EFFECTIVENESS_METRICS:
+        for metric in SINGLE_OBJECTIVE_EFFECTIVENESS_METRICS + _effectiveness_metric_paths(combo_results):
             result = compare_methods_within_combo(combo_results, metric)
             if result is not None:
                 report["rq2_effectiveness"][metric] = result
@@ -186,6 +213,7 @@ def compare_algorithms(
         shared_methods = set(qaoa_tcs_results.keys()) & set(igdec_results.keys())
 
         per_method = {}
+        degenerate = []
         for method in sorted(shared_methods):
             groups = {
                 "qaoa_tcs": extract_samples(qaoa_tcs_results[method], metric_path),
@@ -196,15 +224,18 @@ def compare_algorithms(
                 try:
                     per_method[method] = compare_groups(groups)
                 except ValueError:
-                    continue
+                    # e.g. every sample identical in both groups -- reported
+                    # as degenerate rather than silently dropped.
+                    degenerate.append(method)
 
-        if per_method:
+        if per_method or degenerate:
             reports.append({
                 "dataset": pair["dataset"],
                 "qaoa_tcs_combo": pair["qaoa_tcs"],
                 "igdec_qaoa_combo": pair["igdec_qaoa"],
                 "metric": metric_path,
                 "by_method": per_method,
+                "degenerate_methods": degenerate,
             })
     return reports
 
@@ -220,7 +251,9 @@ def compare_all(
     combo_defs = load_combo_definitions(execution_plan_path)
 
     per_combo = [compare_combo(name, results) for name, results in all_results.items()]
-    rq4 = compare_algorithms(all_results, combo_defs)
+    rq4 = []
+    for metric_path in RQ4_METRICS:
+        rq4.extend(compare_algorithms(all_results, combo_defs, metric_path))
 
     return {"per_combo": per_combo, "rq4_algorithm_comparison": rq4}
 
@@ -265,6 +298,8 @@ def render_report(comparison: Dict[str, Any]) -> str:
             for method, result in report["by_method"].items():
                 lines.append(f"    method={method}:")
                 lines.extend(_render_comparison(result, indent="        "))
+            for method in report.get("degenerate_methods", []):
+                lines.append(f"    method={method}: not testable (identical samples)")
         lines.append("")
 
     return "\n".join(lines)
@@ -309,6 +344,7 @@ def comparison_to_json_dict(comparison: Dict[str, Any]) -> Dict[str, Any]:
             "by_method": {
                 method: _comparison_result_to_json(result) for method, result in report["by_method"].items()
             },
+            "degenerate_methods": report.get("degenerate_methods", []),
         })
 
     return {"per_combo": per_combo_json, "rq4_algorithm_comparison": rq4_json}

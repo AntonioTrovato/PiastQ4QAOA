@@ -36,6 +36,11 @@ class BatchRecord:
     raw_counts: Dict[str, int]
     timestamp: str
     wall_clock_seconds: float
+    # Best-effort job metadata from the provider (None if it exposes none):
+    # the job id, plus whatever the primitive result's `metadata` holds
+    # (e.g. queue/execution timestamps, if the backend reports them).
+    job_id: Optional[str] = None
+    job_metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -56,6 +61,9 @@ class RawCountsRecord:
     total_wall_clock_seconds: float
     aggregated_counts: Dict[str, int]
     twirl_mask: Optional[List[int]] = None  # set only for TREx twirl-instance executions
+    # Depth/size/gate counts of the circuit after transpilation for the
+    # backend (see transpiled_circuit_stats) -- None if it couldn't be computed.
+    transpiled_stats: Optional[Dict[str, Any]] = None
 
     def to_json_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -142,11 +150,64 @@ def counts_from_quasi_probabilities(probabilities: Dict[str, float], shots: int)
     return {bitstring: int(round(prob * shots)) for bitstring, prob in probabilities.items()}
 
 
+def _json_safe(value: Any) -> Any:
+    """Round-trips `value` through JSON (str() for anything unserializable)
+    so provider-specific metadata can never break a raw-counts write."""
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except Exception:
+        return None
+
+
+def _job_info(job, result) -> Dict[str, Any]:
+    """Best-effort job id + result metadata; never raises."""
+    job_id = None
+    try:
+        job_id = str(job.job_id())
+    except Exception:
+        pass
+    metadata = None
+    raw_metadata = getattr(result, "metadata", None)
+    if raw_metadata:
+        metadata = _json_safe(raw_metadata)
+    return {"job_id": job_id, "job_metadata": metadata}
+
+
+def transpiled_circuit_stats(
+    circuit, backend, optimization_level: int = 3, initial_layout: Optional[List[int]] = None
+) -> Optional[Dict[str, Any]]:
+    """Depth, size, two-qubit-gate count and gate histogram of `circuit`
+    transpiled for `backend` with the same optimization level / pinned layout
+    the execution uses. Like `get_physical_qubit_mapping`, this is an
+    independent transpile call, not the sampler's own -- it describes what
+    the transpiler produces for these settings, and is not guaranteed to be
+    gate-for-gate what the sampler submitted. Returns None on any failure
+    (record-keeping must never break an execution).
+    """
+    try:
+        from qiskit import transpile
+
+        kwargs = {"backend": backend, "optimization_level": optimization_level}
+        if initial_layout is not None:
+            kwargs["initial_layout"] = list(initial_layout)
+        transpiled = transpile(circuit, **kwargs)
+        return {
+            "depth": int(transpiled.depth()),
+            "size": int(transpiled.size()),
+            "num_nonlocal_gates": int(transpiled.num_nonlocal_gates()),
+            "count_ops": {str(k): int(v) for k, v in transpiled.count_ops().items()},
+        }
+    except Exception:
+        return None
+
+
 def _run_one_batch(circuit, sampler, shots: int, batch_index: int) -> BatchRecord:
     sampler.options.shots = shots
     start = time.time()
-    result = sampler.run([circuit]).result()
+    job = sampler.run([circuit])
+    result = job.result()
     elapsed = time.time() - start
+    job_info = _job_info(job, result)
 
     probabilities = result.quasi_dists[0].binary_probabilities()
     raw_counts = counts_from_quasi_probabilities(probabilities, shots)
@@ -158,6 +219,8 @@ def _run_one_batch(circuit, sampler, shots: int, batch_index: int) -> BatchRecor
         raw_counts=raw_counts,
         timestamp=datetime.now(timezone.utc).isoformat(),
         wall_clock_seconds=elapsed,
+        job_id=job_info["job_id"],
+        job_metadata=job_info["job_metadata"],
     )
 
 
@@ -252,6 +315,7 @@ def run_circuit_with_batching_recorded(
         total_wall_clock_seconds=sum(b.wall_clock_seconds for b in batch_records),
         aggregated_counts=dict(total_counts),
         twirl_mask=list(twirl_mask) if twirl_mask is not None else None,
+        transpiled_stats=transpiled_circuit_stats(circuit, backend, optimization_level, initial_layout),
     )
 
     return total_counts, record

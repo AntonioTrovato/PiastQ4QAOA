@@ -9,6 +9,12 @@ It implements and evaluates two quantum approaches for Test Case Selection:
 - **QAOA-TCS**, single- and multi-objective
 - **IGDec-QAOA**, single-objective only
 
+> **Scope of the study run on PIAST-Q** (25 QPU-hours): QAOA-TCS only
+> (2 multi-objective + 2 single-objective datasets), focused on the effect of
+> the three mitigation strategies (RQ1, RQ2, RQ3a, RQ3b). IGDec-QAOA is fully
+> implemented and tested in this package but is **not** part of the planned
+> hardware run, so RQ4 (algorithm comparison) is not addressed (§0).
+
 The pipeline, end to end:
 
 1. **Decompose & cluster** the dataset into small (<=7-qubit) subproblems
@@ -25,12 +31,100 @@ The pipeline, end to end:
    actually afford.
 6. **Evaluate** and statistically compare raw vs. mitigated results.
 
+## Index
+
+- [0. One-click run (`run_all.py`) and how to read what it produces](#0-one-click-run-run_allpy-and-how-to-read-what-it-produces)
+- [1. Directory layout](#1-directory-layout)
+- [2. Requirements](#2-requirements)
+- [3. The 14-combo matrix](#3-the-14-combo-matrix)
+- [4. How to run](#4-how-to-run)
+- [5. Mitigation: how each method actually executes](#5-mitigation-how-each-method-actually-executes)
+- [6. Raw-counts persistence](#6-raw-counts-persistence)
+- [7. Budget planning](#7-budget-planning)
+- [8. Evaluation and statistics](#8-evaluation-and-statistics)
+- [9. Tests](#9-tests)
+- [10. Quickstart: setup, simulated run, real run](#10-quickstart-setup-simulated-run-real-run)
+- [11. Every parameter, and why it has that value](#11-every-parameter-and-why-it-has-that-value)
+
+---
+
+## 0. One-click run (`run_all.py`) and how to read what it produces
+
+`run_all.py` (repo root) runs the whole study start to end with one press of
+play. It uses whatever backend `configs/backend.yaml` names: the default
+`offline_simulator_no_noise` is a free dry run; for real hardware set the real
+backend there **and** set `ALLOW_REAL_HARDWARE = True` at the top of
+`run_all.py` (without it the script refuses to start on a non-simulator).
+
+Stages: unit tests -> QUBO backfill (adds the QUBO coefficients evaluation
+needs to circuits trained before they were persisted; no retraining) ->
+budget plan -> MEM/M3 calibration -> **pilot gate** (measures real
+seconds/circuit from the calibration, projects total QPU hours, aborts before
+the main execution if above `QPU_HOURS_LIMIT`) -> QAOA-TCS single-objective ->
+QAOA-TCS multi-objective -> (IGDec-QAOA, only if an IGDec combo is in the
+plan) -> end-of-session drift check ->
+evaluation -> statistical comparison. The first failing stage stops the run.
+Raw-count files of an earlier attempt are moved to `results/_archive_<time>/`
+first, because the writers append.
+
+**The reduced run configured in `configs/execution_plan.yaml`** (25 QPU-hours
+available): QAOA-TCS only. Multi-objective: `gzip` + `flex`. Single-objective:
+`paintcontrol` + `gsdtsr`. Methods raw + MEM + M3 + TREx; 6 repetitions; 200
+shots/circuit; 2 TREx twirl instances; estimated 21.47 h (+0.23 h drift check =
+21.7 h, about 3.3 h of reserve; the 25 h limit holds while a batch takes at
+most about 17.3 s, which the pilot gate checks). Other combos are skipped by
+the execution scripts and by evaluation. Selection is feasibility-driven (QPU
+budget, 6 Nov deadline); the paper must say so. IGDec-QAOA was dropped because
+only `paintcontrol` is affordable for it (`iofrol` alone is ~25 h of raw runs
+and the other IGDec datasets are untrained), so RQ4 is out of scope. TREx at
+two twirls is a weak test of that technique; state it. Other datasets that do
+not fit: `iofrol` and `elevator` (hundreds of circuits), `elevator2` (its 56
+saved circuits do not match the current clustering).
+
+### What you get, and how to read it
+
+| Where | What it is | How to read it |
+|---|---|---|
+| `results/qaoa_tcs/<dataset>/<dataset>-rep-1-raw_counts.jsonl` | One line per executed circuit (raw method): full bitstring counts per 200-shot batch, per-batch wall-clock and timestamp, job id/metadata, physical qubits, backend name/version, **transpiled depth/gate counts** (`transpiled_stats`) | One JSON object per line; `aggregated_counts` is the sum over batches. Source of truth for all post-hoc mitigation |
+| `...-rep-1-trex-raw_counts.jsonl` | Same, one line per **TREx twirl pass** (has `twirl_mask`) | Undo the mask, then average over passes (`mitigation.aggregate_trex_records`) |
+| `results/qaoa_tcs/<dataset>/<dataset>-rep-1.json`, `...-rep-1-subsuites.json` | Derived results (all repetitions) and the per-cluster selections | Legacy result files; all repetitions of a dataset are in the same file |
+| `results/igdec_qaoa/<dataset>-raw_counts.jsonl`, `-trex-raw_counts.jsonl`, `<dataset>.json` | Same for IGDec-QAOA; all samplings share one file, told apart by `circuit_id` (`..._sampling<N>_itr<I>_sub<S>[_trex<K>]`) | Per sampling = one repetition |
+| `calibration/mem_q*.json`, `m3_q*.json` | MEM confusion matrices / M3 single-qubit assignment matrices per circuit width, with measured calibration wall-clock | Start-of-session readout calibration used to correct raw counts |
+| `calibration/drift/m3_drift_report.json` | Per width: largest change of any M3 assignment-matrix entry between start and end of the session | Near 0 = readout stable during the run |
+| `calibration/backend_snapshots/` | Timestamped backend-reported T1/T2/frequency per session | Context for interpreting drift between sessions |
+| `execution_plan/execution_plan_report.{txt,json}` | The budget planner's QPU-hour estimate for the plan | Compare with the measured time in `logs/run_summary_*.json` |
+| `results/evaluation/<combo>.json` | Per method (raw/mem/m3/trex) and repetition: `qubo_energy`, `probability_of_optimal`, `execution_cost`, `effectiveness.*` (single-objective) or `hypervolume`/`igd`/`num_non_dominated` (multi-objective), `execution_time_seconds`, `mitigation_overhead`, `classical_post_processing_seconds` | Lists of per-repetition dicts; this is the statistics' input |
+| `results/evaluation/comparison_report.{txt,json}` | The RQ-mapped statistics | See below |
+| `logs/run_all_<time>.log`, `logs/run_summary_<time>.json` | Full console log; stage times, backend, pilot-gate projection, measured QPU hours | The summary is the quick check against the 25 h limit |
+
+**Reading `comparison_report.txt`**: one block per combo (`RQ1/RQ3a` quality,
+`RQ2` effectiveness, `RQ3b` cost), then `RQ4` if both algorithms were run
+(not in the planned run). Each metric shows
+`normal=…` (Shapiro-Wilk), the omnibus test (ANOVA or Kruskal-Wallis) with its
+p-value, and one line per pair: `p_adj` (Tukey or Dunn+Bonferroni) and the
+effect size (Cohen's d, or Vargha-Delaney `a12`: 0.5 = no effect, >0.5 = the
+first group is larger). With only 6 repetitions per group, weigh effect sizes
+above p-values. "not testable (identical samples)" means every sample was
+identical. Multi-objective combos have no separate RQ2 block: cost is inside
+the 3-objective HV/IGD of RQ1/RQ3a. RQ4 compares `execution_time_seconds`,
+`probability_of_optimal`, and the final suite's `execution_cost` and
+`effectiveness.failure_rate` (`qubo_energy` is deliberately not compared
+across algorithms: it sums each algorithm's own, differently sized QUBOs).
+
+**Before a real run**: move or delete the old result files (the April
+`results/qaoa_tcs/*` and `results/igdec_qaoa/*` outputs, tracked in git, are
+stale and use experiment numbers the new run does not overwrite), delete
+`calibration/*.json` and `calibration/drift/` if they exist from a dry run,
+and `logs/`.
+
 ---
 
 ## 1. Directory layout
 
 ```
 PiastQ4QAOA/
+├── run_all.py                        # one-click full pipeline (see §0)
+├── logs/                             # run_all.py console log + run summary (gitignored)
 ├── src/                              # all importable code lives here
 │   ├── qaoa_tcs/
 │   │   ├── single_obj.py             # QAOA-TCS, single-objective (5 datasets)
@@ -48,7 +142,7 @@ PiastQ4QAOA/
 │       ├── backend_config.py         #   single place to set the real PIAST-Q API token/backend
 │       ├── qubit_layout.py           #   which physical qubits a width-w circuit uses (see §5)
 │       ├── backend_calibration_snapshot.py #   T1/T2/etc. snapshot, once per session (see §5)
-│       ├── run_calibration.py        #   MEM/M3 calibration entry point (see §5)
+│       ├── run_calibration.py        #   MEM/M3 calibration entry point; `drift` mode re-measures M3 at session end (see §5)
 │       ├── budget_planner.py         #   hardware-time budget planning
 │       ├── evaluation.py             #   per-combo x per-method metrics
 │       ├── evaluate_all.py           #   runs evaluation.py across every combo x method (see §8)
@@ -699,12 +793,11 @@ plus the exact 15h/24h answer).
   metric(s) of the final merged suite (`EFFECTIVENESS_METRICS`: failure rate
   for gsdtsr/iofrol/paintcontrol; input diversity for QAOA-TCS's own
   `elevator`; passenger count + travel distance for QAOA-TCS's `elevator2`
-  *and* IGDec-QAOA's `elevator_o2`/`elevator_o3` alike — confirmed by diffing
-  the `elevator_two`/`elevator_three` scripts to use the identical
-  cost+pcount+dist QUBO formulation; `elevator_o2` was previously
-  mislabeled `input_diversity`, a dataset name mismatch that would have
-  raised `Unknown dataset` for QAOA-TCS's own `elevator`/`elevator2` too,
-  since neither was registered at all), quantum-hardware execution time,
+  and IGDec-QAOA's `elevator_o3`; input diversity for IGDec-QAOA's
+  `elevator_o2` (the IGDec pair mirrors the QAOA-TCS pair:
+  `elevator_two` = cost + input diversity, as in SelectQAOA's
+  `loch_qaoa_elev_two.py`; `elevator_three` = cost + passenger count +
+  travel distance), quantum-hardware execution time,
   mitigation overhead, classical post-processing time.
 - **Multi-objective**: non-dominated solutions contributed to an a posteriori
   reference Pareto frontier (union of every compared method's non-dominated
@@ -761,27 +854,28 @@ by cost/benefit (RQ3b, below), not just by how much they improve quality.
 `classical_post_processing_seconds` is the (non-hardware) correction +
 metric-computation time.
 
-### IGDec-QAOA's final-suite metrics: raw only
+### IGDec-QAOA's final-suite metrics: every method, over a training-fixed sequence
 
 `evaluate_single_objective_combo()`'s built-in merge
 (`merge_selected_tests()`, union across independent clusters) is correct for
 QAOA-TCS, whose clusters never share a test case. IGDec-QAOA's subproblems
-are **adaptive** instead: `solution[case_list[i]] = bitstring[i]` overwrites
-specific positions of an evolving global solution, and which subproblem gets
-solved next depends on that evolving solution — a saved circuit sequence
-only reflects the *one* trajectory the raw hardware run actually took.
-Feeding a corrected (MEM/M3/TREx) method's per-circuit selections through
-the same trajectory would silently pretend IGDec-QAOA made the same
-adaptive decisions under a different correction method, which isn't true
-and isn't verified anywhere.
+overwrite an evolving solution (`solution[case_list[i]] = bitstring[i]`,
+last write wins), so `evaluate_all.py` uses `merge_igdec_solution()`, which
+replays that rule starting from the sampling's `initial_random_solution.json`
+(tests no subproblem touches keep their initial value).
 
-So for IGDec-QAOA combos: `execution_cost`/`effectiveness` are only ever
-computed for `raw` (via `evaluate_all.py`'s `merge_igdec_solution()`, which
-replays the real last-write-wins update rule instead of
-`merge_selected_tests()`'s union) — MEM/M3/TREx get `execution_cost=None`,
-`effectiveness={}`. `qubo_energy`/`probability_of_optimal` remain valid for
-every method regardless (they're scored per circuit against its own fixed
-QUBO, independent of the merge).
+The subproblem sequence (each circuit's `case_list`) is **fixed by training**:
+the hardware scripts read `case_list` from the circuit's own metadata instead
+of recomputing an impact ordering from the hardware solution (which diverges
+from the training trajectory and would write a circuit's bits onto the wrong
+tests). Because the sequence is the same for every method, raw, MEM, M3 and
+TREx each get a real final suite by replaying it with their own per-circuit
+bitstrings, so RQ2 is answerable for IGDec-QAOA too. **Caveat for the
+paper**: each circuit's QUBO stays conditioned on the ideal-simulator
+solution it was trained on, so the hardware run is "ideal trajectory,
+hardware-filled bits", not a fully adaptive re-ranking on hardware. The
+hardware script also runs every iteration the sampling was trained for (read
+from `circuits_metadata.json`; e.g. 30 for paintcontrol), not a fixed number.
 
 ### Running the evaluation + comparisons
 
@@ -873,85 +967,65 @@ instead for the two-sample special case).
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about a second (173 tests total).
+about a second (184 tests total).
 
 ---
 
-## 10. Quickstart: clone to results (PyCharm)
+## 10. Quickstart: setup, simulated run, real run
 
-1. **Clone**: PyCharm -> `Get from VCS` -> this repo's URL.
-2. **Interpreter**: `Settings -> Project -> Python Interpreter -> Add ->
-   Virtualenv Environment`, base interpreter Python 3.10, location
-   `qiskit_env/` inside the project (matches §2's `python3.10 -m venv
-   qiskit_env`). Then `pip install -r requirements.txt` in PyCharm's terminal.
-3. **Sanity check (safe anywhere)**: run `python -m unittest discover -s
-   tests` — should show 173 passing tests in ~1s.
-4. **Plan the budget (safe anywhere)**: edit `configs/execution_plan.yaml`
-   (§7), then run `src/piastq_execution/budget_planner.py` to see the
-   resulting repetitions/shots/methods per pool before spending any hardware
-   time.
-5. **On the machine with PIAST-Q/AQT access** — everything below writes
-   under `results/` and `trained_qaoa_circuits/`:
-   a. **Switch from the placeholder to real PIAST-Q first** — see the note
-      below.
-   b. `... train` (§4.1/§4.2) for any combo you don't already have circuits
-      for, or want to regenerate (all 14 combos are trainable from this
-      repo).
-   c. `python single_obj.py` / `multi_obj.py` (§4.1) and the IGDec scripts'
-      default mode (§4.2) — hardware execution, produces raw counts
-      (`*-raw_counts.jsonl`) and the existing derived outputs. Every one of
-      these five scripts (`single_obj.py`, `multi_obj.py`, and the three
-      `loch_qaoa_*_extract_circuits.py`) also automatically runs the TREx
-      twirl-instance pass (§5) and writes `*-trex-raw_counts.jsonl` — no
-      separate step needed, but budget for it (§7).
-   d. `run_calibration.py` (§5) — MEM/M3 calibration, once per circuit
-      width in use, stored under `calibration/`. Not needed for TREx (no
-      calibration step).
+### A. One-time setup
+1. Clone the repo (PyCharm: `Get from VCS`).
+2. Interpreter: Python 3.10 virtualenv at `qiskit_env/` inside the project,
+   then `pip install -r requirements.txt`.
+3. Check: `python -m unittest discover -s tests` -> 184 tests pass in ~1 s
+   (never touches a backend).
 
-   > **Switching from the placeholder to real PIAST-Q**: every execution
-   > entry point gets its API token and backend name from one place —
-   > `configs/backend.yaml`, read by `piastq_execution.backend_config
-   > .get_backend()` — so there is exactly **one file to edit**, not six:
-   > ```yaml
-   > api_token: <your real API key>
-   > backend_name: <piast-q backend name>
-   > ```
-   > (Alternatively, set the `PIASTQ_API_TOKEN` / `PIASTQ_BACKEND_NAME`
-   > environment variables — they take precedence over the YAML file, so a
-   > real token never has to be committed.)
-   >
-   > Every script that opens a backend calls `get_backend()` instead of
-   > constructing `AQTProvider(...)` itself:
-   > - `src/qaoa_tcs/single_obj.py` (`run_hardware_execution()`)
-   > - `src/qaoa_tcs/multi_obj.py` (`run_hardware_execution()`)
-   > - `src/igdec_qaoa/loch_qaoa_tcm_extract_circuits.py` (`run_hardware_like_from_saved_circuits()`)
-   > - `src/igdec_qaoa/loch_qaoa_elev_two_extract_circuits.py` (`run_hardware_like_from_saved_circuits()`)
-   > - `src/igdec_qaoa/loch_qaoa_elev_three_extract_circuits.py` (`run_hardware_like_from_saved_circuits()`)
-   > - `src/piastq_execution/run_calibration.py` (`run_calibration()`)
-   >
-   > `sampler.set_transpile_options(optimization_level=3)` right below each
-   > of these stays as-is. Training functions (`save_trained_circuits()` /
-   > `save_trained_circuits_and_initial_solutions()`) don't touch AQT at
-   > all — they always use a local ideal `AerSampler`, so nothing there
-   > needs to change.
-6. **Evaluate (safe anywhere, once step 5's data exists)**:
-   ```bash
-   cd src/piastq_execution
-   python evaluate_all.py
-   # -> ../../results/evaluation/<combo>.json, one per combo in
-   #    configs/execution_plan.yaml, {method: [per-repetition metrics, ...]}
-   ```
-   Reads every combo's raw-counts + calibration + persisted QUBOs and
-   computes every metric (§8) once per combo x method x repetition — no
-   manual per-combo wiring needed.
-7. **Compare (safe anywhere)**:
-   ```bash
-   python compare_all.py
-   # -> ../../results/evaluation/comparison_report.{txt,json}
-   ```
-   Runs `compare_groups()` (§8) for every combo (method vs. `raw`) and, for
-   datasets present under both algorithms, QAOA-TCS vs. IGDec-QAOA —
-   producing the RQ1/RQ2/RQ3a/RQ3b/RQ4-mapped report below directly.
+### B. Simulated run (free, no QPU, ~20 minutes) - do this first
+1. Leave `configs/backend.yaml` as shipped (`backend_name:
+   offline_simulator_no_noise`) and make sure the env vars `PIASTQ_API_TOKEN`
+   and `PIASTQ_BACKEND_NAME` are **not** set (they override the file).
+2. Press play on `run_all.py` (or `python run_all.py` from the repo root).
+   It runs every stage by itself (§0) and prints `ALL STAGES COMPLETED`.
+3. Results: `results/`, `calibration/`, `logs/` (map in §0).
+4. This writes real files. Before the real run, clean up (below), or run
+   the dry run in a throwaway copy of the repo.
+
+### C. Real PIAST-Q run
+1. **Clean up**: move/delete the old `results/qaoa_tcs/*` and
+   `results/igdec_qaoa/*` (tracked in git, recoverable), and delete
+   `calibration/*.json`, `calibration/drift/`, `calibration/backend_snapshots/`
+   and `logs/` left over from a dry run. (`run_all.py` itself archives stray
+   `*raw_counts.jsonl` files to `results/_archive_<time>/`.)
+2. **Backend**: in `configs/backend.yaml` set `backend_name` to the real PIAST-Q
+   backend name (ask the operators) and check `physical_qubits`. Provide the
+   token via the environment variable `PIASTQ_API_TOKEN` (preferred, keeps it
+   out of git) or `api_token:` in the file. Env vars `PIASTQ_API_TOKEN` /
+   `PIASTQ_BACKEND_NAME` take precedence over the file.
+3. **Safety switch**: in `run_all.py` set `ALLOW_REAL_HARDWARE = True`
+   (without it the script refuses any backend not starting with
+   `offline_simulator`).
+4. **Budget**: check `configs/execution_plan.yaml` (shipped: the reduced
+   25-hour run, §0) and `QPU_HOURS_LIMIT` in `run_all.py`.
+5. Press play on `run_all.py`. After calibration the **pilot gate** projects
+   total QPU hours from the measured seconds/circuit and aborts before the
+   main execution if above the limit.
+6. Read `logs/run_summary_*.json` (measured vs. predicted QPU hours) and
+   `results/evaluation/comparison_report.txt`.
+
+### D. Running pieces by hand (optional)
+Each stage of `run_all.py` is an ordinary script, run from its own folder:
+`src/piastq_execution/run_calibration.py` (calibration; `drift` argument at
+session end), `src/qaoa_tcs/single_obj.py`, `src/qaoa_tcs/multi_obj.py`,
+`src/igdec_qaoa/loch_qaoa_tcm_extract_circuits.py` (execution), then
+`src/piastq_execution/evaluate_all.py` and `compare_all.py`. Order matters:
+calibrate first, evaluate last. For circuits trained before QUBO coefficients
+were persisted, first run `python single_obj.py qubos`, `python multi_obj.py
+qubos` and `python loch_qaoa_tcm_extract_circuits.py qubos` (no retraining).
+Training from scratch: `... train` (§4.1/§4.2).
+
+> Every execution script gets its backend from `configs/backend.yaml` via
+> `piastq_execution.backend_config.get_backend()` - one place to edit, not
+> six. Training never touches AQT (always a local ideal `AerSampler`).
 
 **Research questions this package is built to answer:**
 
@@ -982,7 +1056,8 @@ about a second (173 tests total).
   disproportionately large (full MEM's `2**n` calibration circuits or TREx's
   `trex_twirl_instances` extra passes vs. M3's much cheaper `2*n` circuits),
   which matters directly for planning a constrained budget (§7).
-- **RQ4 (QAOA-TCS vs. IGDec-QAOA)**: how do the two algorithms compare on
+- **RQ4 (QAOA-TCS vs. IGDec-QAOA; not addressed by the planned hardware run,
+  which excludes IGDec-QAOA)**: how do the two algorithms compare on
   the same dataset/metric, with and without mitigation, on real hardware --
   including quantum-hardware execution cost/time (`execution_time_seconds`),
   not just solution quality/effectiveness?

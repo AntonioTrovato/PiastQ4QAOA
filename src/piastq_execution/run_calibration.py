@@ -15,6 +15,8 @@ session:
     cd src/piastq_execution
     python run_calibration.py               # calibrates widths 1..7
     python run_calibration.py 2 7            # calibrates only widths 2 and 7
+    python run_calibration.py drift          # END of session: re-measure M3 and
+                                             # write calibration/drift/m3_drift_report.json
 
 Calibrates by circuit width, pinned to the *same* physical qubits every real
 QAOA/TREx execution uses for that width --
@@ -30,9 +32,11 @@ calibration (T1/T2/etc., see backend_calibration_snapshot.py) before running
 anything -- distinct from the MEM/M3 calibration this script measures itself.
 """
 
+import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
@@ -135,6 +139,60 @@ def run_calibration(widths):
         calibrate_m3(width, sampler, backend, store)
 
 
+def compare_m3_calibrations(start_record, end_record):
+    """Readout-drift summary between two M3 calibrations of the same width:
+    the largest absolute change in any single-qubit assignment-matrix entry
+    (overall and per qubit), plus the timestamps they were measured at.
+    """
+    import numpy as np
+
+    start_cals = start_record.single_qubit_cals()
+    end_cals = end_record.single_qubit_cals()
+    per_qubit = [float(np.max(np.abs(a - b))) for a, b in zip(start_cals, end_cals)]
+    return {
+        "width": start_record.num_qubits,
+        "start_timestamp": start_record.calibration_timestamp,
+        "end_timestamp": end_record.calibration_timestamp,
+        "max_abs_change_per_qubit": per_qubit,
+        "max_abs_change": max(per_qubit) if per_qubit else 0.0,
+    }
+
+
+def run_drift_check(widths):
+    """Re-measures M3 (2*width cheap circuits per width) and compares it to
+    the calibration saved at the start of the session, to quantify readout
+    drift over the run. The fresh calibration goes to calibration/drift/ and
+    never overwrites the primary one used for correction. Run once at the END
+    of a hardware session; report: calibration/drift/m3_drift_report.json.
+    """
+    backend = get_backend()
+    sampler = AQTSampler(backend)
+    sampler.set_transpile_options(optimization_level=3)
+
+    primary_store = CalibrationStore()
+    drift_dir = os.path.join(primary_store.base_dir, "drift")
+    drift_store = CalibrationStore(base_dir=drift_dir)
+
+    reports = []
+    for width in widths:
+        start_record = primary_store.load("m3", physical_layout_for_width(width))
+        if start_record is None:
+            print(f"  width={width}: no start-of-session M3 calibration found, skipping")
+            continue
+        calibrate_m3(width, sampler, backend, drift_store)
+        end_record = drift_store.load("m3", physical_layout_for_width(width))
+        reports.append(compare_m3_calibrations(start_record, end_record))
+
+    os.makedirs(drift_dir, exist_ok=True)
+    path = os.path.join(drift_dir, "m3_drift_report.json")
+    with open(path, "w") as f:
+        json.dump({"generated": datetime.now(timezone.utc).isoformat(), "widths": reports}, f, indent=2)
+    print(f"Saved drift report: {path}")
+
+
 if __name__ == "__main__":
-    requested_widths = [int(w) for w in sys.argv[1:]] or list(range(1, 8))
-    run_calibration(requested_widths)
+    args = sys.argv[1:]
+    if args and args[0] == "drift":
+        run_drift_check([int(w) for w in args[1:]] or list(range(1, 8)))
+    else:
+        run_calibration([int(w) for w in args] or list(range(1, 8)))

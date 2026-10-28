@@ -436,6 +436,43 @@ def save_trained_circuits():
             print(f"Saved: {qubos_filename}")
 
 
+def save_cluster_qubos(programs=None):
+    """Writes <dataset>_rep<r>_qubos.json next to already-trained circuits
+    WITHOUT retraining -- for circuits trained before QUBO coefficients were
+    persisted. Uses this file's own `qubos_dictionary` (the same QUBOs
+    save_trained_circuits() trains) and checks cluster count and every
+    circuit's qubit count against the saved circuits; nothing is written for
+    a dataset that doesn't match.
+    """
+    from qiskit import qpy as _qpy
+
+    base_dir = os.path.join("..", "..", "trained_qaoa_circuits", "qaoa_tcs")
+    for sir_program in programs or sir_programs:
+        for reps in TRAINING_REPS:
+            reps_dir = os.path.join(base_dir, sir_program, f"rep_{reps}")
+            if not os.path.isdir(reps_dir):
+                continue
+            entries = []
+            for cluster_idx, qubo in enumerate(qubos_dictionary[sir_program]):
+                qpy_path = os.path.join(reps_dir, f"{sir_program}_rep{reps}_cluster{cluster_idx}.qpy")
+                with open(qpy_path, "rb") as f:
+                    circuit_qubits = _qpy.load(f)[0].num_qubits
+                if circuit_qubits != qubo.get_num_binary_vars():
+                    raise RuntimeError(
+                        f"{sir_program} cluster {cluster_idx}: rebuilt QUBO has "
+                        f"{qubo.get_num_binary_vars()} variables but the saved circuit has {circuit_qubits} "
+                        f"qubits -- clustering no longer matches the trained circuits."
+                    )
+                entries.append({"cluster_idx": cluster_idx, **qubo_to_json_dict(qubo)})
+            n_files = len([f for f in os.listdir(reps_dir) if f.endswith(".qpy")])
+            if n_files != len(entries):
+                raise RuntimeError(f"{sir_program}: {n_files} saved circuits but {len(entries)} clusters")
+            out = os.path.join(reps_dir, f"{sir_program}_rep{reps}_qubos.json")
+            with open(out, "w") as f:
+                json.dump(entries, f, indent=2)
+            print(f"Saved: {out} ({len(entries)} clusters, verified against saved circuits)")
+
+
 def run_hardware_execution():
     """
     Re-run QAOA-TCS multi-objective by loading the trained circuits and
@@ -467,6 +504,11 @@ def run_hardware_execution():
     trex_rng = random.Random()
 
     for sir_program in sir_programs:
+        if f"{sir_program}_qaoa_tcs" not in combo_settings:
+            # Not covered by any pool in configs/execution_plan.yaml: this
+            # run deliberately excludes it (reduced-scope hardware budget).
+            print(f"Skipping {sir_program}: not in configs/execution_plan.yaml pools")
+            continue
         settings = combo_settings[f"{sir_program}_qaoa_tcs"]
         num_piast_experiments = settings.repetitions
 
@@ -655,5 +697,9 @@ if __name__ == "__main__":
     # circuits on hardware.
     if len(sys.argv) > 1 and sys.argv[1] == "train":
         save_trained_circuits()
+    elif len(sys.argv) > 1 and sys.argv[1] == "qubos":
+        # `python multi_obj.py qubos [dataset ...]` -- backfill QUBO files
+        # for already-trained circuits (no retraining, no backend).
+        save_cluster_qubos(sys.argv[2:] or [p for p in sir_programs if f"{p}_qaoa_tcs" in resolve_all_combo_settings()])
     else:
         run_hardware_execution()

@@ -564,6 +564,77 @@ def save_trained_circuits_and_initial_solutions():
             print(f"Saved trained circuits and metadata in: {sampling_dir}")
 
 
+def save_cluster_qubos(datasets=None):
+    """Adds each circuit's QUBO coefficients (linear/quadratic/num_qubits) to
+    circuits_metadata.json for IGDec-QAOA circuits trained before those were
+    persisted -- WITHOUT retraining.
+
+    A subproblem's QUBO depends on the evolving solution, so it is rebuilt by
+    replaying the training trajectory: start from initial_random_solution.json,
+    and for each saved circuit take its exact (ideal, noiseless) most-likely
+    bitstring -- the same update rule the training loop used. The replay is
+    checked against training_summary.json: the best energy it reaches must
+    equal the recorded `best_fval`, otherwise nothing is written for that
+    sampling.
+    """
+    from qiskit.quantum_info import Statevector
+
+    base_dir = os.path.join("..", "..", "trained_qaoa_circuits", "igdec_qaoa")
+    for file_name in datasets or ["gsdtsr", "iofrol", "paintcontrol"]:
+        dataset_dir = os.path.join(base_dir, file_name)
+        if not os.path.isdir(dataset_dir):
+            continue
+        df = pd.read_csv("../../datasets/quantum_sota_datasets/" + file_name + ".csv",
+                         dtype={"time": float, "rate": float})
+        if file_name == "gsdtsr":
+            df = df[df['rate'] > 0]
+        times, frs = get_data(df)
+
+        for sampling_name in sorted(os.listdir(dataset_dir)):
+            sampling_dir = os.path.join(dataset_dir, sampling_name)
+            metadata_path = os.path.join(sampling_dir, "circuits_metadata.json")
+            if not os.path.exists(metadata_path):
+                continue
+            with open(metadata_path) as f:
+                circuits_metadata = json.load(f)
+            if all("linear" in m for m in circuits_metadata):
+                continue  # already persisted
+            with open(os.path.join(sampling_dir, "initial_random_solution.json")) as f:
+                init_data = json.load(f)
+            with open(os.path.join(sampling_dir, "training_summary.json")) as f:
+                recorded_best = json.load(f)["best_fval"]
+
+            solution = list(init_data["initial_solution"])
+            best_energy = init_data["initial_energy"]
+            last_fval_per_iteration = {}
+            new_metadata = []
+            for meta in circuits_metadata:
+                case_list = meta["case_list"]
+                qubo, _testcase = create_qubo(times, frs, 1 / 3, 1 / 3, 1 / 3, case_list, solution)
+                with open(os.path.join(sampling_dir, meta["qpy_file"]), "rb") as f:
+                    circuit = qpy.load(f)[0]
+                probabilities = Statevector.from_instruction(
+                    circuit.remove_final_measurements(inplace=False)
+                ).probabilities_dict()
+                most_likely = max(probabilities.items(), key=lambda x: x[1])[0]
+                bitstring = [int(b) for b in most_likely[::-1]]
+                for case_index, case in enumerate(case_list):
+                    solution[case] = bitstring[case_index]
+                last_fval_per_iteration[meta["iteration"]] = qubo.objective.evaluate(bitstring)
+                new_metadata.append({**meta, **qubo_to_json_dict(qubo)})
+
+            for iteration in sorted(last_fval_per_iteration):
+                best_energy = min(best_energy, last_fval_per_iteration[iteration])
+            if abs(best_energy - recorded_best) > 1e-9:
+                raise RuntimeError(
+                    f"{file_name}/{sampling_name}: replayed best energy {best_energy} != recorded "
+                    f"best_fval {recorded_best} -- cannot reconstruct this sampling's QUBOs."
+                )
+            with open(metadata_path, "w") as f:
+                json.dump(new_metadata, f, indent=2)
+            print(f"Saved QUBO coefficients for {file_name}/{sampling_name} (replay matches training best_fval)")
+
+
 def run_hardware_like_from_saved_circuits():
     """
     Re-run IGDec-QAOA by loading:
@@ -574,12 +645,10 @@ def run_hardware_like_from_saved_circuits():
     results_dir = os.path.join("..", "..", "results", "igdec_qaoa")
     os.makedirs(results_dir, exist_ok=True)
 
-    # Impact-reordering decomposition rounds per sampling -- an algorithm
-    # parameter inherited from the original study, NOT the same thing as
-    # "how many samplings to run" (that's num_samplings_to_run below, per
-    # combo, resolved from the budget planner). Kept as its own name so the
-    # two are never conflated the way a single `num_experiment` used to.
-    num_impact_iterations = 10
+    # Impact-reordering rounds per sampling are NOT fixed here: each sampling
+    # runs as many as it was trained for (read from its circuits_metadata.json
+    # below). This is also distinct from "how many samplings to run"
+    # (num_samplings_to_run below, per combo, from the budget planner).
     problem_size = 7
 
     backend = get_backend()
@@ -605,6 +674,11 @@ def run_hardware_like_from_saved_circuits():
     trex_rng = random.Random()
 
     for file_name in ["iofrol", "gsdtsr", "paintcontrol"]:
+        if f"{file_name}_igdec_qaoa" not in combo_settings:
+            # Not covered by any pool in configs/execution_plan.yaml: this
+            # run deliberately excludes it (reduced-scope hardware budget).
+            print(f"Skipping {file_name}: not in configs/execution_plan.yaml pools")
+            continue
         settings = combo_settings[f"{file_name}_igdec_qaoa"]
         num_samplings_to_run = settings.repetitions
 
@@ -668,15 +742,25 @@ def run_hardware_like_from_saved_circuits():
             index_begin = 0
             index_end = problem_size
 
+            # Run exactly the iterations this sampling was trained for: the
+            # saved circuits (e.g. 30 per paintcontrol sampling) are the
+            # source of truth, not a hardcoded constant -- a smaller constant
+            # silently executed only the first few circuits.
+            num_impact_iterations = max(m["iteration"] for m in circuits_metadata)
+
             while count < num_impact_iterations:
                 qaoa_time_total = 0
                 itr_num += 1
 
                 if problem_size > 0.15 * len(df):
-                    case_list = impact_order[index_begin:index_end]
-
                     meta = circuits_metadata[metadata_index]
                     metadata_index += 1
+                    # The trained circuit is only valid for the exact test cases (and
+                    # QUBO) it was trained on: take them from its own metadata rather
+                    # than recomputing an impact ordering from the hardware solution,
+                    # which diverges from the training trajectory and would write this
+                    # circuit's bits onto the wrong test cases.
+                    case_list = meta["case_list"]
 
                     circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                     with open(circuit_path, "rb") as f:
@@ -749,10 +833,14 @@ def run_hardware_like_from_saved_circuits():
                     result_fval = None
 
                     while index_end <= 0.15 * len(df):
-                        case_list = impact_order[index_begin:index_end]
-
                         meta = circuits_metadata[metadata_index]
                         metadata_index += 1
+                        # The trained circuit is only valid for the exact test cases (and
+                        # QUBO) it was trained on: take them from its own metadata rather
+                        # than recomputing an impact ordering from the hardware solution,
+                        # which diverges from the training trajectory and would write this
+                        # circuit's bits onto the wrong test cases.
+                        case_list = meta["case_list"]
 
                         circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                         with open(circuit_path, "rb") as f:
@@ -777,6 +865,32 @@ def run_hardware_like_from_saved_circuits():
                         )
                         end_qpu = time.time()
                         raw_counts_writer.write(raw_record)
+
+                        # TREx pass -- same as the large-dataset branch above.
+                        # This small-dataset branch (e.g. paintcontrol) used
+                        # to skip TREx entirely, so those combos could never
+                        # produce TREx data.
+                        if settings.trex_enabled:
+                            for twirl_idx in range(trex_twirl_instances):
+                                twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
+                                twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
+                                _trex_counts, trex_record = run_circuit_with_batching_recorded(
+                                    twirled_circuit,
+                                    sampling_sampler,
+                                    algorithm="igdec_qaoa",
+                                    objective_mode="single_objective",
+                                    dataset=file_name,
+                                    circuit_id=f"{file_name}_sampling{sampling_id}_itr{meta['iteration']}_sub{meta['subproblem_index']}_trex{twirl_idx}",
+                                    backend=backend,
+                                    iteration_id=meta["iteration"],
+                                    subproblem_id=meta["subproblem_index"],
+                                    shots_per_batch=settings.shots_per_batch,
+                                    num_batches=settings.num_batches,
+                                    remainder_shots=settings.remainder_shots,
+                                    twirl_mask=twirl_mask,
+                                    initial_layout=physical_layout_for_width(twirled_circuit.num_qubits),
+                                )
+                                trex_counts_writer.write(trex_record)
 
                         qpu_time = end_qpu - start_qpu
                         qaoa_time_total += qpu_time
@@ -847,5 +961,11 @@ if __name__ == '__main__':
     # that does the actual training, not the one authoring this code.
     if len(sys.argv) > 1 and sys.argv[1] == "train":
         save_trained_circuits_and_initial_solutions()
+    elif len(sys.argv) > 1 and sys.argv[1] == "qubos":
+        # `python loch_qaoa_tcm_extract_circuits.py qubos [dataset ...]` --
+        # backfill QUBO coefficients for already-trained circuits (no
+        # retraining, no backend).
+        save_cluster_qubos(sys.argv[2:] or [d for d in ["iofrol", "gsdtsr", "paintcontrol"]
+                                            if f"{d}_igdec_qaoa" in resolve_all_combo_settings()])
     else:
         run_hardware_like_from_saved_circuits()

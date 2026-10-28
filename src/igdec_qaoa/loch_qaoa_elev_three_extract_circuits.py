@@ -546,10 +546,14 @@ def run_hardware_like_from_saved_circuits():
             itr_num += 1
 
             if PROBLEM_SIZE > 0.15 * len(df):
-                case_list = impact_order[index_begin:index_end]
-
                 meta = circuits_metadata[metadata_index]
                 metadata_index += 1
+                # The trained circuit is only valid for the exact test cases (and
+                # QUBO) it was trained on: take them from its own metadata rather
+                # than recomputing an impact ordering from the hardware solution,
+                # which diverges from the training trajectory and would write this
+                # circuit's bits onto the wrong test cases.
+                case_list = meta["case_list"]
 
                 circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                 with open(circuit_path, "rb") as f:
@@ -620,10 +624,14 @@ def run_hardware_like_from_saved_circuits():
                 result_fval = None
 
                 while index_end <= 0.15 * len(df):
-                    case_list = impact_order[index_begin:index_end]
-
                     meta = circuits_metadata[metadata_index]
                     metadata_index += 1
+                    # The trained circuit is only valid for the exact test cases (and
+                    # QUBO) it was trained on: take them from its own metadata rather
+                    # than recomputing an impact ordering from the hardware solution,
+                    # which diverges from the training trajectory and would write this
+                    # circuit's bits onto the wrong test cases.
+                    case_list = meta["case_list"]
 
                     circuit_path = os.path.join(sampling_dir, meta["qpy_file"])
                     with open(circuit_path, "rb") as f:

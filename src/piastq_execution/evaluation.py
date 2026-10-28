@@ -55,17 +55,17 @@ from piastq_execution.statistics import (
 # both be registered here: QAOA-TCS's own dataset names (single_obj.py's
 # bootqa_programs: "elevator" uses input_div alone, "elevator2" uses
 # pcount+dist) and IGDec-QAOA's "elevator_o2"/"elevator_o3" (circuits_dir
-# "elevator_two"/"elevator_three" -- confirmed by diffing the two scripts to
-# use the IDENTICAL cost+pcount+dist QUBO formulation and weights; "_o3" is
-# just an independently-trained repetition of "_o2", not a different
-# objective set, so both get the same metric names here).
+# "elevator_two"/"elevator_three"). The IGDec pair mirrors the QAOA-TCS pair:
+# elevator_two = cost + input diversity (SelectQAOA's loch_qaoa_elev_two.py,
+# like QAOA-TCS "elevator"); elevator_three = cost + passenger count +
+# travel distance (like QAOA-TCS "elevator2").
 EFFECTIVENESS_METRICS: Dict[str, List[str]] = {
     "gsdtsr": ["failure_rate"],
     "iofrol": ["failure_rate"],
     "paintcontrol": ["failure_rate"],
     "elevator": ["input_diversity"],
     "elevator2": ["passenger_count", "travel_distance"],
-    "elevator_o2": ["passenger_count", "travel_distance"],
+    "elevator_o2": ["input_diversity"],
     "elevator_o3": ["passenger_count", "travel_distance"],
 }
 
@@ -115,7 +115,11 @@ def select_argmax_bitstring(distribution: Dict[str, float]) -> str:
     distribution so every method is evaluated the same way."""
     if not distribution:
         raise ValueError("Cannot select from an empty distribution")
-    return max(distribution.items(), key=lambda kv: kv[1])[0]
+    # Deterministic, method-independent tie-break: highest probability, then
+    # the smallest bitstring. Probabilities are rounded so float noise from a
+    # correction cannot break an exact tie differently than the raw path (a
+    # dict-order tie-break would show up as a spurious "mitigation effect").
+    return min(distribution.items(), key=lambda kv: (-round(kv[1], 12), kv[0]))[0]
 
 
 # ---------------------------------------------------------------------------

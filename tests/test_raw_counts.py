@@ -69,6 +69,9 @@ class _RunHandle:
     def result(self):
         return FakeResult(self._probabilities)
 
+    def job_id(self):
+        return "job-123"
+
 
 class FakeBackend:
     name = "fake_offline_simulator"
@@ -91,6 +94,47 @@ class TestCountsFromQuasiProbabilities(unittest.TestCase):
         raw = counts_from_quasi_probabilities(probabilities, shots=80)
         self.assertEqual(raw, {"00": 60, "11": 20})
         self.assertEqual(sum(raw.values()), 80)
+
+
+class TestExtraExecutionRecording(unittest.TestCase):
+    def test_job_id_recorded_per_batch_and_unsupported_job_info_is_none(self):
+        sampler = FakeSampler([{"00": 1.0}])
+        _, record = run_circuit_with_batching_recorded(
+            TinyCircuit(2), sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="c", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+        )
+        self.assertEqual(record.batches[0].job_id, "job-123")
+        self.assertIsNone(record.batches[0].job_metadata)  # fake result has no metadata
+
+    def test_transpiled_stats_recorded_for_real_circuit(self):
+        from qiskit import QuantumCircuit
+        from qiskit_aer import AerSimulator
+
+        qc = QuantumCircuit(2)
+        qc.h(0)
+        qc.cx(0, 1)
+        qc.measure_all()
+        sampler = FakeSampler([{"00": 1.0}])
+        _, record = run_circuit_with_batching_recorded(
+            qc, sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="c", backend=AerSimulator(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+        )
+        stats = record.transpiled_stats
+        self.assertIsNotNone(stats)
+        self.assertGreaterEqual(stats["depth"], 2)
+        self.assertEqual(stats["num_nonlocal_gates"], 1)
+        self.assertIn("cx", stats["count_ops"])
+
+    def test_transpiled_stats_failure_is_none_not_an_error(self):
+        sampler = FakeSampler([{"00": 1.0}])
+        _, record = run_circuit_with_batching_recorded(
+            TinyCircuit(2), sampler, algorithm="qaoa_tcs", objective_mode="single_objective",
+            dataset="toy", circuit_id="c", backend=FakeBackend(),
+            shots_per_batch=80, num_batches=1, record_qubit_mapping=False,
+        )
+        self.assertIsNone(record.transpiled_stats)
 
 
 class TestRunCircuitWithBatchingRecorded(unittest.TestCase):

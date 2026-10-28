@@ -307,6 +307,78 @@ def bootstrap_confidence_interval(data, num_samples, confidence_alpha=0.95):
 TRAINING_REPS = [1]
 
 
+_qubo_data_cache = {}
+
+
+def build_cluster_qubo(bootqa_program, cluster_test_cases):
+    """The QUBO of one cluster, exactly as trained -- shared by
+    save_trained_circuits() and save_cluster_qubos() so the two can never
+    disagree."""
+    if bootqa_program not in _qubo_data_cache:
+        data = get_data(bootqa_program)
+        costs = data["cost"].tolist() if bootqa_program in ["elevator", "elevator2"] else data["time"].tolist()
+        _qubo_data_cache[bootqa_program] = (data, costs)
+    data, test_cases_costs = _qubo_data_cache[bootqa_program]
+
+    if bootqa_program != "elevator2":
+        effectiveness = data["input_div"].tolist() if bootqa_program == "elevator" else data["rate"].tolist()
+        linear_terms = make_linear_terms_bootqa(
+            cluster_test_cases=cluster_test_cases,
+            test_cases_costs=test_cases_costs,
+            test_cases_rates=effectiveness,
+            alpha=bootqa_alphas[bootqa_program]
+        )
+    else:
+        linear_terms = make_linear_terms_bootqa2(
+            cluster_test_cases=cluster_test_cases,
+            test_cases_costs=test_cases_costs,
+            pcount=data["pcount"].tolist(),
+            dist=data["dist"].tolist(),
+            alpha=bootqa_alphas[bootqa_program][0],
+            beta=bootqa_alphas[bootqa_program][1],
+            gamma=bootqa_alphas[bootqa_program][2]
+        )
+    return create_linear_qubo(linear_terms)
+
+
+def save_cluster_qubos(programs=None):
+    """Writes <dataset>_rep<r>_qubos.json next to already-trained circuits
+    WITHOUT retraining -- for circuits trained before QUBO coefficients were
+    persisted. The QUBOs are rebuilt from the (deterministic) clustering and
+    checked against the saved circuits: cluster count and every circuit's
+    qubit count must match, otherwise nothing is written for that dataset.
+    """
+    from qiskit import qpy as _qpy
+
+    base_dir = os.path.join("..", "..", "trained_qaoa_circuits", "qaoa_tcs")
+    for bootqa_program in programs or bootqa_programs:
+        for reps in TRAINING_REPS:
+            reps_dir = os.path.join(base_dir, bootqa_program, f"rep_{reps}")
+            if not os.path.isdir(reps_dir):
+                continue
+            cluster_items = list(bootqa_clusters[bootqa_program].items())
+            entries = []
+            for cluster_idx, (cluster_id, cluster_test_cases) in enumerate(cluster_items):
+                qubo = build_cluster_qubo(bootqa_program, cluster_test_cases)
+                qpy_path = os.path.join(reps_dir, f"{bootqa_program}_rep{reps}_cluster{cluster_idx}.qpy")
+                with open(qpy_path, "rb") as f:
+                    circuit_qubits = _qpy.load(f)[0].num_qubits
+                if circuit_qubits != qubo.get_num_binary_vars():
+                    raise RuntimeError(
+                        f"{bootqa_program} cluster {cluster_idx}: rebuilt QUBO has "
+                        f"{qubo.get_num_binary_vars()} variables but the saved circuit has {circuit_qubits} "
+                        f"qubits -- clustering no longer matches the trained circuits."
+                    )
+                entries.append({"cluster_idx": cluster_idx, "cluster_id": int(cluster_id), **qubo_to_json_dict(qubo)})
+            n_files = len([f for f in os.listdir(reps_dir) if f.endswith(".qpy")])
+            if n_files != len(entries):
+                raise RuntimeError(f"{bootqa_program}: {n_files} saved circuits but {len(entries)} clusters")
+            out = os.path.join(reps_dir, f"{bootqa_program}_rep{reps}_qubos.json")
+            with open(out, "w") as f:
+                json.dump(entries, f, indent=2)
+            print(f"Saved: {out} ({len(entries)} clusters, verified against saved circuits)")
+
+
 def save_trained_circuits():
     """
     Train QAOA-TCS single-objective circuits in ideal noiseless simulation
@@ -364,25 +436,7 @@ def save_trained_circuits():
             for cluster_idx, (cluster_id, cluster_test_cases) in enumerate(cluster_items):
                 print(f"Training cluster {cluster_idx} (cluster_id={cluster_id})")
 
-                if bootqa_program != "elevator2":
-                    linear_terms = make_linear_terms_bootqa(
-                        cluster_test_cases=cluster_test_cases,
-                        test_cases_costs=test_cases_costs,
-                        test_cases_rates=test_cases_effectiveness,
-                        alpha=bootqa_alphas[bootqa_program]
-                    )
-                else:
-                    linear_terms = make_linear_terms_bootqa2(
-                        cluster_test_cases=cluster_test_cases,
-                        test_cases_costs=test_cases_costs,
-                        pcount=test_cases_pcount,
-                        dist=test_cases_dist,
-                        alpha=bootqa_alphas[bootqa_program][0],
-                        beta=bootqa_alphas[bootqa_program][1],
-                        gamma=bootqa_alphas[bootqa_program][2]
-                    )
-
-                qubo = create_linear_qubo(linear_terms)
+                qubo = build_cluster_qubo(bootqa_program, cluster_test_cases)
                 operator, offset = qubo.to_ising()
 
                 # TRAINING
@@ -451,6 +505,11 @@ def run_hardware_execution():
     trex_rng = random.Random()
 
     for bootqa_program in bootqa_programs:
+        if f"{bootqa_program}_qaoa_tcs" not in combo_settings:
+            # Not covered by any pool in configs/execution_plan.yaml: this
+            # run deliberately excludes it (reduced-scope hardware budget).
+            print(f"Skipping {bootqa_program}: not in configs/execution_plan.yaml pools")
+            continue
         settings = combo_settings[f"{bootqa_program}_qaoa_tcs"]
         num_piast_experiments = settings.repetitions
 
@@ -659,6 +718,10 @@ if __name__ == "__main__":
     # circuits on hardware.
     if len(sys.argv) > 1 and sys.argv[1] == "train":
         save_trained_circuits()
+    elif len(sys.argv) > 1 and sys.argv[1] == "qubos":
+        # `python single_obj.py qubos [dataset ...]` -- backfill QUBO files
+        # for already-trained circuits (no retraining, no backend).
+        save_cluster_qubos(sys.argv[2:] or [p for p in bootqa_programs if f"{p}_qaoa_tcs" in resolve_all_combo_settings()])
     else:
         run_hardware_execution()
 

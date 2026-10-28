@@ -70,6 +70,14 @@ class TestSelectArgmax(unittest.TestCase):
         distribution = {"00": 0.2, "10": 0.7, "11": 0.1}
         self.assertEqual(select_argmax_bitstring(distribution), "10")
 
+    def test_ties_break_to_smallest_bitstring_regardless_of_order(self):
+        a = {"11": 0.25, "00": 0.25, "01": 0.1}
+        b = {"01": 0.1, "00": 0.25, "11": 0.25}
+        self.assertEqual(select_argmax_bitstring(a), "00")
+        self.assertEqual(select_argmax_bitstring(b), "00")
+        # float noise below the rounding threshold must not break an exact tie differently
+        self.assertEqual(select_argmax_bitstring({"11": 0.25 + 1e-15, "00": 0.25}), "00")
+
     def test_empty_distribution_raises(self):
         with self.assertRaises(ValueError):
             select_argmax_bitstring({})

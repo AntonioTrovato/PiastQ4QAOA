@@ -91,6 +91,28 @@ class TestCompareCombo(unittest.TestCase):
         self.assertEqual(report["rq1_rq3a_quality"], {})
 
 
+class TestEffectivenessMetricsCompared(unittest.TestCase):
+    def test_effectiveness_failure_rate_is_compared_for_rq2(self):
+        def rec(failure_rate):
+            r = _single_obj_record(1.0, 1.0, 1.0)
+            r["effectiveness"] = {"failure_rate": failure_rate}
+            return r
+
+        combo_results = {
+            "raw": [rec(0.1), rec(0.2), rec(0.15)],
+            "mem": [rec(0.5), rec(0.6), rec(0.55)],
+        }
+        report = compare_combo("toy_combo", combo_results)
+        self.assertIn("effectiveness.failure_rate", report["rq2_effectiveness"])
+
+    def test_non_raw_without_effectiveness_gives_no_rq2_comparison(self):
+        raw = _single_obj_record(1.0, 1.0, 1.0)
+        mem = _single_obj_record(2.0, None, 1.0)
+        mem["effectiveness"] = {}
+        report = compare_combo("igdec_like", {"raw": [raw, raw], "mem": [mem, mem]})
+        self.assertEqual(report["rq2_effectiveness"], {})
+
+
 class TestPairCombosByDataset(unittest.TestCase):
     def test_pairs_matching_dataset_across_algorithms(self):
         combo_defs = {
@@ -122,6 +144,17 @@ class TestCompareAlgorithms(unittest.TestCase):
         reports = compare_algorithms(all_results, combo_defs)
         self.assertEqual(len(reports), 1)
         self.assertIn("raw", reports[0]["by_method"])
+
+
+    def test_degenerate_identical_samples_reported_not_dropped(self):
+        same = [_single_obj_record(1.0, 1.0, 2.0), _single_obj_record(1.0, 1.0, 2.0)]
+        all_results = {"gsdtsr_qaoa_tcs": {"raw": same}, "gsdtsr_igdec_qaoa": {"raw": same}}
+        combo_defs = {
+            "gsdtsr_qaoa_tcs": {"algorithm": "qaoa_tcs", "dataset": "gsdtsr"},
+            "gsdtsr_igdec_qaoa": {"algorithm": "igdec_qaoa", "dataset": "gsdtsr"},
+        }
+        reports = compare_algorithms(all_results, combo_defs)
+        self.assertEqual(reports[0]["degenerate_methods"], ["raw"])
 
 
 class TestEndToEnd(unittest.TestCase):
@@ -158,7 +191,10 @@ class TestEndToEnd(unittest.TestCase):
 
             comparison = compare_all(eval_dir, plan_path)
             self.assertEqual(len(comparison["per_combo"]), 2)
-            self.assertEqual(len(comparison["rq4_algorithm_comparison"]), 1)
+            self.assertEqual(
+                {r["metric"] for r in comparison["rq4_algorithm_comparison"]},
+                {"execution_time_seconds", "probability_of_optimal", "execution_cost", "effectiveness.failure_rate"},
+            )
 
             report_text = render_report(comparison)
             self.assertIn("RQ4", report_text)
