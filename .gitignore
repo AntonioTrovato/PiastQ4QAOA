@@ -31,3 +31,6 @@ results/evaluation/
 # run_all.py logs
 logs/
 results/_archive_*/
+
+# EuroHPC VPN config files
+piastq_vpn
