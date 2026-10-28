@@ -20,8 +20,7 @@ The target machine is PIAST-Q, a 20-qubit trapped-ion quantum computer (accessed
 |---|---|---|
 | **RQ1** | Does mitigation (MEM, M3, TREx) improve solution quality (QUBO energy, probability of the optimal bitstring) over raw hardware output? | Establishes whether mitigation is needed at all for these circuits. |
 | **RQ2** | Does better quality translate into a better selected test suite (suite cost and effectiveness, or Pareto hypervolume / IGD in the multi-objective case)? | Links quantum-level improvements to the practical test-selection outcome. |
-| **RQ3a** | Which technique improves quality the most, ignoring cost? | If MEM and M3 (which target readout error directly) match TREx (a broader technique), readout error is the dominant noise source for these circuits. |
-| **RQ3b** | Which technique gives the best improvement per second of measured QPU time? | QPU time is the scarce resource. A technique can win RQ3a and still lose here. |
+| **RQ3** | Which technique gives the best improvement per second of measured QPU time? | QPU time is the scarce resource. A technique can win RQ3a and still lose here. |
 
 These are answered on two multi-objective programs (`gzip`, `flex`) and two single-objective datasets (`paintcontrol`, `gsdtsr`), so that conclusions are not tied to one problem type.
 
