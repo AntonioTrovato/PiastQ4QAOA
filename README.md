@@ -53,8 +53,11 @@ The pipeline, end to end:
 `run_all.py` (repo root) runs the whole study start to end with one press of
 play. It uses whatever backend `configs/backend.yaml` names: the default
 `offline_simulator_no_noise` is a free dry run; for real hardware set the real
-backend there **and** set `ALLOW_REAL_HARDWARE = True` at the top of
-`run_all.py` (without it the script refuses to start on a non-simulator).
+backend there (`backend_name: piast_q`, token in `PIASTQ_API_TOKEN`) **and**
+set `ALLOW_REAL_HARDWARE = True` at the top of `run_all.py` (without it the
+script refuses to start on a non-simulator). The real machine is reached
+through the PCSS service (`pcss-qapi`, VPN on) and needs a **Python 3.11+**
+environment (§10 C).
 
 Stages: unit tests -> QUBO backfill (adds the QUBO coefficients evaluation
 needs to circuits trained before they were persisted; no retraining) ->
@@ -63,16 +66,35 @@ seconds/circuit from the calibration, projects total QPU hours, aborts before
 the main execution if above `QPU_HOURS_LIMIT`) -> QAOA-TCS single-objective ->
 QAOA-TCS multi-objective -> (IGDec-QAOA, only if an IGDec combo is in the
 plan) -> end-of-session drift check ->
-evaluation -> statistical comparison. The first failing stage stops the run.
-Raw-count files of an earlier attempt are moved to `results/_archive_<time>/`
-first, because the writers append.
+evaluation -> statistical comparison. Raw-count files of an earlier attempt
+are moved to `results/_archive_<time>/` first, because the writers append.
+
+**When does it stop?** (1) A failing stage stops the whole run; later stages
+never start on top of it. (2) The pilot gate aborts *before* the expensive
+stages if the projected **billed** QPU time exceeds `QPU_HOURS_LIMIT`.
+(3) During execution, every hardware batch first reads the account's billed
+QPU time (PCSS `/me/usage`) and refuses to submit one that would cross the
+limit (`piastq_execution/qpu_usage.py`); the stage ends cleanly, everything
+executed so far is on disk. (4) Dropped connections are retried (about 30
+minutes per call) before a stage is allowed to die. After any stop, **`python
+run_all.py --resume`** continues where it stopped: circuits already in the
+raw-counts files are reused (not re-run, not re-billed), finished calibration
+widths and an existing drift report are skipped, and nothing is archived.
+Without `--resume` a re-run starts from scratch.
+
+**What counts as QPU time.** The 25 h are the *billed* device time, not
+wall-clock: queue wait is free. Measured on PIAST-Q (2026-10-29): one 200-shot
+batch is billed **18.4974 s**, the same for 1-, 3- and 7-qubit circuits (100
+shots: 10.0774 s). The operators' "about 15 s" is the optimistic figure; the
+plan uses the measured one.
 
 **The reduced run configured in `configs/execution_plan.yaml`** (25 QPU-hours
 available): QAOA-TCS only. Multi-objective: `gzip` + `flex`. Single-objective:
-`paintcontrol` + `gsdtsr`. Methods raw + MEM + M3 + TREx; 6 repetitions; 200
-shots/circuit; 2 TREx twirl instances; estimated 21.47 h (+0.23 h drift check =
-21.7 h, about 3.3 h of reserve; the 25 h limit holds while a batch takes at
-most about 17.3 s, which the pilot gate checks). Other combos are skipped by
+`paintcontrol` + `gsdtsr`. Methods raw + MEM + M3 + TREx; 5 repetitions; 200
+shots/circuit; 2 TREx twirl instances; estimated 22.33 h (+0.29 h drift check =
+22.6 h at 18.4974 s/batch, 4,402 batches, about 2.4 h of reserve; the 25 h limit
+holds while a batch is billed at most about 20.4 s, which the pilot gate
+checks). Six repetitions (26.8 h) do not fit. Other combos are skipped by
 the execution scripts and by evaluation. Selection is feasibility-driven (QPU
 budget, 6 Nov deadline); the paper must say so. IGDec-QAOA was dropped because
 only `paintcontrol` is affordable for it (`iofrol` alone is ~25 h of raw runs
@@ -103,7 +125,7 @@ saved circuits do not match the current clustering).
 `normal=…` (Shapiro-Wilk), the omnibus test (ANOVA or Kruskal-Wallis) with its
 p-value, and one line per pair: `p_adj` (Tukey or Dunn+Bonferroni) and the
 effect size (Cohen's d, or Vargha-Delaney `a12`: 0.5 = no effect, >0.5 = the
-first group is larger). With only 6 repetitions per group, weigh effect sizes
+first group is larger). With only 5 repetitions per group, weigh effect sizes
 above p-values. "not testable (identical samples)" means every sample was
 identical. Multi-objective combos have no separate RQ2 block: cost is inside
 the 3-objective HV/IGD of RQ1/RQ3a. RQ4 compares `execution_time_seconds`,
@@ -175,7 +197,10 @@ top of the file — this works regardless of which script you run because
 
 ## 2. Requirements
 
-- **Python 3.10.\***
+- **Python 3.10.\*** for everything except the real machine (simulated run,
+  tests, evaluation). **Real PIAST-Q runs need Python 3.11+** because
+  `pcss-qapi` (the PCSS access library) requires it; see §10 C for that
+  environment.
 
 ```bash
 python3.10 -m venv qiskit_env
@@ -687,7 +712,8 @@ extra hardware passes per circuit, not one (see §5) — dropping it is
 correspondingly the single biggest lever the planner has.
 
 **The underlying cost model, in one formula**: every circuit costs
-`ceil(shots / 200) × 15 seconds` — 201 shots costs exactly as much as 400,
+`ceil(shots / 200) × 18.4974 seconds` (measured billed time; the tables below
+were computed with the operators' 15 s, multiply them by 1.233) — 201 shots costs exactly as much as 400,
 since it rounds up to a second whole 200-shot batch. Raw cost for a combo =
 (circuits × repetitions) × per-circuit cost; TREx cost = that same raw cost
 again, × `trex_twirl_instances`; MEM/M3 calibration is charged once per
@@ -967,7 +993,7 @@ instead for the two-sample special case).
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about a second (184 tests total).
+about two seconds (203 tests total).
 
 ---
 
@@ -977,7 +1003,7 @@ about a second (184 tests total).
 1. Clone the repo (PyCharm: `Get from VCS`).
 2. Interpreter: Python 3.10 virtualenv at `qiskit_env/` inside the project,
    then `pip install -r requirements.txt`.
-3. Check: `python -m unittest discover -s tests` -> 184 tests pass in ~1 s
+3. Check: `python -m unittest discover -s tests` -> 203 tests pass in ~2 s
    (never touches a backend).
 
 ### B. Simulated run (free, no QPU, ~20 minutes) - do this first
@@ -991,25 +1017,37 @@ about a second (184 tests total).
    the dry run in a throwaway copy of the repo.
 
 ### C. Real PIAST-Q run
-1. **Clean up**: move/delete the old `results/qaoa_tcs/*` and
+1. **Environment (Python 3.11+, once)**: `pcss-qapi` does not install on the
+   3.10 `qiskit_env`. Create a second environment and install the tested set:
+   `python3.12 -m venv piastq_env && source piastq_env/bin/activate &&
+   pip install pcss-qapi && pip install -c requirements-piastq-constraints.txt
+   -r requirements-piastq.txt`. (The constraints keep `qiskit` at 1.4.6; without
+   them pip jumps to qiskit 2.x, which the AQT provider does not support.)
+   Run `python -m unittest discover -s tests` there: all tests must pass.
+2. **VPN** on (the `.ovpn` profile from the operators) and the **token** in the
+   environment: `export PIASTQ_API_TOKEN=<token>` (keeps it out of git).
+3. **Clean up**: move/delete the old `results/qaoa_tcs/*` and
    `results/igdec_qaoa/*` (tracked in git, recoverable), and delete
    `calibration/*.json`, `calibration/drift/`, `calibration/backend_snapshots/`
    and `logs/` left over from a dry run. (`run_all.py` itself archives stray
    `*raw_counts.jsonl` files to `results/_archive_<time>/`.)
-2. **Backend**: in `configs/backend.yaml` set `backend_name` to the real PIAST-Q
-   backend name (ask the operators) and check `physical_qubits`. Provide the
-   token via the environment variable `PIASTQ_API_TOKEN` (preferred, keeps it
-   out of git) or `api_token:` in the file. Env vars `PIASTQ_API_TOKEN` /
-   `PIASTQ_BACKEND_NAME` take precedence over the file.
-3. **Safety switch**: in `run_all.py` set `ALLOW_REAL_HARDWARE = True`
+4. **Backend**: in `configs/backend.yaml` set `backend_name: piast_q` and
+   check `physical_qubits` (the 7 physical qubits all circuits are pinned to).
+5. **Safety switch**: in `run_all.py` set `ALLOW_REAL_HARDWARE = True`
    (without it the script refuses any backend not starting with
    `offline_simulator`).
-4. **Budget**: check `configs/execution_plan.yaml` (shipped: the reduced
-   25-hour run, §0) and `QPU_HOURS_LIMIT` in `run_all.py`.
-5. Press play on `run_all.py`. After calibration the **pilot gate** projects
-   total QPU hours from the measured seconds/circuit and aborts before the
-   main execution if above the limit.
-6. Read `logs/run_summary_*.json` (measured vs. predicted QPU hours) and
+6. **Budget**: `configs/execution_plan.yaml` (shipped: the reduced run, §0:
+   5 repetitions, 2 twirls, 22.6 h) and `QPU_HOURS_LIMIT` in `run_all.py`.
+7. From the repo root, in the Python 3.11+ environment: `python run_all.py`.
+   Before anything runs it checks the VPN/token and prints the billed time
+   left on the account; after calibration the **pilot gate** projects total
+   QPU hours from the *billed* seconds per calibration circuit and aborts
+   before the main execution if above the limit. The run takes many hours
+   (queue wait is not billed but is real time): leave the machine awake.
+8. If it stops for any reason (VPN drop, power, a failed stage, the budget
+   stop): `python run_all.py --resume` continues without repeating finished
+   work (§0, "When does it stop?").
+9. Read `logs/run_summary_*.json` (billed vs. predicted QPU hours) and
    `results/evaluation/comparison_report.txt`.
 
 ### D. Running pieces by hand (optional)
@@ -1074,7 +1112,7 @@ and the paper rather than assumed.
 | Parameter | Value | Source |
 |---|---|---|
 | `shots_per_batch_cap` | 200 | Machine operators: "there is a constraint of 200 shots per run" |
-| `seconds_per_batch` | 15 | Machine operators: "200 shots... take around 15 seconds" |
+| `seconds_per_batch` | 18.4974 | **Measured** billed time of one 200-shot batch on PIAST-Q (account usage counter, 2026-10-29; identical for 1/3/7 qubits). The operators had said "around 15 seconds" |
 
 **B. Inherited from the original QAOA-TCS/IGDec-QAOA paper (grounded there, not re-derived here):**
 

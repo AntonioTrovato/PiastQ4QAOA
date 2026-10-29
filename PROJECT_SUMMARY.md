@@ -20,7 +20,7 @@ The target machine is PIAST-Q, a 20-qubit trapped-ion quantum computer (accessed
 |---|---|---|
 | **RQ1** | Does mitigation (MEM, M3, TREx) improve solution quality (QUBO energy, probability of the optimal bitstring) over raw hardware output? | Establishes whether mitigation is needed at all for these circuits. |
 | **RQ2** | Does better quality translate into a better selected test suite (suite cost and effectiveness, or Pareto hypervolume / IGD in the multi-objective case)? | Links quantum-level improvements to the practical test-selection outcome. |
-| **RQ3** | Which technique gives the best improvement per second of measured QPU time? | QPU time is the scarce resource. A technique can win RQ3a and still lose here. |
+| **RQ3** | Which technique gives the best improvement per second of measured QPU time? | QPU time is the scarce resource. A technique can win RQ1 and still lose here. |
 
 These are answered on two multi-objective programs (`gzip`, `flex`) and two single-objective datasets (`paintcontrol`, `gsdtsr`), so that conclusions are not tied to one problem type.
 
@@ -36,13 +36,13 @@ These are answered on two multi-objective programs (`gzip`, `flex`) and two sing
 - **Paired comparison.** Raw, MEM and M3 are all computed from the same stored raw counts, so differences come from the correction alone. TREx uses dedicated twirled runs of the same circuits.
 - **Controlled hardware conditions.** The same trained circuits run for every method. A pinned physical-qubit layout is shared by execution and calibration circuits, so each calibration is measured on the qubits it is applied to. Backend calibration data (T1/T2) is snapshotted per session, and readout drift is measured with a second calibration at the end of the run.
 - **Statistics.** Repeated runs are tested with Shapiro-Wilk normality gating, then ANOVA with Tukey or Kruskal-Wallis with Dunn (Bonferroni-corrected). Effect sizes are reported (Cohen's d or Vargha-Delaney Â12).
-- **Budget control.** A cost model (200 shots per 15 s batch) plans the run, and a pilot check measures the real time per batch after calibration and aborts if the projection exceeds the QPU limit.
-- **Deterministic and tested.** The clustering is deterministic. The ground-truth optimum of each subproblem is found by brute force (at most 128 states). The pipeline has 187 unit tests and was run end to end on a noiseless simulator before any hardware use.
+- **Budget control.** A cost model (200 shots per batch, billed at the measured 18.4974 s on PIAST-Q) plans the run. A pilot check measures the billed time per batch after calibration and aborts if the projection exceeds the QPU limit. During execution every batch is checked against the account's billed QPU time and refused if it would cross the limit, and an interrupted run can be resumed without repeating finished work.
+- **Deterministic and tested.** The clustering is deterministic. The ground-truth optimum of each subproblem is found by brute force (at most 128 states). The pipeline has 203 unit tests and was run end to end on a noiseless simulator before any hardware use.
 - **Raw data preserved.** Counts, per-batch timings, job metadata, transpiled circuit statistics and the qubit mapping are stored for every execution.
 
 ## 5. Scope and limitations (stated explicitly)
 
-- The 25-hour budget limits the study to a reduced, feasibility-driven set: QAOA-TCS on `gzip` and `flex` (multi-objective) and `paintcontrol` and `gsdtsr` (single-objective). All four methods (raw, MEM, M3, TREx) are run with 6 repetitions, 200 shots per circuit and 2 TREx twirls (about 21.7 QPU hours including calibration and a drift check).
+- The 25-hour budget limits the study to a reduced, feasibility-driven set: QAOA-TCS on `gzip` and `flex` (multi-objective) and `paintcontrol` and `gsdtsr` (single-objective). All four methods (raw, MEM, M3, TREx) are run with 5 repetitions, 200 shots per circuit and 2 TREx twirls (about 22.6 billed QPU hours including calibration and a drift check; 6 repetitions would need 26.8 h).
 - IGDec-QAOA, the second algorithm of the original study, is implemented in the package but excluded from the hardware run (only one dataset is affordable for it), so no algorithm comparison is made.
-- Six repetitions give limited statistical power, so effect sizes are reported next to p-values.
-- TREx is implemented as measurement twirling only (random pre-measurement bit flips undone classically); gate-level twirling and calibration-based rescaling are not included. With two twirls it is a weak test of that technique, and it receives more shots (twirls x 200) than raw, which is accounted for in the cost analysis of RQ3b.
+- Five repetitions give limited statistical power, so effect sizes are reported next to p-values.
+- TREx is implemented as measurement twirling only (random pre-measurement bit flips undone classically); gate-level twirling and calibration-based rescaling are not included. With two twirls it is a weak test of that technique, and it receives more shots (twirls x 200) than raw, which is accounted for in the cost analysis of RQ3.

@@ -211,7 +211,7 @@ points at* needs to change (see §5.1).
 maximum of **200 shots per run**. Anything more has to be split into several
 runs of ≤200 shots each and combined — this is why `run_circuit_with_batching_recorded()`
 (§7) exists, and why the budget planner (§10) is denominated in "batches of
-200 shots, ~15 seconds each."
+200 shots, 18.4974 s billed each (measured; the operators had said ~15 s)."
 
 ### 5.1 Right now: pointed at a placeholder, on purpose
 
@@ -424,7 +424,7 @@ anymore, even for combos 1–11 which already have circuits sitting on disk.
 
 ## 10. Budget planning — turning limited hardware time into a concrete plan
 
-Real PIAST-Q time is scarce (200 shots/run, ~15 seconds/batch). Before
+Real PIAST-Q time is scarce (200 shots/run, 18.4974 billed seconds/batch, measured). Before
 spending any of it, `src/piastq_execution/budget_planner.py` answers: *given
 this many hours, and this many combos/methods, what repetitions/shots/methods
 can I actually afford?* It reads the **real** circuit counts from
@@ -438,9 +438,12 @@ order, until the plan fits the budget:
 4. as an absolute last resort, drop/subsample circuits (reported explicitly).
 
 **The cost model itself, in full** — this is the one formula everything else
-is built from: every circuit costs `ceil(shots / 200) × 15 seconds`. Shots
+is built from: every circuit costs `ceil(shots / 200) × 18.4974 seconds`
+(the billed time measured on PIAST-Q on 2026-10-29 — the same for 1-, 3- and
+7-qubit circuits; the operators' original figure was ~15 s, and the cost
+tables in this section were computed with it: multiply them by 1.233). Shots
 are requested in batches of at most 200 (the hardware limit), and *every*
-batch costs ~15s regardless of how full it is — so 201 shots costs exactly
+batch costs the same regardless of how full it is — so 201 shots costs exactly
 as much as 400, because it rounds up to a second whole batch. From there:
 **raw** cost for a combo = (circuits × repetitions) × per-circuit cost;
 **TREx** cost = that *same* raw cost again, multiplied by
@@ -812,14 +815,19 @@ is any run on the real PIAST-Q machine.
    `results/_archive_<time>/`.)
 
 **Steps:**
-1. `configs/backend.yaml`: real backend name (token via the
-   `PIASTQ_API_TOKEN` env var is safest); check `physical_qubits`.
+1. `configs/backend.yaml`: `backend_name: piast_q` (reached through the PCSS
+   service; needs the VPN, a Python 3.11+ environment with `pcss-qapi`, and the
+   token in the `PIASTQ_API_TOKEN` env var — see README §10 C); check
+   `physical_qubits`.
 2. `run_all.py`: set `ALLOW_REAL_HARDWARE = True`.
 3. Press play on `run_all.py` (or `python run_all.py`). It runs, in order:
    tests, QUBO backfill, budget plan, calibration, pilot gate, QAOA-TCS
    single-objective, QAOA-TCS multi-objective, (IGDec-QAOA only if planned), drift check,
    evaluation, comparison. If the pilot gate projects more than 25 h at the
-   measured seconds/batch, it stops before the main execution.
+   measured (billed) seconds/batch, it stops before the main execution. During
+   execution each batch is checked against the account's billed QPU time and
+   refused if it would cross 25 h. If anything interrupts the run, `python
+   run_all.py --resume` continues without repeating finished circuits.
 4. Read `logs/run_summary_*.json` (measured vs. predicted QPU hours) and
    `results/evaluation/comparison_report.txt`. How to read each output:
    README §0.
@@ -910,7 +918,7 @@ here):**
 | Parameter | Value | Source |
 |---|---|---|
 | `shots_per_batch_cap` | 200 | Machine operators' email: "there is a constraint of 200 shots per run" |
-| `seconds_per_batch` | 15 | Machine operators' email: "200 shots... take around 15 seconds" |
+| `seconds_per_batch` | 18.4974 | Measured billed time of a 200-shot batch (account usage counter, 2026-10-29). The operators' email said "around 15 seconds" |
 
 **B. Inherited from the original QAOA-TCS/IGDec-QAOA paper (grounded there,
 not re-derived in this replication package):**
@@ -961,20 +969,22 @@ reproduce the exact numbers already in `execution_plan/execution_plan_report.txt
 Everything in §10 shows the full 14-combo study is far beyond 25 QPU-hours,
 so `configs/execution_plan.yaml` is set to one feasible, complete-but-narrow
 run: **QAOA-TCS only** — `gzip` + `flex` (multi-objective) and `paintcontrol`
-+ `gsdtsr` (single-objective); raw + MEM + M3 + TREx; 6 repetitions; 200
-shots/circuit; 2 TREx twirls. Cost: 5,208 batches x 15 s = 21.7 h (21.47 h
-run, including calibration, + 0.23 h drift check), i.e. about 3.3 h of
-reserve; the 25 h limit holds while a batch takes at most about 17.3 s, which
-the pilot gate checks against the measured calibration time. Repetitions were
-preferred over twirls (each extra repetition costs ~3.4 h, each extra twirl
-~5.6 h); R=5/T=3 would be 23.9 h with a 1 h margin.
++ `gsdtsr` (single-objective); raw + MEM + M3 + TREx; 5 repetitions; 200
+shots/circuit; 2 TREx twirls. Cost at the measured billed 18.4974 s/batch:
+4,402 batches = 22.6 h (22.33 h run, including calibration, + 0.29 h drift
+check), i.e. about 2.4 h of reserve; the 25 h limit holds while a batch is
+billed at most about 20.4 s, which the pilot gate checks against the billed
+calibration time. Repetitions were preferred over twirls (each extra
+repetition costs ~4.1 h, each extra twirl ~6.9 h); R=6/T=2 would be 26.8 h and
+R=5/T=3 29.5 h, neither of which fits. (An earlier plan with R=6 assumed the
+operators' ~15 s per batch, 21.7 h; the measurement showed 18.5 s.)
 
 IGDec-QAOA is excluded: only `paintcontrol` is affordable for it (`iofrol`
 alone is ~25 h of raw runs; the other IGDec datasets are untrained), so RQ4 is
 out of scope and the study concentrates on the mitigation strategies
 (RQ1/RQ2/RQ3a/RQ3b). `elevator2` is not usable (its 56 saved circuits do not
 match the current clustering), and `iofrol`/`elevator` need hundreds of
-circuits. With 6 repetitions the tests have low power (report effect sizes);
+circuits. With 5 repetitions the tests have low power (report effect sizes);
 TREx at two twirls is a weak test of that technique, and it receives T x 200
 shots against raw's 200. Other combos stay defined in the config but are
 skipped.

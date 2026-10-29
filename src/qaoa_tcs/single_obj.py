@@ -6,7 +6,11 @@ import json
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from piastq_execution.raw_counts import run_circuit_with_batching_recorded, RawCountsWriter
+from piastq_execution.raw_counts import (
+    run_circuit_with_batching_recorded,
+    RawCountsWriter,
+    load_completed_records,
+)
 from piastq_execution.backend_calibration_snapshot import save_backend_calibration_snapshot
 from piastq_execution.backend_config import get_backend
 from piastq_execution.budget_planner import resolve_all_combo_settings
@@ -559,6 +563,11 @@ def run_hardware_execution():
             subsuites_data = {}
             qpu_run_times = []
 
+            # --resume: circuits already saved by an interrupted run are reused
+            # (read BEFORE the writers reopen the files in append mode).
+            completed_raw = load_completed_records(raw_counts_file_path)
+            completed_trex = load_completed_records(trex_raw_counts_file_path)
+
             raw_counts_writer = RawCountsWriter(raw_counts_file_path)
             trex_counts_writer = RawCountsWriter(trex_raw_counts_file_path)
 
@@ -601,10 +610,12 @@ def run_hardware_execution():
                         num_batches=settings.num_batches,
                         remainder_shots=settings.remainder_shots,
                         initial_layout=physical_layout_for_width(circuit.num_qubits),
+                        completed=completed_raw,
                     )
                     e = time.time()
 
-                    raw_counts_writer.write(raw_record)
+                    if raw_record is not None:
+                        raw_counts_writer.write(raw_record)
 
                     # TREx: a distinct hardware pass per twirl instance --
                     # cannot reuse the raw counts above. Written to a
@@ -633,8 +644,10 @@ def run_hardware_execution():
                                 remainder_shots=settings.remainder_shots,
                                 twirl_mask=twirl_mask,
                                 initial_layout=physical_layout_for_width(twirled_circuit.num_qubits),
+                                completed=completed_trex,
                             )
-                            trex_counts_writer.write(trex_record)
+                            if trex_record is not None:
+                                trex_counts_writer.write(trex_record)
 
                     qpu_run_times.append((e - s) * 1000)
 

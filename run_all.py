@@ -21,9 +21,25 @@ hand; the first failing stage stops the run):
 
 Which backend it uses is decided ONLY by configs/backend.yaml (or the
 PIASTQ_* env vars): the default `offline_simulator_no_noise` is a free local
-dry run. To run on the real machine, set the real backend there AND flip
-ALLOW_REAL_HARDWARE below -- without it this script refuses to start on
-anything but an offline simulator.
+dry run. To run on the real machine, set `backend_name: piast_q` there (token
+via PIASTQ_API_TOKEN) AND flip ALLOW_REAL_HARDWARE below -- without it this
+script refuses to start on anything but an offline simulator. The real
+machine needs Python >= 3.11 with `pip install pcss-qapi` (see README).
+
+When does it stop?
+  * a stage that fails (non-zero exit) stops the whole run -- no later stage
+    starts on top of a broken one;
+  * the pilot gate (stage 4) aborts BEFORE the expensive stages if the
+    projected billed QPU time exceeds QPU_HOURS_LIMIT;
+  * during execution every hardware batch first checks the account's billed
+    QPU time (PCSS /me/usage) and refuses to submit one that would cross
+    QPU_HOURS_LIMIT (piastq_execution/qpu_usage.py) -- the stage stops
+    cleanly with everything so far saved.
+  * It does NOT stop on its own for network trouble: dropped connections are
+    retried for ~30 min per call; if that fails the stage dies, and
+    `python run_all.py --resume` continues where it stopped (circuits already
+    in the raw-counts files are reused, not re-run; finished calibration
+    widths are skipped) instead of archiving the partial data and starting over.
 
 Output: console + logs/run_all_<timestamp>.log, and a final
 logs/run_summary_<timestamp>.json (stage times, predicted vs measured QPU
@@ -49,11 +65,14 @@ from datetime import datetime
 ALLOW_REAL_HARDWARE = False        # must be True to run on anything but an offline simulator
 RUN_UNIT_TESTS = True
 RUN_DRIFT_CHECK = True             # ~56 extra calibration circuits at the end
-QPU_HOURS_LIMIT = 25.0             # total QPU time available
+QPU_HOURS_LIMIT = 25.0             # total QPU time available (BILLED time, queue wait is free)
+STOP_MARGIN_SECONDS = 120.0        # hardware batches stop this far below the limit
 ABORT_IF_PROJECTION_EXCEEDS_LIMIT = True   # pilot gate (stage 4)
 DRIFT_CIRCUITS = 56                # M3 circuits for widths 1..7 (2 * sum(1..7))
 SINGLE_OBJECTIVE_DATASETS = {"gsdtsr", "iofrol", "paintcontrol", "elevator", "elevator2"}
 MULTI_OBJECTIVE_DATASETS = {"flex", "grep", "gzip", "sed"}
+
+RESUME = "--resume" in sys.argv[1:]   # continue an interrupted run instead of starting over
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
@@ -75,7 +94,10 @@ def _run(name: str, args: list, cwd: str, log) -> float:
     Returns elapsed seconds; raises StageFailed on a non-zero exit."""
     _banner(f"STAGE: {name}")
     start = time.time()
-    env = dict(os.environ, PYTHONUNBUFFERED="1")
+    env = dict(os.environ, PYTHONUNBUFFERED="1",
+               PIASTQ_QPU_LIMIT_SECONDS=str(QPU_HOURS_LIMIT * 3600 - STOP_MARGIN_SECONDS))
+    if RESUME:
+        env["PIASTQ_RESUME"] = "1"
     proc = subprocess.Popen(
         [PY] + args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
@@ -102,7 +124,31 @@ def _check_backend_allowed() -> str:
             f"Refusing to start: backend '{backend_name}' is not an offline simulator and "
             f"ALLOW_REAL_HARDWARE is False in run_all.py."
         )
+    if not is_offline:
+        _check_real_backend_ready()
     return backend_name
+
+
+def _check_real_backend_ready() -> None:
+    """Fails fast, before any stage, if the real machine can't be used."""
+    from piastq_execution.backend_config import is_pcss_backend, load_backend_config
+    from piastq_execution.qpu_usage import billed_seconds
+
+    backend_name = load_backend_config()[1]
+    if not is_pcss_backend(backend_name):
+        return
+    if sys.version_info < (3, 11):
+        raise SystemExit(f"PIAST-Q access (pcss-qapi) needs Python >= 3.11; this is {sys.version.split()[0]}. "
+                         f"Start run_all.py from the Python 3.11+ environment (see README, section C).")
+    try:
+        import pcss_qapi  # noqa: F401
+    except ImportError:
+        raise SystemExit("pcss_qapi is not installed in this environment: pip install pcss-qapi")
+    used = billed_seconds()
+    if used is None:
+        raise SystemExit("Cannot read the PIAST-Q usage counter (VPN connected? token valid?). Not starting.")
+    print(f"PIAST-Q billed so far: {used:.1f}s of {QPU_HOURS_LIMIT * 3600:.0f}s "
+          f"({(QPU_HOURS_LIMIT * 3600 - used) / 3600:.2f}h left)")
 
 
 def _archive_old_raw_counts(stamp: str) -> None:
@@ -149,26 +195,45 @@ def _measured_seconds_per_circuit() -> float | None:
     return total_seconds / total_circuits if total_circuits else None
 
 
-def _pilot_gate(config, plans) -> dict:
+def _calibration_circuit_count() -> int:
+    total = 0
+    for path in glob.glob(os.path.join(ROOT, "calibration", "*_q*.json")):
+        with open(path) as f:
+            rec = json.load(f)
+        width = rec["num_qubits"]
+        total += 2 ** width if rec["method"] == "mem" else 2 * width
+    return total
+
+
+def _pilot_gate(config, plans, calibration_billed_seconds=None) -> dict:
+    """Projects the whole run from the calibration stage. With a real backend
+    the rate is the BILLED seconds per calibration circuit (queue wait is not
+    billed, so it must not inflate the projection); on a simulator there is no
+    billing and the wall-clock figure is used instead."""
     batches = _planned_batches(config, plans) + (DRIFT_CIRCUITS if RUN_DRIFT_CHECK else 0)
     planned_hours = batches * config.cost_model.seconds_per_batch / 3600
-    measured = _measured_seconds_per_circuit()
+    circuits = _calibration_circuit_count()
+    if calibration_billed_seconds is not None and calibration_billed_seconds > 0 and circuits:
+        measured = calibration_billed_seconds / circuits
+        source = "billed"
+    else:
+        measured = _measured_seconds_per_circuit()
+        source = "wall-clock"
     info = {"planned_batches": batches, "planned_hours_at_assumed_rate": planned_hours,
             "assumed_seconds_per_batch": config.cost_model.seconds_per_batch,
-            "measured_seconds_per_batch": measured}
+            "measured_seconds_per_batch": measured, "measured_source": source}
     if measured is None:
         print("Pilot gate: no calibration data found, cannot project QPU time.")
         return info
     projected = batches * measured / 3600
     info["projected_hours_at_measured_rate"] = projected
-    print(f"Pilot gate: {batches:.0f} batches planned; measured {measured:.2f}s/batch "
+    print(f"Pilot gate: {batches:.0f} batches planned; measured {measured:.2f}s/batch ({source}) "
           f"(assumed {config.cost_model.seconds_per_batch}s) -> projected {projected:.2f}h "
           f"of {QPU_HOURS_LIMIT}h")
     if projected > QPU_HOURS_LIMIT and ABORT_IF_PROJECTION_EXCEEDS_LIMIT:
         raise StageFailed(
             f"projected QPU time {projected:.2f}h exceeds the {QPU_HOURS_LIMIT}h limit at the measured "
-            f"rate. Reduce repetitions / trex_twirl_instances in configs/execution_plan.yaml and re-run "
-            f"(or set ABORT_IF_PROJECTION_EXCEEDS_LIMIT = False if queue time inflates the measurement)."
+            f"rate. Reduce repetitions / trex_twirl_instances in configs/execution_plan.yaml and re-run."
         )
     return info
 
@@ -202,7 +267,14 @@ def main() -> int:
             summary["backend"] = _check_backend_allowed()
             import qiskit_aqt_provider  # noqa: F401  (fail early with a clear error)
 
-            _archive_old_raw_counts(stamp)
+            from piastq_execution.qpu_usage import billed_seconds
+
+            billed_start = billed_seconds()
+            summary["billed_seconds_at_start"] = billed_start
+            if RESUME:
+                print("RESUME mode: keeping existing raw counts / calibration, only missing work is executed.")
+            else:
+                _archive_old_raw_counts(stamp)
             config, plans = _plan()
 
             stages = []
@@ -225,12 +297,21 @@ def main() -> int:
 
             def run_stage(stage):
                 name, args, cwd = stage
-                summary["stages"][name] = round(_run(name, args, cwd, log), 1)
+                try:
+                    summary["stages"][name] = round(_run(name, args, cwd, log), 1)
+                finally:
+                    summary.setdefault("billed_seconds_after_stage", {})[name] = billed_seconds()
 
+            calibration_billed = None
             for stage in stages:
+                before = billed_seconds() if stage[0].startswith("calibration") else None
                 run_stage(stage)
+                if before is not None:
+                    after = billed_seconds()
+                    if after is not None:
+                        calibration_billed = after - before
 
-            summary["pilot_gate"] = _pilot_gate(config, plans)
+            summary["pilot_gate"] = _pilot_gate(config, plans, calibration_billed)
 
             execution_stages = []
             if has_single:
@@ -242,21 +323,34 @@ def main() -> int:
             for stage in execution_stages:
                 run_stage(stage)
 
-            if RUN_DRIFT_CHECK:
+            drift_report = os.path.join(ROOT, "calibration", "drift", "m3_drift_report.json")
+            if RUN_DRIFT_CHECK and RESUME and os.path.exists(drift_report):
+                print("Drift check already done, skipping (resume).")
+            elif RUN_DRIFT_CHECK:
                 run_stage(("drift check", ["run_calibration.py", "drift"], os.path.join(SRC, "piastq_execution")))
 
             run_stage(("evaluation", ["evaluate_all.py"], os.path.join(SRC, "piastq_execution")))
             run_stage(("statistical comparison", ["compare_all.py"], os.path.join(SRC, "piastq_execution")))
 
-            measured_hours = _measured_qpu_seconds() / 3600
+            billed_end = billed_seconds()
+            if billed_end is not None:
+                measured_hours = billed_end / 3600       # whole account: what the 25h limit counts
+                summary["billed_qpu_hours_account_total"] = round(measured_hours, 3)
+                if billed_start is not None:
+                    summary["billed_qpu_hours_this_invocation"] = round((billed_end - billed_start) / 3600, 3)
+                kind = "billed"
+            else:
+                measured_hours = _measured_qpu_seconds() / 3600   # simulator: wall-clock only
+                kind = "wall-clock (simulator, nothing is billed)"
             summary["measured_qpu_hours"] = round(measured_hours, 3)
             summary["status"] = "completed"
-            _banner(f"ALL STAGES COMPLETED. Measured QPU-side time: {measured_hours:.2f}h "
+            _banner(f"ALL STAGES COMPLETED. QPU time, {kind}: {measured_hours:.2f}h "
                     f"(limit {QPU_HOURS_LIMIT}h). Report: results/evaluation/comparison_report.txt")
             code = 0
         except StageFailed as e:
             summary["status"] = f"failed: {e}"
-            _banner(f"RUN STOPPED: {e}")
+            _banner(f"RUN STOPPED: {e}\nEverything executed so far is saved. To continue without "
+                    f"repeating it: python run_all.py --resume")
             code = 1
         finally:
             summary_path = os.path.join(ROOT, "logs", f"run_summary_{stamp}.json")

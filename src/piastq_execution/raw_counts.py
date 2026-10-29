@@ -25,7 +25,7 @@ import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -201,7 +201,57 @@ def transpiled_circuit_stats(
         return None
 
 
+def resume_enabled() -> bool:
+    """True when the run was started with `python run_all.py --resume`
+    (PIASTQ_RESUME=1): circuits already saved in the raw-counts files are
+    reused instead of being sent to the QPU again."""
+    return os.environ.get("PIASTQ_RESUME") == "1"
+
+
+def load_completed_records(path: str) -> Dict[Tuple[str, Any], Dict[str, Any]]:
+    """{(circuit_id, iteration_id): record} for every circuit already written
+    to the raw-counts JSONL at `path`. Empty unless resume is enabled and the
+    file exists.
+
+    A crash mid-write leaves a half-written last line. It is dropped, and the
+    file is rewritten with only the complete lines (newline-terminated) BEFORE
+    the writer reopens it in append mode -- otherwise the next record would be
+    glued onto the fragment and corrupt both."""
+    completed: Dict[Tuple[str, Any], Dict[str, Any]] = {}
+    if not resume_enabled() or not os.path.exists(path):
+        return completed
+
+    valid_lines: List[str] = []
+    dirty = False
+    with open(path) as f:
+        text = f.read()
+    if text and not text.endswith("\n"):
+        dirty = True
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+            key = (record["circuit_id"], record.get("iteration_id"))
+        except (json.JSONDecodeError, KeyError):
+            dirty = True
+            continue
+        completed[key] = record
+        valid_lines.append(line)
+
+    if dirty:
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w") as f:
+            f.write("".join(line + "\n" for line in valid_lines))
+        os.replace(tmp_path, path)
+    return completed
+
+
 def _run_one_batch(circuit, sampler, shots: int, batch_index: int) -> BatchRecord:
+    from piastq_execution.qpu_usage import check_budget
+
+    check_budget()
     sampler.options.shots = shots
     start = time.time()
     job = sampler.run([circuit])
@@ -243,6 +293,7 @@ def run_circuit_with_batching_recorded(
     record_qubit_mapping: bool = True,
     twirl_mask: Optional[List[int]] = None,
     initial_layout: Optional[List[int]] = None,
+    completed: Optional[Dict[Tuple[str, Any], Dict[str, Any]]] = None,
 ):
     """Shot-batched circuit execution with full raw-data capture.
 
@@ -273,7 +324,18 @@ def run_circuit_with_batching_recorded(
     transpiler picks a layout automatically and the recorded mapping is only
     a best-effort guess (`get_physical_qubit_mapping`) -- kept for backward
     compatibility, not recommended for new call sites.
+
+    `completed`: the dict from `load_completed_records(path)`. If this
+    (circuit_id, iteration_id) is already in it, nothing is sent to the QPU:
+    the saved counts are returned with `record=None` (the caller must then NOT
+    write a record -- it is already in the file). Used by `--resume`.
     """
+    if completed:
+        prior = completed.get((circuit_id, iteration_id))
+        if prior is not None:
+            print(f"  [resume] {circuit_id} (iteration {iteration_id}) already executed, reusing saved counts")
+            return Counter(prior["aggregated_counts"]), None
+
     if initial_layout is not None:
         sampler.set_transpile_options(optimization_level=optimization_level, initial_layout=list(initial_layout))
 

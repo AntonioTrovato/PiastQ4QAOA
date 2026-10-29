@@ -1,0 +1,20 @@
+# Python 3.11+ environment for REAL PIAST-Q runs (pcss-qapi needs >= 3.11).
+# The simulated run, the tests' main environment and evaluation use the 3.10
+# `qiskit_env` + requirements.txt instead. Install in this order:
+#   python3.12 -m venv piastq_env && source piastq_env/bin/activate
+#   pip install pcss-qapi
+#   pip install -c requirements-piastq-constraints.txt -r requirements-piastq.txt
+pcss-qapi
+qiskit-algorithms==0.3.1
+qiskit-optimization==0.6.1
+qiskit-ibm-runtime
+mthree==3.0.0
+docplex==2.30.251
+numpy==1.26.4
+scipy==1.15.2
+pandas==2.2.2
+scikit-learn==1.5.1
+matplotlib==3.9.2
+PyYAML==6.0.2
+joblib
+sympy

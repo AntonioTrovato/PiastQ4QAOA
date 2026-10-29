@@ -54,7 +54,7 @@ from piastq_execution.mitigation import (
     make_mem_calibration_record,
 )
 from piastq_execution.qubit_layout import physical_layout_for_width
-from piastq_execution.raw_counts import get_backend_identity
+from piastq_execution.raw_counts import get_backend_identity, resume_enabled
 
 CALIBRATION_SHOTS = 200  # one 200-shot batch per calibration circuit
 
@@ -71,6 +71,9 @@ def _run_and_count(circuit, sampler, initial_layout, shots=CALIBRATION_SHOTS):
     circuit may have been submitted through the same sampler since the last
     call.
     """
+    from piastq_execution.qpu_usage import check_budget
+
+    check_budget()
     sampler.set_transpile_options(optimization_level=3, initial_layout=list(initial_layout))
     sampler.options.shots = shots
     start = time.time()
@@ -134,6 +137,10 @@ def run_calibration(widths):
     store = CalibrationStore()
 
     for width in widths:
+        layout = physical_layout_for_width(width)
+        if resume_enabled() and store.load("mem", layout) is not None and store.load("m3", layout) is not None:
+            print(f"\n=== width={width}: calibration already saved, skipping (resume) ===")
+            continue
         print(f"\n=== Calibrating width={width} ===")
         calibrate_mem(width, sampler, backend, store)
         calibrate_m3(width, sampler, backend, store)

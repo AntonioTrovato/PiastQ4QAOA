@@ -34,3 +34,5 @@ results/_archive_*/
 
 # EuroHPC VPN config files
 piastq_vpn
+# Python 3.11+ environment for real PIAST-Q runs (README section 10 C)
+piastq_env/
