@@ -99,8 +99,8 @@ side by side on disjoint qubits of the 20-qubit machine, inside three fixed
 slots (qubits 0-6, 7-13, 14-19; `pack_slots` in `configs/backend.yaml`), runs
 them as one job and splits the counts per circuit afterwards. Each circuit
 keeps its own 200 shots, its own record (`physical_qubit_mapping` tells where
-it ran) and its own results. About 940 execution jobs + 130 calibration + 2
-drift = ~1,070 jobs: ~5.5 billed QPU hours and ~60 hours of wall-clock. Up to
+it ran) and its own results. About 1,255 execution jobs + 130 calibration + 2
+drift = ~1,390 jobs: ~7.1 billed QPU hours and ~78 hours of wall-clock. Up to
 16 jobs are queued at once (`MAX_JOBS_IN_FLIGHT` in `run_all.py`). Cost of the
 design, to state in the paper: circuits run next to each other (possible
 readout crosstalk) and not on qubits 0-6 alone. Nearly all trained circuits
@@ -118,15 +118,15 @@ MEM file per slot.
 **The reduced run configured in `configs/execution_plan.yaml`** (25 QPU-hours
 available): QAOA-TCS only. Multi-objective: `gzip` + `flex`. Single-objective:
 `paintcontrol` + `gsdtsr`. Methods raw + MEM + M3 + TREx; 5 repetitions; 200
-shots/circuit; 2 TREx twirl instances. The budget planner's figure (22.33 h,
-4,346 jobs at 18.4974 s) is the conservative one-circuit-per-job upper bound;
-with packing the run needs ~1,070 jobs, ~5.5 billed hours (far inside 25 h)
-and ~60 h of wall-clock, which is what limits the schedule. Other combos are skipped by
+shots/circuit; 3 TREx twirl instances. The budget planner's figure (~29 h,
+one circuit per job at 18.4974 s) is the conservative upper bound;
+with packing the run needs ~1,390 jobs, ~7.1 billed hours (far inside 25 h)
+and ~78 h of wall-clock, which is what limits the schedule. Other combos are skipped by
 the execution scripts and by evaluation. Selection is feasibility-driven (QPU
 budget, 6 Nov deadline); the paper must say so. IGDec-QAOA was dropped because
 only `paintcontrol` is affordable for it (`iofrol` alone is ~25 h of raw runs
 and the other IGDec datasets are untrained), so RQ4 is out of scope. TREx at
-two twirls is a weak test of that technique; state it. Other datasets that do
+three twirls is still a modest test of that technique; state it. Other datasets that do
 not fit: `iofrol` and `elevator` (hundreds of circuits), `elevator2` (its 56
 saved circuits do not match the current clustering).
 
@@ -1063,7 +1063,7 @@ about two seconds (232 tests total).
    (without it the script refuses any backend not starting with
    `offline_simulator`).
 6. **Budget**: `configs/execution_plan.yaml` (shipped: the reduced run, §0:
-   5 repetitions, 2 twirls; planner upper bound 22.3 h, real ~5.5 billed h)
+   5 repetitions, 3 twirls; planner upper bound ~29 h, real ~7.1 billed h)
    and `QPU_HOURS_LIMIT` in `run_all.py`.
 7. **Run on the PCSS cluster** (Slurm, VPN needed only to ssh in; the
    partition has no time limit):
@@ -1091,7 +1091,7 @@ about two seconds (232 tests total).
 
 **What to expect while it runs** (order of appearance): backend snapshot and
 `calibration/m3_q0-1-...-19.json` + three `mem_q*.json` (130 jobs, a few
-hours); the pilot-gate line (about 18.5 s per job, ~5.5 h projected); then per
+hours); the pilot-gate line (about 18.5 s per job, ~7.1 h projected); then per
 dataset (`gsdtsr`, `paintcontrol`, `flex`, `gzip`, in this order of scripts:
 single-objective first) `results/qaoa_tcs/<dataset>/<dataset>-rep-1-raw_counts.jsonl`
 and `...-trex-raw_counts.jsonl` growing as jobs finish (a job completes a

@@ -970,14 +970,14 @@ Everything in §10 shows the full 14-combo study is far beyond 25 QPU-hours,
 so `configs/execution_plan.yaml` is set to one feasible, complete-but-narrow
 run: **QAOA-TCS only** — `gzip` + `flex` (multi-objective) and `paintcontrol`
 + `gsdtsr` (single-objective); raw + MEM + M3 + TREx; 5 repetitions; 200
-shots/circuit; 2 TREx twirls. At the measured billed 18.4974 s per job the
-planner's one-circuit-per-job upper bound is 22.3 h (+0.29 h drift check). The
+shots/circuit; 3 TREx twirls. At the measured billed 18.4974 s per job the
+planner's one-circuit-per-job upper bound is ~29 h (3 twirls). The
 real bottleneck turned out to be wall-clock (about 3-5 minutes of unbilled
 machine overhead per job), so circuits are packed side by side into 20-qubit
-jobs (README section 0): about 1,070 jobs, ~5.5 billed hours, ~60 hours of
+jobs (README section 0): about 1,390 jobs, ~7.1 billed hours, ~78 hours of
 wall-clock. The pilot gate checks the billed rate against the 25 h limit. Repetitions were preferred over twirls (each extra
-repetition costs ~4.1 h, each extra twirl ~6.9 h); R=6/T=2 would be 26.8 h and
-R=5/T=3 29.5 h, neither of which fits. (An earlier plan with R=6 assumed the
+repetition costs ~4.1 h, each extra twirl ~6.9 h); T=3 was chosen over R=6/7 with T=2 as the
+best use of the ~80 h of wall-clock window. (An earlier plan with R=6 assumed the
 operators' ~15 s per batch, 21.7 h; the measurement showed 18.5 s.)
 
 IGDec-QAOA is excluded: only `paintcontrol` is affordable for it (`iofrol`
@@ -986,6 +986,6 @@ out of scope and the study concentrates on the mitigation strategies
 (RQ1/RQ2/RQ3a/RQ3b). `elevator2` is not usable (its 56 saved circuits do not
 match the current clustering), and `iofrol`/`elevator` need hundreds of
 circuits. With 5 repetitions the tests have low power (report effect sizes);
-TREx at two twirls is a weak test of that technique, and it receives T x 200
+TREx at three twirls is a modest test of that technique, and it receives T x 200
 shots against raw's 200. Other combos stay defined in the config but are
 skipped.

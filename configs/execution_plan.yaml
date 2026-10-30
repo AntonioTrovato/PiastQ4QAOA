@@ -20,7 +20,7 @@ target_shots_per_circuit: 200   # reduced-scope run: one 200-shot batch per circ
 min_shots_per_circuit: 200      # floor: never go below one batch
 target_repetitions: 5           # reduced-scope run: 5 repetitions (paper convention is 10; not affordable in 25 QPU-h)
 calibration_shots_per_circuit: 200
-trex_twirl_instances: 2         # independent random-twirl hardware passes averaged per
+trex_twirl_instances: 3         # independent random-twirl hardware passes averaged per
                                  # TREx circuit (see piastq_execution/mitigation.py's
                                  # load_trex_twirl_instances() docstring for rationale).
                                  # Read by both the budget planner's cost model and every
@@ -121,12 +121,14 @@ combos:
 # Reduced-scope run (25 QPU-hours available, results needed by 6 Nov):
 # ONE pool, four QAOA-TCS combos (2 multi-objective: gzip, flex; 2 single-
 # objective: paintcontrol, gsdtsr), all four methods (raw+MEM+M3+TREx),
-# 5 repetitions, 200 shots/circuit, 2 TREx twirls. IGDec-QAOA is not part of
-# this run. At the measured 18.4974 s/batch the planner estimates ~22.4h
-# (+~0.29h end-of-session drift check); total_hours is set to 23 so ~2h of
-# the 25h stays unplanned as a reserve for failed jobs. Any combo NOT listed
-# here is skipped by the execution scripts and by evaluation.
+# 5 repetitions, 200 shots/circuit, 3 TREx twirls. IGDec-QAOA is not part of
+# this run. The planner prices one circuit per job (an upper bound: ~29.2h at
+# the measured 18.4974 s/job); the run packs circuits side by side, so it
+# really needs ~1,390 jobs, ~7.1 billed hours and ~78h of wall-clock.
+# total_hours is only the planner's cap and must stay above its upper-bound
+# estimate, otherwise it would drop TREx/repetitions to fit. Any combo NOT
+# listed here is skipped by the execution scripts and by evaluation.
 pools:
   - name: reduced_scope_run
-    total_hours: 23
+    total_hours: 35
     combos: [gzip_qaoa_tcs, flex_qaoa_tcs, paintcontrol_qaoa_tcs, gsdtsr_qaoa_tcs]
