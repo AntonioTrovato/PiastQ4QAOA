@@ -240,6 +240,11 @@ def _pilot_gate(config, jobs, calibration_billed_seconds=None) -> dict:
     if calibration_billed_seconds is not None and calibration_billed_seconds > 0:
         measured = calibration_billed_seconds / calibration_jobs
         source = "billed"
+    elif _is_real_backend() and RESUME:
+        # Calibration was reused (nothing billed this time) and wall-clock on the real machine is
+        # queue wait, not QPU time: projecting from it would be wrong. The first run passed the gate.
+        print("Pilot gate: skipped on resume (calibration reused, its billed rate was checked in the first run).")
+        return {**jobs, "skipped": "resume"}
     else:
         measured = _measured_seconds_per_job()
         source = "wall-clock"

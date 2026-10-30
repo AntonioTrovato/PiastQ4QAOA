@@ -191,7 +191,7 @@ class TestPcssBackend(unittest.TestCase):
             self.assertEqual(backend.result("job"), "result")
         self.assertEqual(Flaky.calls, 3)
 
-    def test_hardened_submit_retries_only_connect_errors(self):
+    def test_hardened_submit_retries_connect_errors_and_timeouts(self):
         class Backend:
             attempts = 0
 
@@ -208,9 +208,9 @@ class TestPcssBackend(unittest.TestCase):
 
         with mock.patch.object(backend_config, "_RETRY_SECONDS", 0):
             backend = backend_config._harden_pcss_backend(Backend())
-            with self.assertRaises(httpx.ReadTimeout):  # not retried: could duplicate a job
-                backend.submit(object())
-        self.assertEqual(Backend.attempts, 2)
+            # a timeout may leave one orphan job server-side (~18 s billed); giving up would stop the run
+            self.assertEqual(backend.submit(object()), "id")
+        self.assertEqual(Backend.attempts, 3)
 
 
 if __name__ == "__main__":

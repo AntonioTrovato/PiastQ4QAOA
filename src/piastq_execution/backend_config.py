@@ -88,7 +88,9 @@ def _harden_pcss_backend(backend):
     error while waiting for a result, even though the job is still running
     server-side, and (b) prints every single shot. Waiting is retried (the job
     id is kept, nothing is resubmitted); a submit is retried only when the
-    request provably never reached the server (connect errors)."""
+    request provably never reached the server (connect errors) or timed out
+    (then the job may exist server-side; at worst one orphan job is billed
+    ~18 s, while giving up would stop a multi-day run)."""
     import httpx
 
     original_result, original_submit = backend.result, backend.submit
@@ -110,7 +112,7 @@ def _harden_pcss_backend(backend):
         while True:
             try:
                 return original_submit(circuit)
-            except (httpx.ConnectError, httpx.ConnectTimeout):
+            except (httpx.ConnectError, httpx.TimeoutException):
                 attempts += 1
                 if attempts > _MAX_RETRIES:
                     raise
