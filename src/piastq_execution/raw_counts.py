@@ -41,6 +41,9 @@ class BatchRecord:
     # (e.g. queue/execution timestamps, if the backend reports them).
     job_id: Optional[str] = None
     job_metadata: Optional[Dict[str, Any]] = None
+    # QPU seconds billed for this batch (modeled from the measured PIAST-Q
+    # billing, see qpu_usage.modeled_billed_seconds); None on simulators.
+    billed_seconds: Optional[float] = None
 
 
 @dataclass
@@ -64,6 +67,10 @@ class RawCountsRecord:
     # Depth/size/gate counts of the circuit after transpilation for the
     # backend (see transpiled_circuit_stats) -- None if it couldn't be computed.
     transpiled_stats: Optional[Dict[str, Any]] = None
+    # Sum of the batches' billed QPU seconds; None on simulators. This, not
+    # the wall-clock (which includes minutes of queue wait per job), is the
+    # execution time used by the evaluation on the real machine.
+    total_billed_seconds: Optional[float] = None
 
     def to_json_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -248,14 +255,34 @@ def load_completed_records(path: str) -> Dict[Tuple[str, Any], Dict[str, Any]]:
     return completed
 
 
+MAX_JOB_ATTEMPTS = 3
+
+
+def _submit_and_wait(sampler, circuit):
+    """sampler.run(...).result(), retried when the service ends a job as
+    `failed`/`canceled` (seen once on PIAST-Q; a failed job is billed 0 s).
+    Any other error is not retried."""
+    last_error = None
+    for attempt in range(1, MAX_JOB_ATTEMPTS + 1):
+        try:
+            job = sampler.run([circuit])
+            return job, job.result()
+        except RuntimeError as exc:
+            if "status:" not in str(exc):
+                raise
+            last_error = exc
+            print(f"  [retry] {exc} (attempt {attempt}/{MAX_JOB_ATTEMPTS})")
+            time.sleep(5)
+    raise last_error
+
+
 def _run_one_batch(circuit, sampler, shots: int, batch_index: int) -> BatchRecord:
-    from piastq_execution.qpu_usage import check_budget
+    from piastq_execution.qpu_usage import check_budget, modeled_billed_seconds
 
     check_budget()
     sampler.options.shots = shots
     start = time.time()
-    job = sampler.run([circuit])
-    result = job.result()
+    job, result = _submit_and_wait(sampler, circuit)
     elapsed = time.time() - start
     job_info = _job_info(job, result)
 
@@ -271,6 +298,7 @@ def _run_one_batch(circuit, sampler, shots: int, batch_index: int) -> BatchRecor
         wall_clock_seconds=elapsed,
         job_id=job_info["job_id"],
         job_metadata=job_info["job_metadata"],
+        billed_seconds=modeled_billed_seconds(shots),
     )
 
 
@@ -375,12 +403,210 @@ def run_circuit_with_batching_recorded(
         total_shots_requested=sum(b.shots_requested for b in batch_records),
         total_shots_returned=sum(b.shots_returned for b in batch_records),
         total_wall_clock_seconds=sum(b.wall_clock_seconds for b in batch_records),
+        total_billed_seconds=(
+            sum(b.billed_seconds for b in batch_records)
+            if all(b.billed_seconds is not None for b in batch_records) else None
+        ),
         aggregated_counts=dict(total_counts),
         twirl_mask=list(twirl_mask) if twirl_mask is not None else None,
         transpiled_stats=transpiled_circuit_stats(circuit, backend, optimization_level, initial_layout),
     )
 
     return total_counts, record
+
+
+MAX_IN_FLIGHT_ENV = "PIASTQ_MAX_IN_FLIGHT"
+
+
+def max_jobs_in_flight() -> int:
+    """How many circuits may be submitted to the service at once (env var set
+    by run_all.py for the real machine; 1 = strictly sequential, the default
+    and what simulators use). On PIAST-Q every job waits minutes in the shared
+    queue, so sequential submission is limited by that wait, not by the 18.5 s
+    of QPU time -- queueing many jobs together overlaps the waits."""
+    try:
+        return max(1, int(os.environ.get(MAX_IN_FLIGHT_ENV, "1")))
+    except ValueError:
+        return 1
+
+
+def run_circuits_concurrently(specs, make_sampler, on_record=None, max_workers: Optional[int] = None):
+    """Runs several independent circuits at once.
+
+    `specs`: list of dicts, each holding `circuit` plus every other keyword of
+    `run_circuit_with_batching_recorded` (circuit_id, iteration_id, ...).
+    `make_sampler`: builds a fresh sampler per circuit -- samplers carry
+    mutable state (shots, transpile layout), so threads must not share one.
+    `on_record(record)`: called in the CALLING thread as each circuit finishes
+    (not for circuits reused by --resume), so results reach disk immediately.
+
+    Returns [(counts, record)] in `specs` order. If any circuit fails (e.g.
+    BudgetExceeded), circuits not yet started are cancelled, those already in
+    flight still finish and are recorded, and the first error is re-raised.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    workers = max_workers or max_jobs_in_flight()
+    results = [None] * len(specs)
+
+    def run_one(index):
+        spec = dict(specs[index])
+        circuit = spec.pop("circuit")
+        return run_circuit_with_batching_recorded(circuit, make_sampler(), **spec)
+
+    if workers <= 1 or len(specs) <= 1:
+        for index in range(len(specs)):
+            results[index] = run_one(index)
+            if on_record is not None and results[index][1] is not None:
+                on_record(results[index][1])
+        return results
+
+    first_error = None
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(run_one, index): index for index in range(len(specs))}
+        for future in as_completed(futures):
+            if future.cancelled():
+                continue
+            try:
+                results[futures[future]] = future.result()
+            except BaseException as exc:  # noqa: BLE001 - re-raised below
+                if first_error is None:
+                    first_error = exc
+                    for other in futures:
+                        other.cancel()
+                continue
+            record = results[futures[future]][1]
+            if on_record is not None and record is not None:
+                on_record(record)
+    if first_error is not None:
+        raise first_error
+    return results
+
+
+def _member_batch(joint_batch: BatchRecord, offset: int, width: int, total_width: int, pack_info: Dict[str, Any]) -> BatchRecord:
+    from dataclasses import replace
+
+    from piastq_execution.packing import marginalize_counts
+
+    marginal = marginalize_counts(joint_batch.raw_counts, offset, width)
+    metadata = dict(joint_batch.job_metadata) if isinstance(joint_batch.job_metadata, dict) else {}
+    metadata["pack"] = pack_info
+    return replace(
+        joint_batch,
+        raw_counts=marginal,
+        shots_returned=sum(marginal.values()),
+        job_metadata=metadata,
+        # the job's billed time is shared between its circuits by qubit share
+        billed_seconds=(joint_batch.billed_seconds * width / total_width
+                        if joint_batch.billed_seconds is not None else None),
+    )
+
+
+def member_record_from_joint(joint: RawCountsRecord, spec: Dict[str, Any], placement, total_width: int,
+                             pack_info: Dict[str, Any]) -> RawCountsRecord:
+    """The ordinary one-circuit RawCountsRecord of one member of a packed job:
+    its own marginal counts, its physical qubits, and its share of the job's
+    time, so everything downstream (evaluation, mitigation, statistics) treats
+    it exactly like a circuit that had been run alone."""
+    batches = [_member_batch(b, placement.offset, placement.width, total_width, pack_info)
+               for b in joint.batches]
+    counts: Counter = Counter()
+    for batch in batches:
+        for bitstring, count in batch.raw_counts.items():
+            counts[bitstring] += count
+    stats = dict(joint.transpiled_stats) if isinstance(joint.transpiled_stats, dict) else None
+    if stats is not None:
+        stats["note"] = "statistics of the whole packed job, not of this circuit alone"
+    return RawCountsRecord(
+        algorithm=spec["algorithm"],
+        objective_mode=spec["objective_mode"],
+        dataset=spec["dataset"],
+        circuit_id=spec["circuit_id"],
+        cluster_id=spec.get("cluster_id"),
+        iteration_id=spec.get("iteration_id"),
+        subproblem_id=spec.get("subproblem_id"),
+        backend_name=joint.backend_name,
+        backend_version=joint.backend_version,
+        physical_qubit_mapping={i: placement.start + i for i in range(placement.width)},
+        batches=batches,
+        total_shots_requested=sum(b.shots_requested for b in batches),
+        total_shots_returned=sum(b.shots_returned for b in batches),
+        total_wall_clock_seconds=sum(b.wall_clock_seconds for b in batches),
+        aggregated_counts=dict(counts),
+        twirl_mask=list(spec["twirl_mask"]) if spec.get("twirl_mask") is not None else None,
+        transpiled_stats=stats,
+        total_billed_seconds=(sum(b.billed_seconds for b in batches)
+                              if all(b.billed_seconds is not None for b in batches) else None),
+    )
+
+
+def run_packed_circuits(specs, make_sampler, on_record=None, max_workers: Optional[int] = None, slots=None,
+                        label: str = "pack"):
+    """Runs many independent circuits as few hardware jobs as possible.
+
+    `specs` as for `run_circuits_concurrently` (each with its `circuit`,
+    `circuit_id`, `iteration_id`, optional `twirl_mask`, `completed`, shot
+    settings; `initial_layout` is ignored -- placement is decided here, see
+    piastq_execution.packing). Circuits are packed into jobs of up to 20
+    qubits, the jobs run concurrently, and each circuit gets back its own
+    marginal counts and its own RawCountsRecord, exactly like an unpacked run.
+
+    Returns [(counts, record)] in `specs` order; `record` is None for circuits
+    reused by --resume (already in the raw-counts file, so not written again).
+    A job is skipped entirely when all its circuits were already completed.
+    """
+    from piastq_execution.packing import build_packed_circuit, load_pack_slots, plan_packs
+
+    slots = list(slots) if slots is not None else load_pack_slots()
+    widths = [spec["circuit"].remove_final_measurements(inplace=False).num_qubits for spec in specs]
+    packs = plan_packs(widths, slots)
+    results = [None] * len(specs)
+
+    def key(spec):
+        return (spec["circuit_id"], spec.get("iteration_id"))
+
+    def prior_of(spec):
+        completed = spec.get("completed") or {}
+        return completed.get(key(spec))
+
+    pack_specs, pack_by_id = [], {}
+    for number, pack in enumerate(packs):
+        priors = [prior_of(specs[p.member_index]) for p in pack]
+        if all(prior is not None for prior in priors):
+            for placement, prior in zip(pack, priors):
+                results[placement.member_index] = (Counter(prior["aggregated_counts"]), None)
+            print(f"  [resume] {label}{number}: all {len(pack)} circuits already executed")
+            continue
+        combined, layout = build_packed_circuit([spec["circuit"] for spec in specs], pack)
+        base = specs[pack[0].member_index]
+        pack_id = f"{label}{number}"
+        pack_by_id[pack_id] = pack
+        pack_specs.append(dict(
+            circuit=combined, algorithm=base["algorithm"], objective_mode=base["objective_mode"],
+            dataset=base["dataset"], circuit_id=pack_id, backend=base["backend"],
+            iteration_id=base.get("iteration_id"), shots_per_batch=base["shots_per_batch"],
+            num_batches=base["num_batches"], remainder_shots=base["remainder_shots"],
+            initial_layout=layout, record_qubit_mapping=False))
+        print(f"  [pack] {pack_id}: {len(pack)} circuits, {combined.num_qubits} qubits "
+              f"(widths {[p.width for p in pack]})")
+
+    def on_joint(joint):
+        pack = pack_by_id[joint.circuit_id]
+        total_width = sum(p.width for p in pack)
+        info = {"pack_id": joint.circuit_id, "job_qubits": total_width, "members": len(pack)}
+        for placement in pack:
+            spec = specs[placement.member_index]
+            prior = prior_of(spec)
+            if prior is not None:               # --resume: keep the saved result, write nothing
+                results[placement.member_index] = (Counter(prior["aggregated_counts"]), None)
+                continue
+            record = member_record_from_joint(joint, spec, placement, total_width, info)
+            results[placement.member_index] = (Counter(record.aggregated_counts), record)
+            if on_record is not None:
+                on_record(record)
+
+    run_circuits_concurrently(pack_specs, make_sampler, on_record=on_joint, max_workers=max_workers)
+    return results
 
 
 class RawCountsWriter:

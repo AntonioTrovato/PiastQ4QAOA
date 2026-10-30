@@ -56,8 +56,8 @@ play. It uses whatever backend `configs/backend.yaml` names: the default
 backend there (`backend_name: piast_q`, token in `PIASTQ_API_TOKEN`) **and**
 set `ALLOW_REAL_HARDWARE = True` at the top of `run_all.py` (without it the
 script refuses to start on a non-simulator). The real machine is reached
-through the PCSS service (`pcss-qapi`, VPN on) and needs a **Python 3.11+**
-environment (§10 C).
+through the PCSS service (`pcss-qapi`, VPN on); the same single environment
+serves the simulated and the real run (§2).
 
 Stages: unit tests -> QUBO backfill (adds the QUBO coefficients evaluation
 needs to circuits trained before they were persisted; no retraining) ->
@@ -84,17 +84,44 @@ Without `--resume` a re-run starts from scratch.
 
 **What counts as QPU time.** The 25 h are the *billed* device time, not
 wall-clock: queue wait is free. Measured on PIAST-Q (2026-10-29): one 200-shot
-batch is billed **18.4974 s**, the same for 1-, 3- and 7-qubit circuits (100
+job is billed **18.4974 s**, the same for 1-, 3- and 7-qubit circuits (100
 shots: 10.0774 s). The operators' "about 15 s" is the optimistic figure; the
-plan uses the measured one.
+plan uses the measured one. The execution times in the results are this billed
+time (each packed circuit gets its qubit share of its job's time), not
+wall-clock.
+
+**Why circuits are packed (the real bottleneck is wall-clock).** Every job
+holds the machine for about 3-5 minutes of unbilled overhead, whatever its
+size (measured: 170-290 s from start to result for 18.5 s billed), and jobs
+wait in a shared queue. One circuit per job would need ~4,400 jobs, i.e. 9-15
+days. So `piastq_execution/packing.py` places several independent circuits
+side by side on disjoint qubits of the 20-qubit machine, inside three fixed
+slots (qubits 0-6, 7-13, 14-19; `pack_slots` in `configs/backend.yaml`), runs
+them as one job and splits the counts per circuit afterwards. Each circuit
+keeps its own 200 shots, its own record (`physical_qubit_mapping` tells where
+it ran) and its own results. About 940 execution jobs + 130 calibration + 2
+drift = ~1,070 jobs: ~5.5 billed QPU hours and ~60 hours of wall-clock. Up to
+16 jobs are queued at once (`MAX_JOBS_IN_FLIGHT` in `run_all.py`). Cost of the
+design, to state in the paper: circuits run next to each other (possible
+readout crosstalk) and not on qubits 0-6 alone. Nearly all trained circuits
+contain no two-qubit gates, so the packed circuits do not interact
+computationally.
+
+**Calibration under packing.** M3: 2 jobs (all qubits |0>, all |1>) give each of
+the 20 qubits its assignment matrix. MEM: 128 jobs, in which every slot cycles
+through its own basis states at the same time, give each slot's full confusion
+matrix; a circuit placed on a smaller window of a slot gets the window's
+matrix by marginalisation (verified in the tests against exact tensor
+products). `calibration/` therefore holds one M3 file (qubits 0-19) and one
+MEM file per slot.
 
 **The reduced run configured in `configs/execution_plan.yaml`** (25 QPU-hours
 available): QAOA-TCS only. Multi-objective: `gzip` + `flex`. Single-objective:
 `paintcontrol` + `gsdtsr`. Methods raw + MEM + M3 + TREx; 5 repetitions; 200
-shots/circuit; 2 TREx twirl instances; estimated 22.33 h (+0.29 h drift check =
-22.6 h at 18.4974 s/batch, 4,402 batches, about 2.4 h of reserve; the 25 h limit
-holds while a batch is billed at most about 20.4 s, which the pilot gate
-checks). Six repetitions (26.8 h) do not fit. Other combos are skipped by
+shots/circuit; 2 TREx twirl instances. The budget planner's figure (22.33 h,
+4,346 jobs at 18.4974 s) is the conservative one-circuit-per-job upper bound;
+with packing the run needs ~1,070 jobs, ~5.5 billed hours (far inside 25 h)
+and ~60 h of wall-clock, which is what limits the schedule. Other combos are skipped by
 the execution scripts and by evaluation. Selection is feasibility-driven (QPU
 budget, 6 Nov deadline); the paper must say so. IGDec-QAOA was dropped because
 only `paintcontrol` is affordable for it (`iofrol` alone is ~25 h of raw runs
@@ -197,17 +224,20 @@ top of the file — this works regardless of which script you run because
 
 ## 2. Requirements
 
-- **Python 3.10.\*** for everything except the real machine (simulated run,
-  tests, evaluation). **Real PIAST-Q runs need Python 3.11+** because
-  `pcss-qapi` (the PCSS access library) requires it; see §10 C for that
-  environment.
+- **Python 3.12** (3.11 or newer is required by `pcss-qapi`, the PCSS access
+  library for the real PIAST-Q machine). One single environment is used for
+  everything: simulated run, tests, evaluation and the real run.
 
 ```bash
-python3.10 -m venv qiskit_env
+python3.12 -m venv qiskit_env
 source qiskit_env/bin/activate
-pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 ```
+
+`requirements.txt` pins the tested set (`qiskit` 1.4.6, `qiskit-aqt-provider`
+1.15.0, `pcss-qapi` 0.3.2, ...). `qiskit` must stay below 2.x, which the AQT
+provider does not support. The trained circuits are `.qpy` files and the
+results are plain JSON, so nothing stored depends on the library versions.
 
 ---
 
@@ -993,7 +1023,7 @@ instead for the two-sample special case).
 Every test is synthetic (hand-built 1-3 qubit toy circuits/QUBOs, fake
 samplers, tiny Pareto fronts) — none of them call `AQTProvider`/`AQTSampler`,
 run a QAOA training loop, or touch the real trained circuits. They run in
-about two seconds (203 tests total).
+about two seconds (232 tests total).
 
 ---
 
@@ -1001,9 +1031,9 @@ about two seconds (203 tests total).
 
 ### A. One-time setup
 1. Clone the repo (PyCharm: `Get from VCS`).
-2. Interpreter: Python 3.10 virtualenv at `qiskit_env/` inside the project,
-   then `pip install -r requirements.txt`.
-3. Check: `python -m unittest discover -s tests` -> 203 tests pass in ~2 s
+2. Interpreter: Python 3.12 virtualenv at `qiskit_env/` inside the project,
+   then `pip install -r requirements.txt` (§2).
+3. Check: `python -m unittest discover -s tests` -> 232 tests pass in ~2 s
    (never touches a backend).
 
 ### B. Simulated run (free, no QPU, ~20 minutes) - do this first
@@ -1017,15 +1047,11 @@ about two seconds (203 tests total).
    the dry run in a throwaway copy of the repo.
 
 ### C. Real PIAST-Q run
-1. **Environment (Python 3.11+, once)**: `pcss-qapi` does not install on the
-   3.10 `qiskit_env`. Create a second environment and install the tested set:
-   `python3.12 -m venv piastq_env && source piastq_env/bin/activate &&
-   pip install pcss-qapi && pip install -c requirements-piastq-constraints.txt
-   -r requirements-piastq.txt`. (The constraints keep `qiskit` at 1.4.6; without
-   them pip jumps to qiskit 2.x, which the AQT provider does not support.)
-   Run `python -m unittest discover -s tests` there: all tests must pass.
-2. **VPN** on (the `.ovpn` profile from the operators) and the **token** in the
-   environment: `export PIASTQ_API_TOKEN=<token>` (keeps it out of git).
+1. **Environment**: the single `qiskit_env` of §2 (Python 3.12). Check once:
+   `python -m unittest discover -s tests` -> all tests pass.
+2. **Where to run it**: from the PCSS cluster (below) so your laptop can
+   sleep, or locally with the VPN on and `export PIASTQ_API_TOKEN=<token>`
+   (keeps it out of git).
 3. **Clean up**: move/delete the old `results/qaoa_tcs/*` and
    `results/igdec_qaoa/*` (tracked in git, recoverable), and delete
    `calibration/*.json`, `calibration/drift/`, `calibration/backend_snapshots/`
@@ -1037,18 +1063,42 @@ about two seconds (203 tests total).
    (without it the script refuses any backend not starting with
    `offline_simulator`).
 6. **Budget**: `configs/execution_plan.yaml` (shipped: the reduced run, §0:
-   5 repetitions, 2 twirls, 22.6 h) and `QPU_HOURS_LIMIT` in `run_all.py`.
-7. From the repo root, in the Python 3.11+ environment: `python run_all.py`.
-   Before anything runs it checks the VPN/token and prints the billed time
-   left on the account; after calibration the **pilot gate** projects total
-   QPU hours from the *billed* seconds per calibration circuit and aborts
-   before the main execution if above the limit. The run takes many hours
-   (queue wait is not billed but is real time): leave the machine awake.
-8. If it stops for any reason (VPN drop, power, a failed stage, the budget
-   stop): `python run_all.py --resume` continues without repeating finished
-   work (§0, "When does it stop?").
-9. Read `logs/run_summary_*.json` (billed vs. predicted QPU hours) and
-   `results/evaluation/comparison_report.txt`.
+   5 repetitions, 2 twirls; planner upper bound 22.3 h, real ~5.5 billed h)
+   and `QPU_HOURS_LIMIT` in `run_all.py`.
+7. **Run on the PCSS cluster** (Slurm, VPN needed only to ssh in; the
+   partition has no time limit):
+   - Once: `ssh <email>@150.254.192.221`, copy the project there (`rsync -az
+     --exclude qiskit_env --exclude .git ./ <email>@150.254.192.221:PiastQ4QAOA/`),
+     build the environment there (§2; Python 3.12 via `uv python install
+     3.12`, then `uv venv --seed --python 3.12 qiskit_env` and `pip install -r
+     requirements.txt`), and store the token in `~/.piastq_token` (`chmod 600`).
+   - Launch: `cd PiastQ4QAOA && sbatch run_cluster.sh` (the script sets the
+     real-machine switches; the repo files stay on the simulator).
+     Continue after any stop: `sbatch run_cluster.sh --resume`.
+   - Watch: `squeue -u $USER`, `tail -f logs/slurm_*.out`, `tail -f
+     logs/run_all_*.log`. Cancel: `scancel <jobid>`.
+   Locally instead: `python run_all.py` with `qiskit_env` active, VPN on and
+   `PIASTQ_BACKEND_NAME=piast_q PIASTQ_ALLOW_REAL_HARDWARE=1`.
+8. Before anything runs, `run_all.py` checks the token/VPN and prints the
+   billed time left; after calibration the **pilot gate** projects the
+   billed hours from the measured seconds per calibration job and aborts
+   before the main execution if above the limit.
+9. If it stops for any reason (VPN drop, power, a failed stage, the budget
+   stop): `--resume` continues without repeating finished work (§0, "When does
+   it stop?").
+10. Read `logs/run_summary_*.json` (billed vs. predicted QPU hours) and
+    `results/evaluation/comparison_report.txt`.
+
+**What to expect while it runs** (order of appearance): backend snapshot and
+`calibration/m3_q0-1-...-19.json` + three `mem_q*.json` (130 jobs, a few
+hours); the pilot-gate line (about 18.5 s per job, ~5.5 h projected); then per
+dataset (`gsdtsr`, `paintcontrol`, `flex`, `gzip`, in this order of scripts:
+single-objective first) `results/qaoa_tcs/<dataset>/<dataset>-rep-1-raw_counts.jsonl`
+and `...-trex-raw_counts.jsonl` growing as jobs finish (a job completes a
+whole group of circuits at once), the `-rep-1.json` and `-subsuites.json`
+files only when a dataset is done; then `calibration/drift/`, evaluation and
+`comparison_report.txt`. The account's billed time on the PCSS dashboard rises
+by ~18.5 s per finished job.
 
 ### D. Running pieces by hand (optional)
 Each stage of `run_all.py` is an ordinary script, run from its own folder:

@@ -66,7 +66,7 @@ _openqapi_client = None
 
 def get_openqapi_client(config_path: Optional[str] = None):
     """The (cached) authenticated PCSS client when the configured backend is
-    PIAST-Q, else None. Needs Python >= 3.11 and `pip install pcss-qapi`."""
+    PIAST-Q, else None. Needs `pcss-qapi` (in requirements.txt; Python >= 3.11)."""
     global _openqapi_client
     api_token, backend_name = load_backend_config(config_path)
     if not is_pcss_backend(backend_name):

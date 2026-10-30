@@ -11,6 +11,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import hermetic_env  # noqa: F401,E402  (scrubs PIASTQ_* variables)
+
 from piastq_execution.backend_config import load_backend_config
 
 

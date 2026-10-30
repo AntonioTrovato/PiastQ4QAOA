@@ -8,6 +8,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from piastq_execution.raw_counts import (
+    run_packed_circuits,
     run_circuit_with_batching_recorded,
     RawCountsWriter,
     load_completed_records,
@@ -16,7 +17,6 @@ from piastq_execution.statistics import pareto_front_indices
 from piastq_execution.backend_calibration_snapshot import save_backend_calibration_snapshot
 from piastq_execution.backend_config import get_backend
 from piastq_execution.budget_planner import resolve_all_combo_settings
-from piastq_execution.qubit_layout import physical_layout_for_width
 from piastq_execution.mitigation import (
     build_trex_twirled_circuit,
     generate_random_twirl_mask,
@@ -485,9 +485,12 @@ def run_hardware_execution():
     backend = get_backend()
     save_backend_calibration_snapshot(backend)
 
-    sampling_sampler = AQTSampler(backend)
-
-    sampling_sampler.set_transpile_options(optimization_level=3)
+    def make_sampler():
+        # one sampler per circuit: samplers hold mutable state (shots, layout),
+        # so circuits running at the same time must not share one
+        sampler = AQTSampler(backend)
+        sampler.set_transpile_options(optimization_level=3)
+        return sampler
 
     base_results_dir = os.path.join("..", "..", "results", "qaoa_tcs")
     os.makedirs(base_results_dir, exist_ok=True)
@@ -565,6 +568,11 @@ def run_hardware_execution():
                 final_selected_tests = []
                 experiment_cluster_assignments = []
 
+                # Phase 1: every circuit of this repetition -- raw + TREx twirls of
+                # every cluster. They are independent (the trained circuits are
+                # fixed), so Phase 2 can have many in flight at once.
+                specs = []
+                raw_spec_index = {}
                 for cluster_idx, qubo in enumerate(qubos_dictionary[sir_program]):
 
                     filename = os.path.join(
@@ -582,10 +590,9 @@ def run_hardware_execution():
 
                     circuit = circuits[0]
 
-                    s = time.time()
-                    counts, raw_record = run_circuit_with_batching_recorded(
-                        circuit,
-                        sampling_sampler,
+                    raw_spec_index[cluster_idx] = len(specs)
+                    specs.append(dict(
+                        circuit=circuit,
                         algorithm="qaoa_tcs",
                         objective_mode="multi_objective",
                         dataset=sir_program,
@@ -596,29 +603,21 @@ def run_hardware_execution():
                         shots_per_batch=settings.shots_per_batch,
                         num_batches=settings.num_batches,
                         remainder_shots=settings.remainder_shots,
-                        initial_layout=physical_layout_for_width(circuit.num_qubits),
                         completed=completed_raw,
-                    )
-                    e = time.time()
+                    ))
 
-                    if raw_record is not None:
-                        raw_counts_writer.write(raw_record)
-
-                    # TREx: a distinct hardware pass per twirl instance --
-                    # cannot reuse the raw counts above. Written to a
-                    # separate file since it's mitigation data, not the raw
-                    # baseline; evaluation-time undoing/aggregation is
-                    # piastq_execution.mitigation.aggregate_trex_records().
-                    # Skipped entirely if the plan dropped TREx for this
-                    # combo -- running it anyway would silently blow past
-                    # whatever budget the plan was computed for.
+                    # TREx: a distinct hardware pass per twirl instance -- cannot
+                    # reuse the raw counts. Written to a separate file (mitigation
+                    # data, not the raw baseline). Skipped entirely if the plan
+                    # dropped TREx for this combo: running it anyway would blow
+                    # past the budget the plan was computed for. Masks are drawn
+                    # here, in a fixed order, so the run stays reproducible.
                     if settings.trex_enabled:
                         for twirl_idx in range(trex_twirl_instances):
                             twirl_mask = generate_random_twirl_mask(circuit.num_qubits, rng=trex_rng)
                             twirled_circuit = build_trex_twirled_circuit(circuit, twirl_mask)
-                            _trex_counts, trex_record = run_circuit_with_batching_recorded(
-                                twirled_circuit,
-                                sampling_sampler,
+                            specs.append(dict(
+                                circuit=twirled_circuit,
                                 algorithm="qaoa_tcs",
                                 objective_mode="multi_objective",
                                 dataset=sir_program,
@@ -630,13 +629,29 @@ def run_hardware_execution():
                                 num_batches=settings.num_batches,
                                 remainder_shots=settings.remainder_shots,
                                 twirl_mask=twirl_mask,
-                                initial_layout=physical_layout_for_width(twirled_circuit.num_qubits),
                                 completed=completed_trex,
-                            )
-                            if trex_record is not None:
-                                trex_counts_writer.write(trex_record)
+                            ))
 
-                    qpu_run_times.append((e - s) * 1000)
+                # Phase 2: execute. Circuits are packed side by side into as few
+                # hardware jobs as possible (piastq_execution/packing.py) and the
+                # jobs run concurrently; each circuit gets its own counts and
+                # record, written the moment its job finishes (an interrupted
+                # run keeps everything done so far).
+                def write_record(record):
+                    writer = trex_counts_writer if record.twirl_mask is not None else raw_counts_writer
+                    writer.write(record)
+
+                results = run_packed_circuits(
+                    specs, make_sampler, on_record=write_record,
+                    label=f"{sir_program}_rep{reps}_exp{exp_id}_job")
+
+                # Phase 3: selection from each cluster's raw counts
+                for cluster_idx, qubo in enumerate(qubos_dictionary[sir_program]):
+                    counts, raw_record = results[raw_spec_index[cluster_idx]]
+                    prior = completed_raw.get((f"{sir_program}_rep{reps}_cluster{cluster_idx}", exp_id))
+                    run_seconds = raw_record.total_wall_clock_seconds if raw_record is not None else (
+                        prior["total_wall_clock_seconds"] if prior else 0.0)
+                    qpu_run_times.append(run_seconds * 1000)
 
                     most_likely = max(counts.items(), key=lambda x: x[1])[0]
                     bitstring = [int(b) for b in most_likely[::-1]]

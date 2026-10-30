@@ -24,7 +24,7 @@ PIASTQ_* env vars): the default `offline_simulator_no_noise` is a free local
 dry run. To run on the real machine, set `backend_name: piast_q` there (token
 via PIASTQ_API_TOKEN) AND flip ALLOW_REAL_HARDWARE below -- without it this
 script refuses to start on anything but an offline simulator. The real
-machine needs Python >= 3.11 with `pip install pcss-qapi` (see README).
+machine is reached through `pcss-qapi` (Python >= 3.11; README section 2).
 
 When does it stop?
   * a stage that fails (non-zero exit) stops the whole run -- no later stage
@@ -35,6 +35,9 @@ When does it stop?
     QPU time (PCSS /me/usage) and refuses to submit one that would cross
     QPU_HOURS_LIMIT (piastq_execution/qpu_usage.py) -- the stage stops
     cleanly with everything so far saved.
+  On the real machine up to MAX_JOBS_IN_FLIGHT circuits are submitted at once:
+  every job waits minutes in the service's shared queue, so one-at-a-time
+  submission would take weeks even though the QPU time is only 18.5 s per job.
   * It does NOT stop on its own for network trouble: dropped connections are
     retried for ~30 min per call; if that fails the stage dies, and
     `python run_all.py --resume` continues where it stopped (circuits already
@@ -62,13 +65,14 @@ from datetime import datetime
 # --------------------------------------------------------------------------
 # Settings
 # --------------------------------------------------------------------------
-ALLOW_REAL_HARDWARE = False        # must be True to run on anything but an offline simulator
+ALLOW_REAL_HARDWARE = os.environ.get("PIASTQ_ALLOW_REAL_HARDWARE") == "1"
+                                   # off unless run_cluster.sh (or you) sets PIASTQ_ALLOW_REAL_HARDWARE=1 -- or edit to True
 RUN_UNIT_TESTS = True
 RUN_DRIFT_CHECK = True             # ~56 extra calibration circuits at the end
 QPU_HOURS_LIMIT = 25.0             # total QPU time available (BILLED time, queue wait is free)
-STOP_MARGIN_SECONDS = 120.0        # hardware batches stop this far below the limit
+MAX_JOBS_IN_FLIGHT = 16            # real machine only: circuits submitted at once (waits in the queue overlap)
 ABORT_IF_PROJECTION_EXCEEDS_LIMIT = True   # pilot gate (stage 4)
-DRIFT_CIRCUITS = 56                # M3 circuits for widths 1..7 (2 * sum(1..7))
+MINUTES_PER_JOB_ESTIMATE = 3.4     # measured machine time per job on PIAST-Q (wall-clock, informational)
 SINGLE_OBJECTIVE_DATASETS = {"gsdtsr", "iofrol", "paintcontrol", "elevator", "elevator2"}
 MULTI_OBJECTIVE_DATASETS = {"flex", "grep", "gzip", "sed"}
 
@@ -89,15 +93,30 @@ def _banner(text: str) -> None:
     print("\n" + "=" * 78 + f"\n{text}\n" + "=" * 78, flush=True)
 
 
-def _run(name: str, args: list, cwd: str, log) -> float:
+def _is_real_backend() -> bool:
+    from piastq_execution.backend_config import load_backend_config
+
+    return not load_backend_config()[1].startswith("offline_simulator")
+
+
+def _run(name: str, args: list, cwd: str, log, clean_env: bool = False) -> float:
     """Runs one stage as a subprocess, echoing output to console + log.
     Returns elapsed seconds; raises StageFailed on a non-zero exit."""
     _banner(f"STAGE: {name}")
     start = time.time()
+    # With N jobs in flight, up to N already-submitted jobs are still billed after
+    # the last budget check, so the stop margin covers them (plus two spare).
+    margin = (MAX_JOBS_IN_FLIGHT + 2) * 18.4974
     env = dict(os.environ, PYTHONUNBUFFERED="1",
-               PIASTQ_QPU_LIMIT_SECONDS=str(QPU_HOURS_LIMIT * 3600 - STOP_MARGIN_SECONDS))
+               PIASTQ_QPU_LIMIT_SECONDS=str(QPU_HOURS_LIMIT * 3600 - margin))
+    if _is_real_backend():
+        env["PIASTQ_MAX_IN_FLIGHT"] = str(MAX_JOBS_IN_FLIGHT)
     if RESUME:
         env["PIASTQ_RESUME"] = "1"
+    if clean_env:
+        # the unit tests must never see (or touch) the real-run settings
+        env = {k: v for k, v in env.items() if not k.startswith("PIASTQ_")}
+        env["PYTHONUNBUFFERED"] = "1"
     proc = subprocess.Popen(
         [PY] + args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
@@ -139,7 +158,7 @@ def _check_real_backend_ready() -> None:
         return
     if sys.version_info < (3, 11):
         raise SystemExit(f"PIAST-Q access (pcss-qapi) needs Python >= 3.11; this is {sys.version.split()[0]}. "
-                         f"Start run_all.py from the Python 3.11+ environment (see README, section C).")
+                         f"Start run_all.py from the Python 3.12 qiskit_env (README section 2).")
     try:
         import pcss_qapi  # noqa: F401
     except ImportError:
@@ -173,63 +192,72 @@ def _plan():
     config = load_config(config_path)
     inventories = build_inventories_from_config(config_path, os.path.join(ROOT, "trained_qaoa_circuits"))
     plans = plan_all(config, inventories)
-    return config, plans
+    return config, plans, inventories
 
 
-def _planned_batches(config, plans) -> float:
-    return sum(p.estimated_seconds for p in plans) / config.cost_model.seconds_per_batch
+def _packed_job_estimate(config, plans, inventories) -> dict:
+    """Hardware jobs the run needs with circuits packed side by side
+    (piastq_execution/packing.py): each (dataset, repetition) packs its raw
+    circuits plus the TREx twirl copies; plus calibration and the drift check.
+    The budget planner's own hours are the conservative one-circuit-per-job
+    upper bound."""
+    from piastq_execution.packing import count_jobs
+    from piastq_execution.run_calibration import calibration_job_count
+
+    execution = 0
+    for plan in plans:
+        for combo, methods in plan.methods_by_combo.items():
+            widths = [r.num_qubits for r in inventories[combo].repetition_units[0]]
+            passes = 1 + (config.cost_model.trex_twirl_instances if "trex" in methods else 0)
+            execution += plan.repetitions * count_jobs(widths * passes)
+    calibration = calibration_job_count()
+    drift = 2 if RUN_DRIFT_CHECK else 0
+    return {"execution_jobs": execution, "calibration_jobs": calibration, "drift_jobs": drift,
+            "total_jobs": execution + calibration + drift}
 
 
-def _measured_seconds_per_circuit() -> float | None:
-    """Mean measured wall-clock per 200-shot calibration circuit, from the
-    MEM/M3 calibration files the calibration stage just wrote."""
-    total_seconds = 0.0
-    total_circuits = 0
+def _measured_seconds_per_job() -> float | None:
+    """Simulator fallback: mean measured wall-clock per calibration job, from
+    the calibration files the calibration stage just wrote."""
+    rates = []
     for path in glob.glob(os.path.join(ROOT, "calibration", "*_q*.json")):
         with open(path) as f:
             rec = json.load(f)
-        width = rec["num_qubits"]
-        circuits = 2 ** width if rec["method"] == "mem" else 2 * width
-        total_seconds += rec["calibration_wall_clock_seconds"]
-        total_circuits += circuits
-    return total_seconds / total_circuits if total_circuits else None
+        rates.append(rec["calibration_wall_clock_seconds"] / max(1, rec["data"].get("calibration_jobs", 1)))
+    return sum(rates) / len(rates) if rates else None
 
 
-def _calibration_circuit_count() -> int:
-    total = 0
-    for path in glob.glob(os.path.join(ROOT, "calibration", "*_q*.json")):
-        with open(path) as f:
-            rec = json.load(f)
-        width = rec["num_qubits"]
-        total += 2 ** width if rec["method"] == "mem" else 2 * width
-    return total
-
-
-def _pilot_gate(config, plans, calibration_billed_seconds=None) -> dict:
+def _pilot_gate(config, jobs, calibration_billed_seconds=None) -> dict:
     """Projects the whole run from the calibration stage. With a real backend
-    the rate is the BILLED seconds per calibration circuit (queue wait is not
+    the rate is the BILLED seconds per calibration job (queue wait is not
     billed, so it must not inflate the projection); on a simulator there is no
     billing and the wall-clock figure is used instead."""
-    batches = _planned_batches(config, plans) + (DRIFT_CIRCUITS if RUN_DRIFT_CHECK else 0)
-    planned_hours = batches * config.cost_model.seconds_per_batch / 3600
-    circuits = _calibration_circuit_count()
-    if calibration_billed_seconds is not None and calibration_billed_seconds > 0 and circuits:
-        measured = calibration_billed_seconds / circuits
+    from piastq_execution.run_calibration import calibration_job_count
+
+    total_jobs = jobs["total_jobs"]
+    planned_hours = total_jobs * config.cost_model.seconds_per_batch / 3600
+    calibration_jobs = calibration_job_count()
+    if calibration_billed_seconds is not None and calibration_billed_seconds > 0:
+        measured = calibration_billed_seconds / calibration_jobs
         source = "billed"
     else:
-        measured = _measured_seconds_per_circuit()
+        measured = _measured_seconds_per_job()
         source = "wall-clock"
-    info = {"planned_batches": batches, "planned_hours_at_assumed_rate": planned_hours,
-            "assumed_seconds_per_batch": config.cost_model.seconds_per_batch,
-            "measured_seconds_per_batch": measured, "measured_source": source}
+    info = {**jobs, "planned_hours_at_assumed_rate": planned_hours,
+            "assumed_seconds_per_job": config.cost_model.seconds_per_batch,
+            "measured_seconds_per_job": measured, "measured_source": source,
+            "expected_wall_clock_hours": total_jobs * MINUTES_PER_JOB_ESTIMATE / 60}
+    print(f"Jobs: {jobs['execution_jobs']} execution + {jobs['calibration_jobs']} calibration + "
+          f"{jobs['drift_jobs']} drift = {total_jobs}; at ~{MINUTES_PER_JOB_ESTIMATE} min of machine time "
+          f"per job that is ~{info['expected_wall_clock_hours']:.0f} h of wall-clock.")
     if measured is None:
         print("Pilot gate: no calibration data found, cannot project QPU time.")
         return info
-    projected = batches * measured / 3600
+    projected = total_jobs * measured / 3600
     info["projected_hours_at_measured_rate"] = projected
-    print(f"Pilot gate: {batches:.0f} batches planned; measured {measured:.2f}s/batch ({source}) "
-          f"(assumed {config.cost_model.seconds_per_batch}s) -> projected {projected:.2f}h "
-          f"of {QPU_HOURS_LIMIT}h")
+    print(f"Pilot gate: measured {measured:.2f}s/job ({source}) (assumed "
+          f"{config.cost_model.seconds_per_batch}s) -> projected {projected:.2f}h of billed QPU time "
+          f"(limit {QPU_HOURS_LIMIT}h)")
     if projected > QPU_HOURS_LIMIT and ABORT_IF_PROJECTION_EXCEEDS_LIMIT:
         raise StageFailed(
             f"projected QPU time {projected:.2f}h exceeds the {QPU_HOURS_LIMIT}h limit at the measured "
@@ -275,7 +303,7 @@ def main() -> int:
                 print("RESUME mode: keeping existing raw counts / calibration, only missing work is executed.")
             else:
                 _archive_old_raw_counts(stamp)
-            config, plans = _plan()
+            config, plans, inventories = _plan()
 
             stages = []
             if RUN_UNIT_TESTS:
@@ -298,7 +326,7 @@ def main() -> int:
             def run_stage(stage):
                 name, args, cwd = stage
                 try:
-                    summary["stages"][name] = round(_run(name, args, cwd, log), 1)
+                    summary["stages"][name] = round(_run(name, args, cwd, log, clean_env=(name == "unit tests")), 1)
                 finally:
                     summary.setdefault("billed_seconds_after_stage", {})[name] = billed_seconds()
 
@@ -311,7 +339,7 @@ def main() -> int:
                     if after is not None:
                         calibration_billed = after - before
 
-            summary["pilot_gate"] = _pilot_gate(config, plans, calibration_billed)
+            summary["pilot_gate"] = _pilot_gate(config, _packed_job_estimate(config, plans, inventories), calibration_billed)
 
             execution_stages = []
             if has_single:

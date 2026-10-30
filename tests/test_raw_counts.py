@@ -14,6 +14,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import hermetic_env  # noqa: F401,E402  (scrubs PIASTQ_* variables)
+
 from piastq_execution.raw_counts import (
     counts_from_quasi_probabilities,
     run_circuit_with_batching_recorded,

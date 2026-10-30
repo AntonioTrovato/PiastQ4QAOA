@@ -25,10 +25,26 @@ LIMIT_ENV = "PIASTQ_QPU_LIMIT_SECONDS"
 DEVICE_NAME = "PIAST-Q"
 # Measured billing of one 200-shot batch (see module docstring).
 BILLED_SECONDS_PER_200_SHOT_BATCH = 18.4974
+# Billing model fitted on the account usage counter: 100 shots -> 10.0774 s,
+# 200 shots -> 18.4974 s (1-, 3- and 7-qubit circuits alike).
+BILLED_FIXED_SECONDS = 1.6574
+BILLED_SECONDS_PER_SHOT = 0.0842
 
 
 class BudgetExceeded(RuntimeError):
     pass
+
+
+def modeled_billed_seconds(shots: int) -> Optional[float]:
+    """QPU seconds one batch of `shots` shots is billed on PIAST-Q, or None on
+    anything that is not the real machine (simulators bill nothing). Used for
+    the execution-time metrics: on the real machine wall-clock is dominated by
+    queue wait (minutes per job), which is not QPU time."""
+    from piastq_execution.backend_config import is_pcss_backend, load_backend_config
+
+    if not is_pcss_backend(load_backend_config()[1]):
+        return None
+    return BILLED_FIXED_SECONDS + BILLED_SECONDS_PER_SHOT * shots
 
 
 def billed_seconds() -> Optional[float]:

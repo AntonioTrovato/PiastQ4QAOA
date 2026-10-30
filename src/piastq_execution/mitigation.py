@@ -423,6 +423,9 @@ class CalibrationRecord:
     shots_per_calibration_circuit: int
     calibration_wall_clock_seconds: float  # measured hardware time for every calibration circuit combined
     data: dict  # method-specific: MEM -> {"confusion_matrix": [[...]]}; M3 -> {"single_qubit_cals": [[[...]], ...]}
+    # Billed QPU seconds of every calibration circuit combined (real machine
+    # only; wall-clock above includes queue wait). None on simulators.
+    calibration_billed_seconds: Optional[float] = None
 
     def to_json_dict(self) -> dict:
         return asdict(self)
@@ -445,6 +448,7 @@ def make_mem_calibration_record(
     backend_version: str,
     shots_per_calibration_circuit: int,
     calibration_wall_clock_seconds: float,
+    calibration_billed_seconds: Optional[float] = None,
 ) -> CalibrationRecord:
     return CalibrationRecord(
         method="mem",
@@ -456,6 +460,7 @@ def make_mem_calibration_record(
         shots_per_calibration_circuit=shots_per_calibration_circuit,
         calibration_wall_clock_seconds=calibration_wall_clock_seconds,
         data={"confusion_matrix": confusion_matrix.tolist()},
+        calibration_billed_seconds=calibration_billed_seconds,
     )
 
 
@@ -466,6 +471,7 @@ def make_m3_calibration_record(
     backend_version: str,
     shots_per_calibration_circuit: int,
     calibration_wall_clock_seconds: float,
+    calibration_billed_seconds: Optional[float] = None,
 ) -> CalibrationRecord:
     return CalibrationRecord(
         method="m3",
@@ -477,7 +483,39 @@ def make_m3_calibration_record(
         shots_per_calibration_circuit=shots_per_calibration_circuit,
         calibration_wall_clock_seconds=calibration_wall_clock_seconds,
         data={"single_qubit_cals": [m.tolist() for m in single_qubit_cals]},
+        calibration_billed_seconds=calibration_billed_seconds,
     )
+
+
+def marginal_confusion_matrix(matrix: np.ndarray, num_qubits: int, keep: Sequence[int]) -> np.ndarray:
+    """Confusion matrix of a subset of qubits, from the full matrix of a larger
+    group (A[measured, prepared]; bit k of an index = qubit k).
+
+    `keep`: positions (0..num_qubits-1) of the qubits to keep, ascending; the
+    result's qubit j is `keep[j]`. Measured outcomes of the dropped qubits are
+    summed over, their prepared states averaged uniformly -- the exact marginal
+    when the kept qubits' readout does not depend on the others, and a fair
+    average over the others' states otherwise.
+    """
+    keep = [int(q) for q in keep]
+    if keep != sorted(set(keep)) or not all(0 <= q < num_qubits for q in keep):
+        raise ValueError(f"keep must be ascending, unique positions within 0..{num_qubits - 1}: {keep!r}")
+    tensor = np.asarray(matrix, dtype=float).reshape((2,) * (2 * num_qubits))
+    # axis labels: reshape puts the most significant bit (highest qubit) first
+    labels = [("measured", num_qubits - 1 - i) for i in range(num_qubits)] + \
+             [("prepared", num_qubits - 1 - i) for i in range(num_qubits)]
+    for qubit in range(num_qubits):
+        if qubit in keep:
+            continue
+        axis = labels.index(("measured", qubit))
+        tensor = tensor.sum(axis=axis)
+        labels.pop(axis)
+        axis = labels.index(("prepared", qubit))
+        tensor = tensor.mean(axis=axis)
+        labels.pop(axis)
+    # remaining axes are already in descending-qubit order (measured, then prepared)
+    width = len(keep)
+    return tensor.reshape(2 ** width, 2 ** width)
 
 
 class CalibrationStore:
@@ -512,6 +550,50 @@ class CalibrationStore:
             return None
         with open(path) as f:
             return CalibrationRecord.from_json_dict(json.load(f))
+
+    def load_window(self, method: str, physical_qubits: Sequence[int]) -> Optional[CalibrationRecord]:
+        """Calibration for exactly `physical_qubits` (a circuit's window inside
+        a packed job). An exact record wins; otherwise it is derived from a
+        stored record covering those qubits: M3 -> pick the per-qubit matrices,
+        MEM -> marginalise the slot's confusion matrix
+        (`marginal_confusion_matrix`). The derived record reports the cost of
+        calibrating that window on its own (2**w resp. 2w circuits)."""
+        exact = self.load(method, physical_qubits)
+        if exact is not None:
+            return exact
+        wanted = sorted(int(q) for q in physical_qubits)
+        if not os.path.isdir(self.base_dir):
+            return None
+        for name in sorted(os.listdir(self.base_dir)):
+            if not (name.startswith(f"{method}_q") and name.endswith(".json")):
+                continue
+            with open(os.path.join(self.base_dir, name)) as f:
+                base = CalibrationRecord.from_json_dict(json.load(f))
+            if not set(wanted) <= set(base.physical_qubits):
+                continue
+            positions = [list(base.physical_qubits).index(q) for q in wanted]
+            width = len(wanted)
+            if method == "mem":
+                data = {"confusion_matrix": marginal_confusion_matrix(
+                    base.confusion_matrix(), base.num_qubits, positions).tolist()}
+                circuits = 2 ** width
+            else:
+                cals = base.single_qubit_cals()
+                data = {"single_qubit_cals": [cals[i].tolist() for i in positions]}
+                circuits = 2 * width
+            jobs = max(1, int(base.data.get("calibration_jobs", 1)))
+            per_circuit_billed = (base.calibration_billed_seconds / jobs
+                                  if base.calibration_billed_seconds is not None else None)
+            return CalibrationRecord(
+                method=base.method, num_qubits=width, physical_qubits=wanted,
+                backend_name=base.backend_name, backend_version=base.backend_version,
+                calibration_timestamp=base.calibration_timestamp,
+                shots_per_calibration_circuit=base.shots_per_calibration_circuit,
+                calibration_wall_clock_seconds=base.calibration_wall_clock_seconds / jobs * circuits,
+                data=data,
+                calibration_billed_seconds=(per_circuit_billed * circuits if per_circuit_billed is not None else None),
+            )
+        return None
 
 
 # ---------------------------------------------------------------------------

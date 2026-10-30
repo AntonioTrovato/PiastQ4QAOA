@@ -179,6 +179,19 @@ def load_calibration_for_width(store: CalibrationStore, method: str, num_qubits:
     return store.load(method, physical_qubits=list(range(num_qubits)))
 
 
+def load_calibration_for_record(store: CalibrationStore, method: str, record, num_qubits: int):
+    """Calibration for the physical qubits this circuit actually ran on (its
+    record's qubit mapping -- circuits run packed at different places of the
+    machine). Falls back to qubits 0..w-1 when there is no record. The store
+    derives windows from the stored slot/qubit calibration."""
+    if method not in ("mem", "m3"):
+        return None
+    if record is None or not getattr(record, "physical_qubit_mapping", None):
+        return store.load_window(method, list(range(num_qubits)))
+    mapping = {int(k): int(v) for k, v in record.physical_qubit_mapping.items()}
+    return store.load_window(method, [mapping[i] for i in range(num_qubits)])
+
+
 # ---------------------------------------------------------------------------
 # QAOA-TCS single-objective
 # ---------------------------------------------------------------------------
@@ -227,8 +240,8 @@ def evaluate_qaoa_tcs_single_objective_combo(
             exp_records = [r for r in method_records if r.iteration_id == iteration_id]
 
             calibration_records = [
-                load_calibration_for_width(calibration_store, method, num_qubits)
-                for _linear, _quadratic, num_qubits in cluster_qubos
+                load_calibration_for_record(calibration_store, method, raw_index.get(key), num_qubits)
+                for key, (_linear, _quadratic, num_qubits) in zip(keys, cluster_qubos)
             ]
 
             result = evaluate_single_objective_combo(
@@ -298,8 +311,8 @@ def evaluate_qaoa_tcs_multi_objective_combo(
                 cluster_counts_for_method(method, key, raw_index, trex_aggregated) for key in keys
             ]
             calibration_records = [
-                load_calibration_for_width(calibration_store, method, num_qubits)
-                for _linear, _quadratic, num_qubits in cluster_qubos
+                load_calibration_for_record(calibration_store, method, raw_index.get(key), num_qubits)
+                for key, (_linear, _quadratic, num_qubits) in zip(keys, cluster_qubos)
             ]
 
             # Reuse the single-objective per-cluster correction machinery

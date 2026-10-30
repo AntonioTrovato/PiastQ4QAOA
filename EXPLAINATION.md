@@ -793,7 +793,7 @@ the files on disk (not just what the code is *capable* of):
 | QUBO backfill for the already-trained circuits | ✅ (`... qubos` mode of the three scripts, a stage of `run_all.py`) | ✅ | the old circuits had no QUBO coefficients, so evaluation could not run; they are rebuilt without retraining and checked against the saved circuits (QAOA-TCS: cluster and qubit counts; IGDec-QAOA: the replay must reproduce each sampling's recorded `best_fval`) |
 | Evaluation (`evaluate_all.py`) / comparison (`compare_all.py`) | ✅ | ✅ dry-run only | evaluates only the combos in the plan's pools |
 | Budget planning (`budget_planner.py`) | ✅ | ✅ | `execution_plan/execution_plan_report.{txt,json}` |
-| Unit tests | ✅ | ✅ passing | `./qiskit_env/bin/python -m unittest discover -s tests` → **184 tests, all pass, ~1 second**, entirely synthetic (tiny 1–3 qubit toy circuits/QUBOs, no AQT, no real circuits) |
+| Unit tests | ✅ | ✅ passing | `./qiskit_env/bin/python -m unittest discover -s tests` → **232 tests, all pass, ~2 seconds**, entirely synthetic (tiny 1–3 qubit toy circuits/QUBOs, no AQT, no real circuits) |
 | Qubit-layout pinning + calibration snapshot (§6.4/§6.5) | ✅ | ✅ **verified end-to-end against the real `offline_simulator_no_noise` backend** (not just synthetic tests) | a real execution and a real MEM/M3 calibration circuit, pinned to a deliberately non-default layout (`[3, 4]`), independently confirmed to land on the same physical qubits — see the git history for the exact verification script; not committed to the repo since it's a one-off check, not a permanent test |
 | Plan-to-execution wiring (`resolve_all_combo_settings()`, §10) | ✅ | ✅ **verified against the real config/circuits** | calling it against the real repo reproduces the exact repetitions/shots/dropped-TREx numbers already in `execution_plan/execution_plan_report.txt` for all 14 combos, confirming the resolver and the planner agree; the execution scripts calling it have not been run for real yet (same "never run" status as the row above) |
 
@@ -816,7 +816,7 @@ is any run on the real PIAST-Q machine.
 
 **Steps:**
 1. `configs/backend.yaml`: `backend_name: piast_q` (reached through the PCSS
-   service; needs the VPN, a Python 3.11+ environment with `pcss-qapi`, and the
+   service; needs the VPN, the single Python 3.12 environment (README §2), and the
    token in the `PIASTQ_API_TOKEN` env var — see README §10 C); check
    `physical_qubits`.
 2. `run_all.py`: set `ALLOW_REAL_HARDWARE = True`.
@@ -970,11 +970,12 @@ Everything in §10 shows the full 14-combo study is far beyond 25 QPU-hours,
 so `configs/execution_plan.yaml` is set to one feasible, complete-but-narrow
 run: **QAOA-TCS only** — `gzip` + `flex` (multi-objective) and `paintcontrol`
 + `gsdtsr` (single-objective); raw + MEM + M3 + TREx; 5 repetitions; 200
-shots/circuit; 2 TREx twirls. Cost at the measured billed 18.4974 s/batch:
-4,402 batches = 22.6 h (22.33 h run, including calibration, + 0.29 h drift
-check), i.e. about 2.4 h of reserve; the 25 h limit holds while a batch is
-billed at most about 20.4 s, which the pilot gate checks against the billed
-calibration time. Repetitions were preferred over twirls (each extra
+shots/circuit; 2 TREx twirls. At the measured billed 18.4974 s per job the
+planner's one-circuit-per-job upper bound is 22.3 h (+0.29 h drift check). The
+real bottleneck turned out to be wall-clock (about 3-5 minutes of unbilled
+machine overhead per job), so circuits are packed side by side into 20-qubit
+jobs (README section 0): about 1,070 jobs, ~5.5 billed hours, ~60 hours of
+wall-clock. The pilot gate checks the billed rate against the 25 h limit. Repetitions were preferred over twirls (each extra
 repetition costs ~4.1 h, each extra twirl ~6.9 h); R=6/T=2 would be 26.8 h and
 R=5/T=3 29.5 h, neither of which fits. (An earlier plan with R=6 assumed the
 operators' ~15 s per batch, 21.7 h; the measurement showed 18.5 s.)

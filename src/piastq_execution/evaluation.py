@@ -190,6 +190,11 @@ def compute_execution_time_seconds(raw_records: Sequence[RawCountsRecord]) -> fl
     method -- for TREx, `raw_records` should include every twirl instance,
     so this naturally captures TREx's extra hardware passes too.
     """
+    # On the real machine wall-clock is mostly queue wait (minutes per job), so
+    # the billed QPU time is used whenever the records carry it; simulators
+    # have none and keep the measured wall-clock.
+    if raw_records and all(getattr(r, "total_billed_seconds", None) is not None for r in raw_records):
+        return sum(r.total_billed_seconds for r in raw_records)
     return sum(r.total_wall_clock_seconds for r in raw_records)
 
 
@@ -225,7 +230,13 @@ def compute_mitigation_overhead(
         elif calibration_record.method == "m3":
             calibration_circuits = 2 * calibration_record.num_qubits
         total_shots += calibration_circuits * calibration_shots_per_circuit
-        calibration_wall_clock_seconds = calibration_record.calibration_wall_clock_seconds
+        # billed QPU seconds when the calibration recorded them (real machine),
+        # else the measured wall-clock (simulators)
+        calibration_wall_clock_seconds = (
+            calibration_record.calibration_billed_seconds
+            if getattr(calibration_record, "calibration_billed_seconds", None) is not None
+            else calibration_record.calibration_wall_clock_seconds
+        )
 
     return MitigationOverhead(
         calibration_circuits=calibration_circuits,

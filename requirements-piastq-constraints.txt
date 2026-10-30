@@ -1,4 +1,0 @@
-# Keeps pip from jumping to qiskit 2.x (unsupported by qiskit-aqt-provider).
-qiskit==1.4.6
-qiskit-aer==0.18.2
-qiskit-aqt-provider==1.15.0

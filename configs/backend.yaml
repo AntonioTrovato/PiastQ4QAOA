@@ -24,3 +24,12 @@ backend_name: offline_simulator_no_noise
 # Update this list (not the code) if PIAST-Q's real qubit numbering, or which
 # specific physical qubits you want to dedicate to this study, changes.
 physical_qubits: [0, 1, 2, 3, 4, 5, 6]
+
+# Fixed qubit SLOTS used to pack several circuits into one hardware job
+# (piastq_execution/packing.py): [first physical qubit, width]. Every job
+# holds circuits side by side on disjoint qubits inside these slots, and the
+# MEM/M3 calibration is measured on the same slots. Slots must not overlap;
+# the widest circuit (7 qubits) must fit the widest slot. The default uses
+# qubits 0..19 of PIAST-Q. `physical_qubits` above is only used when a single
+# circuit is run on its own (no packing).
+pack_slots: [[0, 7], [7, 7], [14, 6]]
