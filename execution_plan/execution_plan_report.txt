@@ -1,0 +1,18 @@
+PIAST-Q execution budget plan
+================================
+
+Pool: reduced_scope_run
+  Budget: 35h | Estimated: 29.24h | Fits: True
+  Repetitions: 5
+  Shots/circuit: 200
+  Combos: ['gzip_qaoa_tcs', 'flex_qaoa_tcs', 'paintcontrol_qaoa_tcs', 'gsdtsr_qaoa_tcs']
+    - gzip_qaoa_tcs: methods=['raw', 'mem', 'm3', 'trex']
+    - flex_qaoa_tcs: methods=['raw', 'mem', 'm3', 'trex']
+    - paintcontrol_qaoa_tcs: methods=['raw', 'mem', 'm3', 'trex']
+    - gsdtsr_qaoa_tcs: methods=['raw', 'mem', 'm3', 'trex']
+
+Summary
+--------------------------------
+Total budget across pools: 35.00h
+Total estimated: 29.24h
+All pools fit: True

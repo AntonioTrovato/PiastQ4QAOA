@@ -1,0 +1,39 @@
+[
+  {
+    "pool": "reduced_scope_run",
+    "total_hours_budget": 35,
+    "repetitions": 5,
+    "shots_per_circuit": 200,
+    "methods_by_combo": {
+      "gzip_qaoa_tcs": [
+        "raw",
+        "mem",
+        "m3",
+        "trex"
+      ],
+      "flex_qaoa_tcs": [
+        "raw",
+        "mem",
+        "m3",
+        "trex"
+      ],
+      "paintcontrol_qaoa_tcs": [
+        "raw",
+        "mem",
+        "m3",
+        "trex"
+      ],
+      "gsdtsr_qaoa_tcs": [
+        "raw",
+        "mem",
+        "m3",
+        "trex"
+      ]
+    },
+    "dropped_trex_combos": [],
+    "dropped_circuits": {},
+    "estimated_hours": 29.236,
+    "fits_budget": true,
+    "notes": []
+  }
+]
