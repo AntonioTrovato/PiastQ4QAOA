@@ -52,7 +52,7 @@ bootqa_programs_rep_values = {"gsdtsr": 1, "paintcontrol": 1, "iofrol": 1, "elev
 # Per-dataset QUBO alpha (elevator2: alpha, beta, gamma) used when (re)training
 # circuits -- matches SelectQAOA/MOQ-Pipeline.ipynb's single-objective
 # training cell, i.e. what the already-ported circuits were trained with.
-bootqa_alphas = {"gsdtsr": 0, "paintcontrol": 0.45, "iofrol": 0.50, "elevator": 0.20, "elevator2": (0.1, 0.9, 0.9)}
+bootqa_alphas = {"gsdtsr": 0.3745401188473625, "paintcontrol": 0.7319939418114051, "iofrol": 0.7319939418114051, "elevator": 0.3745401188473625, "elevator2": (0.13949386065204183, 0.29214464853521815, 0.3663618432936917)}
 experiments = 10
 
 def get_data(data_name):
