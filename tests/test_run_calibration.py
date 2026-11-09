@@ -144,6 +144,20 @@ class TestCalibration(unittest.TestCase):
             self.assertEqual(m3.num_qubits, 3)
             self.assertIsNone(store.load_window("mem", [0, 1, 2]))          # spans two slots: not available
 
+    def test_derived_window_carries_the_cost_of_the_shared_calibration(self):
+        from piastq_execution.evaluation import compute_mitigation_overhead
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = CalibrationStore(base_dir=tmp)
+            m3_source = calibrate_m3_all(SLOTS, NoisyMachine(), FakeBackend(), store)
+            mem_sources = calibrate_mem_slots(SLOTS, NoisyMachine(), FakeBackend(), store)
+            for method, source in (("m3", m3_source), ("mem", mem_sources[0])):
+                window = store.load_window(method, [0] if method == "mem" else [2, 3])
+                overhead = compute_mitigation_overhead([], window, 200)
+                # the jobs actually run for the stored calibration, whatever the window width
+                self.assertEqual(overhead.calibration_circuits, source.data["calibration_jobs"])
+                self.assertEqual(window.calibration_wall_clock_seconds, source.calibration_wall_clock_seconds)
+
     def test_correction_with_a_derived_window_recovers_the_true_distribution(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = CalibrationStore(base_dir=tmp)

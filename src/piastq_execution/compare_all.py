@@ -2,33 +2,28 @@
 evaluate_all.py produced, and writes a report mapped to this study's
 research questions (README.md's Quickstart section):
 
-  RQ1/RQ3a (mitigation vs. quality, cost-agnostic): per combo, method vs
-    raw on qubo_energy / probability_of_optimal (single-objective) or
-    hypervolume / igd / num_non_dominated (multi-objective).
-  RQ2: per combo, method vs raw on execution_cost and every
+  RQ1 (quality): per combo, every method compared on qubo_energy /
+    probability_of_optimal (single-objective) or hypervolume / igd /
+    num_non_dominated (multi-objective).
+  RQ2 (effectiveness): per combo, execution_cost and every
     effectiveness.<name> the combo recorded (failure_rate, input_diversity,
     passenger_count, travel_distance -- discovered from the data)
-    (single-objective) or hypervolume / igd (multi-objective) -- same
-    machinery as RQ1, different metric selection. IGDec-QAOA combos get
-    them for every method (training-fixed subproblem sequence, see
-    evaluate_all.merge_igdec_solution).
-  RQ3b (mitigation cost/benefit): per combo, method vs raw on
-    execution_time_seconds and mitigation_overhead.calibration_wall_clock_seconds
-    -- reported alongside RQ1/RQ3a's quality numbers so the two can be
-    related by hand, rather than collapsed into one invented composite
-    index this module would have to justify methodologically.
-  RQ4 (QAOA-TCS vs IGDec-QAOA): for combo pairs sharing the same `dataset`
-    across algorithms (gsdtsr/iofrol/paintcontrol pair automatically;
-    elevator variants use different naming per algorithm and are not
-    auto-paired -- see module docstring in evaluation.py's
-    EFFECTIVENESS_METRICS), same-method comparison on RQ4_METRICS:
-    execution_time_seconds (cost), probability_of_optimal (quality), and,
-    where both sides have it, execution_cost and effectiveness.failure_rate of the final
-    suite. qubo_energy is deliberately NOT compared across algorithms: it is
-    a sum over each algorithm's own, differently-sized subproblem QUBOs.
+    (single-objective); the multi-objective combos have no separate suite-level
+    indicator beyond the Pareto metrics of RQ1.
+  RQ3 (cost): billed QPU seconds of the executions and of the calibration,
+    per method. These are deterministic (the billing is a function of the
+    shots and of the packing, not a random variable), so they are reported
+    descriptively -- mean, standard deviation and ratio to raw -- instead of
+    being fed to a significance test, which would only report the zero
+    variance as an astronomically large effect size. The quality numbers of
+    RQ1/RQ2 are related to them by hand, rather than collapsed into one
+    invented composite index this module would have to justify.
+  (IGDec-QAOA, implemented but not part of the reported study): for combo pairs
+    sharing the same `dataset` across algorithms, a same-method comparison on
+    RQ4_METRICS; it only runs when both algorithms are in the plan.
 
-Reads results/evaluation/*.json (evaluate_all.py's output) and
-configs/execution_plan.yaml (for RQ4's algorithm/dataset pairing). Pure
+Reads results/evaluation/<combo>.json (evaluate_all.py's output) and
+configs/execution_plan.yaml (for the algorithm/dataset pairing). Pure
 classical statistics -- no backend, no AQT, safe anywhere.
 """
 
@@ -56,11 +51,18 @@ def load_evaluation_results(evaluation_dir: str) -> Dict[str, Dict[str, List[Dic
     if not os.path.isdir(evaluation_dir):
         return results
     for filename in sorted(os.listdir(evaluation_dir)):
-        if not filename.endswith(".json"):
+        if not filename.endswith(".json") or filename == "comparison_report.json":
             continue
         combo_name = filename[:-len(".json")]
         with open(os.path.join(evaluation_dir, filename)) as f:
-            results[combo_name] = json.load(f)
+            content = json.load(f)
+        # only `{method: [per-repetition dict, ...]}` files are combos; this
+        # directory also holds the report itself and ideal_reference.json
+        if not isinstance(content, dict) or not content or not all(
+            isinstance(v, list) and all(isinstance(r, dict) for r in v) for v in content.values()
+        ):
+            continue
+        results[combo_name] = content
     return results
 
 
@@ -87,7 +89,7 @@ def extract_samples(records: List[Dict[str, Any]], metric_path: str) -> List[flo
 
 
 # ---------------------------------------------------------------------------
-# Method-vs-raw comparisons (RQ1/RQ2/RQ3a/RQ3b)
+# Method-vs-raw comparisons (RQ1/RQ2) and cost summary (RQ3)
 # ---------------------------------------------------------------------------
 
 def compare_methods_within_combo(
@@ -114,6 +116,25 @@ def compare_methods_within_combo(
         return compare_groups(groups)
     except ValueError:
         return None
+
+
+def describe_cost(combo_results: Dict[str, List[Dict[str, Any]]], metric_path: str) -> Dict[str, Dict[str, Optional[float]]]:
+    """Descriptive summary of a deterministic cost metric per method: mean,
+    population standard deviation, number of repetitions and ratio of the mean
+    to raw's mean (None when raw's mean is 0, e.g. the calibration of raw)."""
+    means = {}
+    summary: Dict[str, Dict[str, Optional[float]]] = {}
+    for method, records in combo_results.items():
+        samples = extract_samples(records, metric_path)
+        if not samples:
+            continue
+        means[method] = sum(samples) / len(samples)
+        sd = (sum((x - means[method]) ** 2 for x in samples) / len(samples)) ** 0.5   # population sd
+        summary[method] = {"mean": means[method], "sd": sd, "n": len(samples)}
+    raw_mean = means.get("raw")
+    for method, entry in summary.items():
+        entry["ratio_vs_raw"] = (means[method] / raw_mean) if raw_mean else None
+    return summary
 
 
 SINGLE_OBJECTIVE_QUALITY_METRICS = ["qubo_energy", "probability_of_optimal"]
@@ -152,12 +173,12 @@ def compare_combo(combo_name: str, combo_results: Dict[str, List[Dict[str, Any]]
     quality_metrics = (
         MULTI_OBJECTIVE_QUALITY_METRICS if _is_multi_objective_combo(combo_results) else SINGLE_OBJECTIVE_QUALITY_METRICS
     )
-    report: Dict[str, Any] = {"combo": combo_name, "rq1_rq3a_quality": {}, "rq2_effectiveness": {}, "rq3b_cost": {}}
+    report: Dict[str, Any] = {"combo": combo_name, "rq1_quality": {}, "rq2_effectiveness": {}, "rq3_cost": {}}
 
     for metric in quality_metrics:
         result = compare_methods_within_combo(combo_results, metric)
         if result is not None:
-            report["rq1_rq3a_quality"][metric] = result
+            report["rq1_quality"][metric] = result
 
     if not _is_multi_objective_combo(combo_results):
         for metric in SINGLE_OBJECTIVE_EFFECTIVENESS_METRICS + _effectiveness_metric_paths(combo_results):
@@ -166,15 +187,15 @@ def compare_combo(combo_name: str, combo_results: Dict[str, List[Dict[str, Any]]
                 report["rq2_effectiveness"][metric] = result
 
     for metric in COST_METRICS:
-        result = compare_methods_within_combo(combo_results, metric)
-        if result is not None:
-            report["rq3b_cost"][metric] = result
+        summary = describe_cost(combo_results, metric)
+        if summary:
+            report["rq3_cost"][metric] = summary
 
     return report
 
 
 # ---------------------------------------------------------------------------
-# QAOA-TCS vs IGDec-QAOA (RQ4)
+# QAOA-TCS vs IGDec-QAOA (not part of the reported study)
 # ---------------------------------------------------------------------------
 
 def pair_combos_by_dataset(combo_defs: Dict[str, Dict[str, Any]]) -> List[Dict[str, str]]:
@@ -203,7 +224,7 @@ def compare_algorithms(
     combo_defs: Dict[str, Dict[str, Any]],
     metric_path: str = "execution_time_seconds",
 ) -> List[Dict[str, Any]]:
-    """RQ4: for each dataset with both a QAOA-TCS and an IGDec-QAOA combo,
+    """For each dataset with both a QAOA-TCS and an IGDec-QAOA combo,
     compares `metric_path` between the two algorithms, per shared method
     (raw vs raw, mem vs mem, ...)."""
     reports = []
@@ -274,9 +295,8 @@ def render_report(comparison: Dict[str, Any]) -> str:
     for combo_report in comparison["per_combo"]:
         lines.append(f"Combo: {combo_report['combo']}")
         for section, title in [
-            ("rq1_rq3a_quality", "RQ1/RQ3a (quality, cost-agnostic)"),
+            ("rq1_quality", "RQ1 (quality)"),
             ("rq2_effectiveness", "RQ2 (effectiveness)"),
-            ("rq3b_cost", "RQ3b (cost)"),
         ]:
             metrics = combo_report[section]
             if not metrics:
@@ -285,10 +305,17 @@ def render_report(comparison: Dict[str, Any]) -> str:
             for metric_name, result in metrics.items():
                 lines.append(f"    {metric_name}:")
                 lines.extend(_render_comparison(result))
+        if combo_report["rq3_cost"]:
+            lines.append("  RQ3 (cost, billed QPU seconds; deterministic, so descriptive):")
+            for metric_name, summary in combo_report["rq3_cost"].items():
+                lines.append(f"    {metric_name}:")
+                for method, entry in summary.items():
+                    ratio = "n/a" if entry["ratio_vs_raw"] is None else f"{entry['ratio_vs_raw']:.2f}x raw"
+                    lines.append(f"      {method}: mean={entry['mean']:.4g}, sd={entry['sd']:.3g}, n={entry['n']}, {ratio}")
         lines.append("")
 
     if comparison["rq4_algorithm_comparison"]:
-        lines.append("RQ4: QAOA-TCS vs IGDec-QAOA")
+        lines.append("QAOA-TCS vs IGDec-QAOA")
         lines.append("-" * 32)
         for report in comparison["rq4_algorithm_comparison"]:
             lines.append(
@@ -328,10 +355,11 @@ def comparison_to_json_dict(comparison: Dict[str, Any]) -> Dict[str, Any]:
     per_combo_json = []
     for combo_report in comparison["per_combo"]:
         entry = {"combo": combo_report["combo"]}
-        for section in ("rq1_rq3a_quality", "rq2_effectiveness", "rq3b_cost"):
+        for section in ("rq1_quality", "rq2_effectiveness"):
             entry[section] = {
                 metric: _comparison_result_to_json(result) for metric, result in combo_report[section].items()
             }
+        entry["rq3_cost"] = combo_report["rq3_cost"]
         per_combo_json.append(entry)
 
     rq4_json = []

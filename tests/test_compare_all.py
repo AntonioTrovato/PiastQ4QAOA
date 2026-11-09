@@ -70,10 +70,10 @@ class TestCompareCombo(unittest.TestCase):
             "mem": [_single_obj_record(1.0, 8.0, 1.5), _single_obj_record(1.1, 8.2, 1.4)],
         }
         report = compare_combo("toy_combo", combo_results)
-        self.assertIn("qubo_energy", report["rq1_rq3a_quality"])
+        self.assertIn("qubo_energy", report["rq1_quality"])
         self.assertIn("execution_cost", report["rq2_effectiveness"])
-        self.assertIn("execution_time_seconds", report["rq3b_cost"])
-        pair = report["rq1_rq3a_quality"]["qubo_energy"].pairwise[0]
+        self.assertIn("execution_time_seconds", report["rq3_cost"])
+        pair = report["rq1_quality"]["qubo_energy"].pairwise[0]
         self.assertEqual({pair.group_a, pair.group_b}, {"raw", "mem"})
 
     def test_multi_objective_combo_uses_hv_igd_not_execution_cost(self):
@@ -82,13 +82,13 @@ class TestCompareCombo(unittest.TestCase):
             "mem": [_multi_obj_record(15.0, 1.5), _multi_obj_record(15.5, 1.4)],
         }
         report = compare_combo("toy_multi", combo_results)
-        self.assertIn("hypervolume", report["rq1_rq3a_quality"])
+        self.assertIn("hypervolume", report["rq1_quality"])
         self.assertEqual(report["rq2_effectiveness"], {})
 
     def test_single_method_produces_no_comparisons(self):
         combo_results = {"raw": [_single_obj_record(5.0, 10.0, 1.0)]}
         report = compare_combo("toy_combo", combo_results)
-        self.assertEqual(report["rq1_rq3a_quality"], {})
+        self.assertEqual(report["rq1_quality"], {})
 
 
 class TestEffectivenessMetricsCompared(unittest.TestCase):
@@ -157,6 +157,30 @@ class TestCompareAlgorithms(unittest.TestCase):
         self.assertEqual(reports[0]["degenerate_methods"], ["raw"])
 
 
+class TestCostIsDescriptive(unittest.TestCase):
+    def test_cost_is_summarised_not_tested_and_ratio_is_against_raw(self):
+        combo_results = {
+            "raw": [_single_obj_record(5.0, 10.0, 2.0), _single_obj_record(5.1, 10.1, 2.0)],
+            "trex": [_single_obj_record(5.0, 10.0, 6.0), _single_obj_record(5.1, 10.1, 6.0)],
+        }
+        report = compare_combo("toy", combo_results)
+        summary = report["rq3_cost"]["execution_time_seconds"]
+        self.assertEqual(summary["raw"]["ratio_vs_raw"], 1.0)
+        self.assertAlmostEqual(summary["trex"]["ratio_vs_raw"], 3.0)
+        self.assertEqual(summary["trex"]["sd"], 0.0)
+        # raw has no calibration: the ratio is undefined, not a division by zero
+        overhead = report["rq3_cost"]["mitigation_overhead.calibration_wall_clock_seconds"]
+        self.assertIsNone(overhead["raw"]["ratio_vs_raw"])
+
+    def test_own_report_file_is_not_loaded_as_a_combo(self):
+        with tempfile.TemporaryDirectory() as eval_dir:
+            with open(os.path.join(eval_dir, "gsdtsr_qaoa_tcs.json"), "w") as f:
+                json.dump({"raw": [_single_obj_record(1.0, 1.0, 1.0)]}, f)
+            with open(os.path.join(eval_dir, "comparison_report.json"), "w") as f:
+                json.dump({"per_combo": [], "rq4_algorithm_comparison": []}, f)
+            self.assertEqual(list(load_evaluation_results(eval_dir)), ["gsdtsr_qaoa_tcs"])
+
+
 class TestEndToEnd(unittest.TestCase):
     def test_compare_all_and_render_report(self):
         with tempfile.TemporaryDirectory() as root:
@@ -197,7 +221,7 @@ class TestEndToEnd(unittest.TestCase):
             )
 
             report_text = render_report(comparison)
-            self.assertIn("RQ4", report_text)
+            self.assertIn("QAOA-TCS vs IGDec-QAOA", report_text)
             self.assertIn("gsdtsr_qaoa_tcs", report_text)
 
             json_dict = comparison_to_json_dict(comparison)

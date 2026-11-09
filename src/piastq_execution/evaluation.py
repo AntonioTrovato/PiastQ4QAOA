@@ -225,7 +225,12 @@ def compute_mitigation_overhead(
     calibration_circuits = 0
     calibration_wall_clock_seconds = 0.0
     if calibration_record is not None:
-        if calibration_record.method == "mem":
+        stored_jobs = (calibration_record.data or {}).get("calibration_jobs")
+        if stored_jobs:
+            # the calibration jobs actually run (a window derived from a packed,
+            # slot-wide calibration carries the jobs of that whole calibration)
+            calibration_circuits = int(stored_jobs)
+        elif calibration_record.method == "mem":
             calibration_circuits = 2 ** calibration_record.num_qubits
         elif calibration_record.method == "m3":
             calibration_circuits = 2 * calibration_record.num_qubits

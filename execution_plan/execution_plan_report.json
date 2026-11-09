@@ -1,8 +1,8 @@
 [
   {
     "pool": "reduced_scope_run",
-    "total_hours_budget": 35,
-    "repetitions": 5,
+    "total_hours_budget": 80,
+    "repetitions": 10,
     "shots_per_circuit": 200,
     "methods_by_combo": {
       "gzip_qaoa_tcs": [
@@ -32,7 +32,7 @@
     },
     "dropped_trex_combos": [],
     "dropped_circuits": {},
-    "estimated_hours": 29.236,
+    "estimated_hours": 56.88,
     "fits_budget": true,
     "notes": []
   }

@@ -1,10 +1,8 @@
 PIAST-Q comparison report
 ================================
 
-Combo: comparison_report
-
 Combo: flex_qaoa_tcs
-  RQ1/RQ3a (quality, cost-agnostic):
+  RQ1 (quality):
     hypervolume:
       normal=True, omnibus=anova, p=0.9481
         raw vs mem: p_adj=0.9655, cohens_d=0.2087
@@ -29,26 +27,20 @@ Combo: flex_qaoa_tcs
         mem vs m3: p_adj=1, a12=0.55
         mem vs trex: p_adj=1, a12=0.425
         m3 vs trex: p_adj=0.9715, a12=0.31
-  RQ3b (cost):
+  RQ3 (cost, billed QPU seconds; deterministic, so descriptive):
     execution_time_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=1, cohens_d=0
-        raw vs m3: p_adj=1, cohens_d=0
-        raw vs trex: p_adj=4.885e-15, cohens_d=-6.954e+15
-        mem vs m3: p_adj=1, cohens_d=0
-        mem vs trex: p_adj=4.885e-15, cohens_d=-6.954e+15
-        m3 vs trex: p_adj=4.885e-15, cohens_d=-6.954e+15
+      raw: mean=585.3, sd=0, n=10, 1.00x raw
+      mem: mean=585.3, sd=0, n=10, 1.00x raw
+      m3: mean=585.3, sd=0, n=10, 1.00x raw
+      trex: mean=1764, sd=2.27e-13, n=10, 3.01x raw
     mitigation_overhead.calibration_wall_clock_seconds:
-      normal=True, omnibus=anova, p=nan
-        raw vs mem: p_adj=nan, cohens_d=0
-        raw vs m3: p_adj=nan, cohens_d=0
-        raw vs trex: p_adj=nan, cohens_d=0
-        mem vs m3: p_adj=nan, cohens_d=0
-        mem vs trex: p_adj=nan, cohens_d=0
-        m3 vs trex: p_adj=nan, cohens_d=0
+      raw: mean=0, sd=0, n=10, n/a
+      mem: mean=2368, sd=0, n=10, n/a
+      m3: mean=36.99, sd=0, n=10, n/a
+      trex: mean=0, sd=0, n=10, n/a
 
 Combo: gsdtsr_qaoa_tcs
-  RQ1/RQ3a (quality, cost-agnostic):
+  RQ1 (quality):
     qubo_energy:
       normal=True, omnibus=anova, p=1.525e-05
         raw vs mem: p_adj=0.0001778, cohens_d=2.277
@@ -82,26 +74,20 @@ Combo: gsdtsr_qaoa_tcs
         mem vs m3: p_adj=0.9983, cohens_d=-0.07216
         mem vs trex: p_adj=0.9988, cohens_d=-0.07379
         m3 vs trex: p_adj=1, cohens_d=0.009019
-  RQ3b (cost):
+  RQ3 (cost, billed QPU seconds; deterministic, so descriptive):
     execution_time_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=1, cohens_d=0
-        raw vs m3: p_adj=1, cohens_d=0
-        raw vs trex: p_adj=4.885e-15, cohens_d=-5.662e+15
-        mem vs m3: p_adj=1, cohens_d=0
-        mem vs trex: p_adj=4.885e-15, cohens_d=-5.662e+15
-        m3 vs trex: p_adj=4.885e-15, cohens_d=-5.662e+15
+      raw: mean=268.2, sd=0, n=10, 1.00x raw
+      mem: mean=268.2, sd=0, n=10, 1.00x raw
+      m3: mean=268.2, sd=0, n=10, 1.00x raw
+      trex: mean=804.6, sd=0, n=10, 3.00x raw
     mitigation_overhead.calibration_wall_clock_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=0, cohens_d=0
-        raw vs m3: p_adj=0, cohens_d=0
-        raw vs trex: p_adj=nan, cohens_d=0
-        mem vs m3: p_adj=nan, cohens_d=0
-        mem vs trex: p_adj=0, cohens_d=0
-        m3 vs trex: p_adj=0, cohens_d=0
+      raw: mean=0, sd=0, n=10, n/a
+      mem: mean=2368, sd=0, n=10, n/a
+      m3: mean=36.99, sd=0, n=10, n/a
+      trex: mean=0, sd=0, n=10, n/a
 
 Combo: gzip_qaoa_tcs
-  RQ1/RQ3a (quality, cost-agnostic):
+  RQ1 (quality):
     hypervolume:
       normal=False, omnibus=kruskal_wallis, p=0.9157
         raw vs mem: p_adj=1, a12=0.46
@@ -126,26 +112,20 @@ Combo: gzip_qaoa_tcs
         mem vs m3: p_adj=1, a12=0.61
         mem vs trex: p_adj=0.8395, a12=0.305
         m3 vs trex: p_adj=0.1222, a12=0.21
-  RQ3b (cost):
+  RQ3 (cost, billed QPU seconds; deterministic, so descriptive):
     execution_time_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=nan, cohens_d=0
-        raw vs m3: p_adj=nan, cohens_d=0
-        raw vs trex: p_adj=0, cohens_d=0
-        mem vs m3: p_adj=nan, cohens_d=0
-        mem vs trex: p_adj=0, cohens_d=0
-        m3 vs trex: p_adj=0, cohens_d=0
+      raw: mean=215.2, sd=0, n=10, 1.00x raw
+      mem: mean=215.2, sd=0, n=10, 1.00x raw
+      m3: mean=215.2, sd=0, n=10, 1.00x raw
+      trex: mean=654.2, sd=0, n=10, 3.04x raw
     mitigation_overhead.calibration_wall_clock_seconds:
-      normal=True, omnibus=anova, p=nan
-        raw vs mem: p_adj=nan, cohens_d=0
-        raw vs m3: p_adj=nan, cohens_d=0
-        raw vs trex: p_adj=nan, cohens_d=0
-        mem vs m3: p_adj=nan, cohens_d=0
-        mem vs trex: p_adj=nan, cohens_d=0
-        m3 vs trex: p_adj=nan, cohens_d=0
+      raw: mean=0, sd=0, n=10, n/a
+      mem: mean=2368, sd=0, n=10, n/a
+      m3: mean=36.99, sd=0, n=10, n/a
+      trex: mean=0, sd=0, n=10, n/a
 
 Combo: paintcontrol_qaoa_tcs
-  RQ1/RQ3a (quality, cost-agnostic):
+  RQ1 (quality):
     qubo_energy:
       normal=False, omnibus=kruskal_wallis, p=0.8616
         raw vs mem: p_adj=1, a12=0.505
@@ -179,20 +159,14 @@ Combo: paintcontrol_qaoa_tcs
         mem vs m3: p_adj=1, a12=0.515
         mem vs trex: p_adj=1, a12=0.585
         m3 vs trex: p_adj=1, a12=0.57
-  RQ3b (cost):
+  RQ3 (cost, billed QPU seconds; deterministic, so descriptive):
     execution_time_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=1, cohens_d=0
-        raw vs m3: p_adj=1, cohens_d=0
-        raw vs trex: p_adj=4.885e-15, cohens_d=-1.695e+16
-        mem vs m3: p_adj=1, cohens_d=0
-        mem vs trex: p_adj=4.885e-15, cohens_d=-1.695e+16
-        m3 vs trex: p_adj=4.885e-15, cohens_d=-1.695e+16
+      raw: mean=85.94, sd=0, n=10, 1.00x raw
+      mem: mean=85.94, sd=0, n=10, 1.00x raw
+      m3: mean=85.94, sd=0, n=10, 1.00x raw
+      trex: mean=265.5, sd=0, n=10, 3.09x raw
     mitigation_overhead.calibration_wall_clock_seconds:
-      normal=True, omnibus=anova, p=0
-        raw vs mem: p_adj=0, cohens_d=0
-        raw vs m3: p_adj=0, cohens_d=0
-        raw vs trex: p_adj=nan, cohens_d=0
-        mem vs m3: p_adj=nan, cohens_d=0
-        mem vs trex: p_adj=0, cohens_d=0
-        m3 vs trex: p_adj=0, cohens_d=0
+      raw: mean=0, sd=0, n=10, n/a
+      mem: mean=2368, sd=0, n=10, n/a
+      m3: mean=36.99, sd=0, n=10, n/a
+      trex: mean=0, sd=0, n=10, n/a

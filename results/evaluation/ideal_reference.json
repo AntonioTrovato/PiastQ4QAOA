@@ -1,0 +1,34 @@
+{
+  "gsdtsr_qaoa_tcs": {
+    "clusters": 79,
+    "mean_probability_of_optimal": 0.377041987483604,
+    "min_probability_of_optimal": 0.009981858729406885,
+    "clusters_where_argmax_is_optimal": 79,
+    "qubo_energy_of_argmax_bitstrings": -8.743228702983897,
+    "qubo_energy_of_brute_force_optima": -8.743228702983897
+  },
+  "paintcontrol_qaoa_tcs": {
+    "clusters": 24,
+    "mean_probability_of_optimal": 0.7884329728411879,
+    "min_probability_of_optimal": 0.2498294152134974,
+    "clusters_where_argmax_is_optimal": 24,
+    "qubo_energy_of_argmax_bitstrings": -8.535742391632072,
+    "qubo_energy_of_brute_force_optima": -8.535742391632072
+  },
+  "flex_qaoa_tcs": {
+    "clusters": 105,
+    "mean_probability_of_optimal": 0.9301374719337355,
+    "min_probability_of_optimal": 0.015619887078346837,
+    "clusters_where_argmax_is_optimal": 105,
+    "qubo_energy_of_argmax_bitstrings": -304.0214161868856,
+    "qubo_energy_of_brute_force_optima": -304.0214161868856
+  },
+  "gzip_qaoa_tcs": {
+    "clusters": 61,
+    "mean_probability_of_optimal": 0.7530736665687491,
+    "min_probability_of_optimal": 0.035644573911601654,
+    "clusters_where_argmax_is_optimal": 60,
+    "qubo_energy_of_argmax_bitstrings": -120.07448974929177,
+    "qubo_energy_of_brute_force_optima": -190.62188626244856
+  }
+}

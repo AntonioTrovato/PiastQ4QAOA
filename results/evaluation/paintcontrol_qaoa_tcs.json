@@ -16,7 +16,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0011172294616699219
+      "classical_post_processing_seconds": 0.0010559558868408203
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -34,7 +34,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014767646789550781
+      "classical_post_processing_seconds": 0.0010411739349365234
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -52,7 +52,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014488697052001953
+      "classical_post_processing_seconds": 0.0010378360748291016
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -70,7 +70,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014464855194091797
+      "classical_post_processing_seconds": 0.0027790069580078125
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -88,7 +88,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014557838439941406
+      "classical_post_processing_seconds": 0.0010209083557128906
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -106,7 +106,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014328956604003906
+      "classical_post_processing_seconds": 0.0028829574584960938
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -124,7 +124,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014183521270751953
+      "classical_post_processing_seconds": 0.0010030269622802734
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -142,7 +142,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014307498931884766
+      "classical_post_processing_seconds": 0.0010230541229248047
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -160,7 +160,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014224052429199219
+      "classical_post_processing_seconds": 0.0010001659393310547
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -178,7 +178,7 @@
         "total_shots": 4800,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.001425027847290039
+      "classical_post_processing_seconds": 0.0010199546813964844
     }
   ],
   "mem": [
@@ -187,18 +187,18 @@
       "method": "mem",
       "qubo_energy": -8.53305925375285,
       "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8181509192311002,
+      "probability_of_optimal": 0.8181509192311,
       "execution_cost": 2416752.0,
       "effectiveness": {
         "failure_rate": 19.671956950285647
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03438115119934082
+      "classical_post_processing_seconds": 0.017603635787963867
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -212,11 +212,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.033403873443603516
+      "classical_post_processing_seconds": 0.03799009323120117
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -230,11 +230,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.033312082290649414
+      "classical_post_processing_seconds": 0.017431974411010742
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -248,29 +248,29 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03225088119506836
+      "classical_post_processing_seconds": 0.01759791374206543
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "mem",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8212424484315456,
+      "probability_of_optimal": 0.8212424484315458,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03273177146911621
+      "classical_post_processing_seconds": 0.0189969539642334
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -284,11 +284,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03445124626159668
+      "classical_post_processing_seconds": 0.025519847869873047
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -302,11 +302,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03360486030578613
+      "classical_post_processing_seconds": 0.02800726890563965
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -320,11 +320,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03464937210083008
+      "classical_post_processing_seconds": 0.024740219116210938
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -338,11 +338,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.032277584075927734
+      "classical_post_processing_seconds": 0.027857065200805664
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -356,11 +356,11 @@
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 0.03508162498474121
+      "classical_post_processing_seconds": 0.019068002700805664
     }
   ],
   "m3": [
@@ -369,180 +369,180 @@
       "method": "m3",
       "qubo_energy": -8.53305925375285,
       "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8154658352335294,
+      "probability_of_optimal": 0.8154658252994219,
       "execution_cost": 2416752.0,
       "effectiveness": {
         "failure_rate": 19.671956950285647
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005230426788330078
+      "classical_post_processing_seconds": 0.006542682647705078
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8223896287381649,
+      "probability_of_optimal": 0.8223896125952402,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005385637283325195
+      "classical_post_processing_seconds": 0.0027272701263427734
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.53305925375285,
       "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8320818121234576,
+      "probability_of_optimal": 0.8320818108816942,
       "execution_cost": 2416752.0,
       "effectiveness": {
         "failure_rate": 19.671956950285647
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005196809768676758
+      "classical_post_processing_seconds": 0.007806062698364258
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.52610526731735,
       "optimal_bitstring": "01+11+1+0+1+01+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8354762134452661,
+      "probability_of_optimal": 0.8354762146870295,
       "execution_cost": 2355199.0,
       "effectiveness": {
         "failure_rate": 19.55342969043198
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005151987075805664
+      "classical_post_processing_seconds": 0.0025789737701416016
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8166791175802549,
+      "probability_of_optimal": 0.8166791262725989,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005279064178466797
+      "classical_post_processing_seconds": 0.0061681270599365234
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8251785735289255,
+      "probability_of_optimal": 0.8251785822212696,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.00505518913269043
+      "classical_post_processing_seconds": 0.00775599479675293
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.532362440751998,
       "optimal_bitstring": "11+11+1+0+1+00+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8267384562641382,
+      "probability_of_optimal": 0.8267384550223748,
       "execution_cost": 2383771.0,
       "effectiveness": {
         "failure_rate": 19.61395600622145
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005030632019042969
+      "classical_post_processing_seconds": 0.002608060836791992
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8454064577817917,
+      "probability_of_optimal": 0.8454064428806305,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.00504612922668457
+      "classical_post_processing_seconds": 0.002599000930786133
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8434652934471766,
+      "probability_of_optimal": 0.8434652984142303,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.005014181137084961
+      "classical_post_processing_seconds": 0.0026078224182128906
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
       "method": "m3",
       "qubo_energy": -8.535742391632072,
       "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
-      "probability_of_optimal": 0.8264253760377566,
+      "probability_of_optimal": 0.8264253723124663,
       "execution_cost": 2406267.0,
       "effectiveness": {
         "failure_rate": 19.658799055548805
       },
       "execution_time_seconds": 85.93583749999999,
       "mitigation_overhead": {
-        "calibration_circuits": 4,
-        "total_shots": 5600,
-        "calibration_wall_clock_seconds": 73.9896
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 0.0051233768463134766
+      "classical_post_processing_seconds": 0.002624988555908203
     }
   ],
   "trex": [
@@ -562,7 +562,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014941692352294922
+      "classical_post_processing_seconds": 0.0010869503021240234
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -580,7 +580,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0015599727630615234
+      "classical_post_processing_seconds": 0.0011179447174072266
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -598,7 +598,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.001542806625366211
+      "classical_post_processing_seconds": 0.00286102294921875
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -616,7 +616,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0015151500701904297
+      "classical_post_processing_seconds": 0.0010879039764404297
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -634,7 +634,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.001512765884399414
+      "classical_post_processing_seconds": 0.002905130386352539
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -652,7 +652,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0015234947204589844
+      "classical_post_processing_seconds": 0.001779794692993164
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -670,7 +670,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014982223510742188
+      "classical_post_processing_seconds": 0.0010881423950195312
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -688,7 +688,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.001497030258178711
+      "classical_post_processing_seconds": 0.0010619163513183594
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -706,7 +706,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.001495361328125
+      "classical_post_processing_seconds": 0.0010628700256347656
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
@@ -724,7 +724,7 @@
         "total_shots": 14400,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 0.0014896392822265625
+      "classical_post_processing_seconds": 0.0010707378387451172
     }
   ]
 }

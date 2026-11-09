@@ -1,991 +1,1100 @@
-# EXPLAINATION.md — This Repository, From Scratch
+# EXPLAINATION.md — The study, the code, every decision, and the results
 
-> Written as a "come back after two months and understand everything again"
-> document. Nothing is assumed. Where useful, a diagram or table replaces a
-> wall of text. The most important section, if you only read one, is
-> **§12 "What has actually been run, right now"** — everything else is
-> context to make that section make sense.
-
----
-
-## 0. One paragraph summary
-
-This repo takes two existing quantum algorithms for picking a smaller,
-cheaper subset of software tests to re-run after a code change
-("Regression Test Case Selection"), and extends them so they can run on a
-**real quantum computer** (PIAST-Q) instead of only on a computer's simulated
-approximation of one. Running on real hardware introduces noise (errors),
-so this repo also builds three different ways to clean up that noise
-("mitigation"), a way to plan how much of the limited real-hardware time is
-needed, and a way to measure and statistically compare how well everything
-worked. As of today, **all of that code exists and is unit-tested, but none
-of it has been run against real hardware yet** — see §12.
-
-> **Scope of the planned PIAST-Q run (§17)**: QAOA-TCS only (2 multi-objective
-> + 2 single-objective datasets), focused on the effect of the three
-> mitigation strategies (RQ1, RQ2, RQ3a, RQ3b). IGDec-QAOA is implemented and
-> tested here but excluded from the 25-hour run, so RQ4 is not addressed.
+> **Purpose.** This is the reference document of the replication package. It is
+> written so that a reader (or another Claude instance) who has never seen the
+> project can write the paper from it: what was studied and why, exactly what
+> was executed on the real quantum computer, every design and parameter choice
+> with its justification, the final results with their statistical support, and
+> every known limitation. Statements are tied to files so they can be checked.
+> Where something was *not* verified, or is an inherited quirk, it says so.
+>
+> **Status (as of 9 Nov 2026): the experimental work is finished.** The study
+> ran on the real PIAST-Q machine between 30 Oct and 6 Nov 2026; all raw data,
+> calibrations, evaluation files and the statistical report are in this
+> repository. If you only read one section, read **§1 (summary)** and
+> **§12 (results)**, then **§14 (threats to validity)**.
+>
+> File names: the document is called `EXPLAINATION.md` (sic) for historical
+> reasons; other files refer to it by that name.
 
 ---
 
-## 1. The problem this project solves (no quantum yet)
+## Table of contents
 
-Imagine a software project with thousands of automated tests. Every time a
-developer changes the code, in principle you should re-run *all* tests to
-make sure nothing broke. In practice that's too slow/expensive. **Test Case
-Selection (TCS)** is the problem of picking a smaller subset of tests that
-still catches most bugs, instead of re-running everything.
-
-Concretely, every test case has some attributes, e.g.:
-- **execution cost** (how long/expensive it is to run),
-- **failure rate** (how often it has caught a bug in the past),
-- for some datasets: **statement coverage**, **input diversity**, **passenger
-  count**, **travel distance** (dataset-specific — see §4).
-
-TCS tries to pick a subset of tests that is **cheap** (low total cost) but
-still **effective** (high failure-catching power / coverage). This is an
-optimization problem: for `n` tests, there are `2^n` possible subsets — for
-even a few dozen tests, checking every subset by hand is already impossible.
-
----
-
-## 2. Turning it into something a quantum computer can solve
-
-### 2.1 QUBO — the "shape" every solver here understands
-
-A **QUBO** (Quadratic Unconstrained Binary Optimization) is a way of writing
-an optimization problem so that:
-- every decision is a single bit `x_i ∈ {0, 1}` (1 = "include this test", 0 =
-  "leave it out"),
-- the thing you're minimizing is a sum of terms that are each either
-  `(a single x_i)` or `(x_i times x_j)` — nothing more complicated than that.
-
-For TCS, a simple QUBO says (in words): *minimize total execution cost of the
-selected tests, while also rewarding tests with a high failure rate, and
-penalizing when two tests that both cover the same line of code are picked
-together (redundant coverage)*. That's it — cost, effectiveness, and
-redundancy, expressed purely as bit-flips and pairs of bit-flips. Every
-dataset in this repo has its own QUBO formula (§4), but they're all this same
-"shape."
-
-### 2.2 QAOA — a quantum recipe for approximately solving a QUBO
-
-**QAOA** (Quantum Approximate Optimization Algorithm) is a specific recipe
-for asking a quantum computer to solve a QUBO. You don't need the quantum
-mechanics to follow what happens operationally:
-
-1. You translate the QUBO into a small quantum circuit (one qubit per
-   decision bit `x_i`).
-2. You run that circuit, together with a classical optimizer (`COBYLA` here),
-   which repeatedly tweaks the circuit's internal parameters to make its
-   output more and more likely to land on a *good* (low-cost) bitstring.
-   This tweaking loop is called **training**, and it happens entirely on a
-   classical computer simulating a small quantum system ("ideal simulator")
-   — no real quantum hardware needed for this part.
-3. Once trained, the circuit is "frozen" (its parameters fixed) and can be
-   run — this time, ideally, on a **real** quantum computer — to sample
-   candidate bitstrings. Each run ("shot") of the circuit returns one
-   bitstring; running it many times gives you a *distribution* over
-   bitstrings, and the most frequent one is treated as "the answer."
-
-The frozen, trained circuit is saved to disk as a `.qpy` file (Qiskit's
-circuit-serialization format) so it can be executed on hardware later
-without re-training. Every `.qpy` file in `trained_qaoa_circuits/` is exactly
-this: a frozen QAOA circuit, ready to be sampled.
-
-### 2.3 Why not just solve the whole problem at once?
-
-A real test suite can have thousands of tests, but a QAOA circuit needs one
-qubit per test case, and current/near-term quantum hardware (including
-PIAST-Q) only reliably supports a handful of qubits before noise makes
-results useless. This repo (like the two algorithms it implements) caps
-every quantum circuit at **7 qubits** (7 test-case decisions at a time). The
-big test suite is therefore broken into many small ≤7-test-case pieces,
-solved separately, then recombined. *How* you break it up is exactly where
-the two algorithms in this repo differ:
-
-```mermaid
-flowchart LR
-    subgraph QTCS["QAOA-TCS (clustering-based)"]
-        direction TB
-        A1["Whole test suite"] --> A2["Ward hierarchical clustering\n(groups similar tests by\ncost/failure-rate/etc.)"]
-        A2 --> A3["Split any cluster > 7\ninto smaller chunks"]
-        A3 --> A4["One QAOA circuit\nper final cluster\n(solved independently,\nall at once)"]
-        A4 --> A5["Union all clusters'\nselected tests"]
-    end
-    subgraph IGD["IGDec-QAOA (impact-guided)"]
-        direction TB
-        B1["Whole test suite +\na random starting guess"] --> B2["Rank every test by\n'impact' (how much flipping\nit changes the score)"]
-        B2 --> B3["Take the next 7\nhighest-impact tests"]
-        B3 --> B4["Solve that group\nwith QAOA, update\nthe running solution"]
-        B4 --> B5{"More iterations\nleft?"}
-        B5 -- yes --> B2
-        B5 -- no --> B6["Keep the best\nsolution seen"]
-    end
-```
-
-**QAOA-TCS**: decompose once (deterministic — the same clustering every
-time), solve every cluster independently, union the results. Simple, stable,
-and every cluster's circuit is reusable across repeated hardware runs.
-
-**IGDec-QAOA**: an iterative loop — pick a random starting guess, repeatedly
-re-rank tests by impact, solve the top-impact chunk, update the guess, and
-repeat for several iterations, keeping the best solution ever seen. Because
-the ranking depends on the *current* (evolving) guess, every subproblem's
-circuit is only valid for that one specific point in that one specific
-trajectory — nothing is reusable the way QAOA-TCS's clusters are. This is
-why IGDec-QAOA needs vastly more circuits per dataset (§9) and why its
-mitigated (MEM/M3/TREx) results can't be "re-merged" the same way raw results
-are (§11, "IGDec-QAOA's final-suite metrics: raw only").
+1. [Summary of the study](#1-summary-of-the-study)
+2. [Background: the problem and the algorithm](#2-background-the-problem-and-the-algorithm)
+3. [What was studied: scope, subjects, research questions](#3-what-was-studied-scope-subjects-research-questions)
+4. [Subjects in detail: datasets, QUBOs, clustering, circuits](#4-subjects-in-detail-datasets-qubos-clustering-circuits)
+5. [Training of the circuits (offline, before the study)](#5-training-of-the-circuits-offline-before-the-study)
+6. [The machine and how it is reached](#6-the-machine-and-how-it-is-reached)
+7. [Execution design: how circuits were run on the hardware](#7-execution-design-how-circuits-were-run-on-the-hardware)
+8. [The four methods: raw, MEM, M3, TREx — as implemented](#8-the-four-methods-raw-mem-m3-trex--as-implemented)
+9. [Calibration design and what it measured](#9-calibration-design-and-what-it-measured)
+10. [Evaluation: metrics, statistics, how RQs are answered](#10-evaluation-metrics-statistics-how-rqs-are-answered)
+11. [What was actually run: configuration and chronology](#11-what-was-actually-run-configuration-and-chronology)
+12. [Results](#12-results)
+13. [Answers to the research questions](#13-answers-to-the-research-questions)
+14. [Threats to validity and known limitations](#14-threats-to-validity-and-known-limitations)
+15. [Every parameter and why it has that value](#15-every-parameter-and-why-it-has-that-value)
+16. [Repository map and data dictionary](#16-repository-map-and-data-dictionary)
+17. [How to reproduce, re-evaluate or extend](#17-how-to-reproduce-re-evaluate-or-extend)
+18. [Out of scope but implemented (IGDec-QAOA, other datasets)](#18-out-of-scope-but-implemented-igdec-qaoa-other-datasets)
+19. [Glossary](#19-glossary)
+20. [Decision log](#20-decision-log)
 
 ---
 
-## 3. Single-objective vs. multi-objective
+## 1. Summary of the study
 
-TCS can be framed two ways:
+**What.** Regression Test Case Selection (TCS) picks a cheap but effective
+subset of a test suite. QAOA-TCS (an existing method) formulates TCS as a QUBO,
+splits the suite into clusters of at most 7 test cases, and solves each cluster
+with a small, pre-trained QAOA circuit (`p = 1`). Until now QAOA-TCS had been
+evaluated on simulators. This study runs it on a **real 20-qubit trapped-ion
+quantum computer, PIAST-Q**, and asks whether **readout-error mitigation**
+improves the result, and at what cost in scarce QPU time.
 
-- **Single-objective**: combine everything you care about into *one* number
-  to minimize (e.g., `α·cost − (1−α)·failure_rate`), and each run gives you
-  **one** final selected subset. Simple to compare, simple to rank.
-- **Multi-objective**: keep the objectives separate (e.g., cost, statement
-  coverage, fault coverage) and instead of one winner, produce a **Pareto
-  frontier** — the set of solutions where no other solution is better on
-  *every* objective simultaneously (i.e., every solution on the frontier
-  represents a different, defensible trade-off).
+**Three mitigation methods** are compared with the unmitigated baseline
+("raw"): full measurement-error mitigation (**MEM**, full confusion matrix),
+**M3** (per-qubit calibration, scalable matrix-free correction) and **TREx**
+(measurement twirling). The comparison is a *paired design* for raw, MEM and M3
+(all three are computed from the same stored counts) and a separate set of
+hardware passes for TREx.
 
-**QAOA-TCS** has both a single-objective version (`src/qaoa_tcs/single_obj.py`)
-and a multi-objective version (`src/qaoa_tcs/multi_obj.py`). **IGDec-QAOA**
-in this study is single-objective only (`src/igdec_qaoa/`).
+**Subjects.** QAOA-TCS only: two single-objective datasets (`gsdtsr`,
+`paintcontrol`) and two multi-objective programs (`flex`, `gzip`), i.e.
+79 + 24 + 105 + 61 = **269 circuits** of 1–7 qubits (287 + 89 + 567 + 214 test
+cases). Each circuit is run with 200 shots; the full set of circuits is run
+**10 times** ("repetitions") for each method; TREx uses **3 twirled passes** per
+circuit.
 
-The multi-objective version still solves the *same kind* of small QAOA
-subproblems — the difference is only in the last step: instead of unioning
-cluster results into one final list, `build_pareto_front()` looks at the
-merged list of selected tests, considers every *growing prefix* of that list
-as a candidate sub-suite (this specific method is called "Additional-Greedy"
-in the literature), scores each candidate on all three objectives
-(`-execution_cost`, `statement_coverage`, `fault_coverage` — cost is negated
-so that "bigger is better" applies to all three uniformly), and keeps only
-the ones no other candidate dominates on all three at once.
+**What was run.** About 2,510 execution jobs + 130 calibration jobs + 2 drift
+jobs on the real machine, **13.6 QPU hours billed out of the 25 available**
+(account counter 13.67 h at the end), over 30 Oct – 6 Nov 2026. To make the
+wall-clock fit the deadline, several independent circuits were *packed side by
+side on disjoint qubits of one 20-qubit job* (§7.2).
 
----
+**Headline findings** (details and statistics in §12–§13):
 
-## 4. The datasets, and which algorithm/mode uses which
-
-| Dataset | What it is | Attributes used | Used by |
-|---|---|---|---|
-| `gsdtsr` | Google's shared test-suite results | execution time, failure rate | QAOA-TCS single-obj, IGDec-QAOA |
-| `iofrol` | ABB Robotics robot test suite | execution time, failure rate | QAOA-TCS single-obj, IGDec-QAOA |
-| `paintcontrol` | ABB Robotics painting-robot test suite | execution time, failure rate | QAOA-TCS single-obj, IGDec-QAOA |
-| `elevator` (o2) | Orona5 elevator scheduler tests | cost, input diversity | QAOA-TCS single-obj **only** |
-| `elevator2` (o3) | same elevator tests, different attributes | cost, passenger count, travel distance | QAOA-TCS single-obj, and (see note below) IGDec-QAOA's `elevator_two`/`elevator_three` |
-| `flex`, `grep`, `gzip`, `sed` | SIR benchmark C programs | execution cost, fault coverage, statement coverage | QAOA-TCS **multi-obj only** |
-
-That's **9 distinct dataset/formulation pairs**, each usable by QAOA-TCS,
-plus IGDec-QAOA running on 5 of them (the single-objective ones) — 14 total
-algorithm × dataset combinations. See §9 for the full matrix with circuit
-counts.
-
-> **Naming**: IGDec-QAOA's `elevator_two`/`elevator_three` mirror QAOA-TCS's
-> `elevator`/`elevator2` split: `elevator_two` is the cost + input-diversity
-> problem (SelectQAOA's `loch_qaoa_elev_two.py`, weights 0.0206/0.9699),
-> `elevator_three` the cost + passenger-count + travel-distance problem.
-> (An earlier copy of `elevator_two` had by mistake the three-objective
-> formulation; it was corrected. Neither IGDec elevator combo is trained yet.)
-> Also: QAOA-TCS's saved `elevator2` circuits (56) do not match the current
-> clustering (800 target clusters, like `elevator`'s 881 circuits), so
-> `elevator2` cannot be evaluated or run as it stands.
+* Readout errors on this machine are **very small and one-sided**: mean
+  P(read 0 | prepared 1) = 0.5 % (max 1.5 %), P(read 1 | prepared 0) = 0 % on
+  all 20 qubits (§9.3). There is little for mitigation to correct, which
+  frames every result below.
+* **RQ1 (quality).** Mitigation does *not* improve quality in general. A small
+  but statistically robust gain appears only on the single-objective subject
+  `gsdtsr` (QUBO energy −8.517 raw → −8.560/−8.562/−8.562 for MEM/M3/TREx, all
+  p_adj < 0.001, ≈ 19 % of the remaining gap to the noiseless optimum −8.743),
+  and MEM raises the probability of the optimal bitstring by +0.4 pp
+  (`gsdtsr`) and +1.4 pp (`paintcontrol`). On the multi-objective subjects there
+  is no benefit at all; TREx is significantly *worse* on `gzip` (IGD).
+* **RQ2 (suite-level effectiveness).** No consistent difference, apart from
+  `gsdtsr` where the effectiveness indicator is mathematically the energy
+  again (α = 0).
+* **RQ3 (cost-effectiveness).** TREx costs ≈ 3× the QPU time of a raw run and
+  never helps. M3 costs 37 s once (≈ 1–4 % of a subject's QPU time over 10
+  repetitions) and gives the same energy gain as MEM (on P(optimal) MEM's gain
+  is significant, M3's is not); MEM costs 2,368 s once (+40 % to +276 %
+  of a subject's QPU time). **M3 is the most cost-effective method.**
 
 ---
 
-## 5. Real hardware: PIAST-Q, and why this repo currently talks to a stand-in instead
+## 2. Background: the problem and the algorithm
 
-**PIAST-Q** is the real quantum computer this whole project targets. It's
-accessed through **AQT** (Alpine Quantum Technologies)'s Qiskit provider —
-`qiskit_aqt_provider`'s `AQTProvider`/`AQTSampler` classes, which is the same
-interface regardless of whether it points at the real machine or a
-simulator. That's important: it means every script in this repo is *already
-written* exactly as it would be for real hardware — only *which backend it
-points at* needs to change (see §5.1).
+### 2.1 Test case selection (TCS)
 
-**The hard constraint that shapes everything downstream**: PIAST-Q accepts a
-maximum of **200 shots per run**. Anything more has to be split into several
-runs of ≤200 shots each and combined — this is why `run_circuit_with_batching_recorded()`
-(§7) exists, and why the budget planner (§10) is denominated in "batches of
-200 shots, 18.4974 s billed each (measured; the operators had said ~15 s)."
+A project has `n` automated tests. After a code change, re-running all of them
+is too expensive; TCS selects a subset that is cheap (low execution cost) yet
+effective (high fault-revealing power). Each test has attributes — execution
+time/cost, historical failure rate, and, for multi-objective programs,
+statement coverage and fault coverage.
 
-### 5.1 Right now: pointed at a placeholder, on purpose
+### 2.2 QUBO
 
-`configs/backend.yaml` currently holds:
+A QUBO (Quadratic Unconstrained Binary Optimization) has one bit `x_i ∈ {0,1}`
+per test (1 = selected) and minimizes `Σ_i l_i x_i + Σ_{i<j} q_ij x_i x_j`. The
+repository's QUBOs are built in `src/qaoa_tcs/single_obj.py` and
+`src/qaoa_tcs/multi_obj.py` (details in §4.2). **An important structural fact:**
+the single-objective QUBOs are **purely linear** (no `q_ij` terms), and in the
+multi-objective ones the quadratic terms survive in only one cluster of `flex`
+and one of `gzip` (see §4.4). Consequently the QAOA circuits are essentially
+**products of independent single-qubit circuits with no entanglement**: of the
+269 circuits, 0/79 (`gsdtsr`), 0/24 (`paintcontrol`), 1/105 (`flex`) and 1/61
+(`gzip`) contain any two-qubit gate after unrolling. The problem is thus
+classically trivial (a bit is 1 iff its linear coefficient is negative); the
+study is about *running the quantum algorithm on a real machine*, not about
+quantum advantage, and the dominant noise source for these shallow,
+non-entangling circuits is readout (plus single-qubit gate error).
 
-```yaml
-api_token: ACCESS_TOKEN
-backend_name: offline_simulator_no_noise
-```
+### 2.3 QAOA and "training"
 
-`offline_simulator_no_noise` is AQT's own local, noise-free software
-simulator — useful for making sure the *code* runs correctly, but it teaches
-you nothing about real quantum noise, and it costs no real hardware time.
-This is intentional and temporary: to point everything at the real PIAST-Q
-machine, **only this one file** needs to change (or the `PIASTQ_API_TOKEN` /
-`PIASTQ_BACKEND_NAME` environment variables, which override it — useful for
-keeping a real token out of version control). Every script that opens a
-backend goes through one shared function,
-`piastq_execution.backend_config.get_backend()`, specifically so this is a
-one-file change instead of six.
+QAOA turns the QUBO into a parameterized circuit (cost layer + mixer layer,
+`reps = p`; here `p = 1`). A classical optimizer (COBYLA, ≤ 500 evaluations)
+tunes the parameters on an **ideal simulator** so that the circuit's output
+distribution concentrates on low-energy bitstrings. The tuned ("frozen")
+circuit is saved as a `.qpy` file. At execution time the frozen circuit is
+sampled on the machine (200 shots); the **most frequent bitstring** (argmax) is
+taken as the cluster's answer.
 
----
+### 2.4 QAOA-TCS decomposition
 
-## 6. Why quantum results need to be "cleaned up": noise & mitigation
+Hardware (and simulators) cannot hold thousands of qubits, so the suite is
+decomposed **once, deterministically**:
 
-### 6.1 The problem
+1. standardize the per-test attributes (`StandardScaler`);
+2. Ward hierarchical clustering into a target number of clusters
+   (`fcluster(..., criterion='maxclust')`);
+3. any cluster with more than 7 members is split into balanced parts of ≤ 7;
+4. one QUBO and one QAOA circuit per final cluster; the cluster answers are
+   merged (union of selected tests) into the final suite.
 
-Real quantum hardware makes mistakes. The specific mistake this repo focuses
-on is **readout error**: you prepared/measured a qubit that was "really" in
-state `1`, but the hardware reports `0` (or vice versa) some small
-percentage of the time. Run a circuit many times (many shots) and you get a
-*distribution* of returned bitstrings that's subtly (or not-so-subtly)
-wrong compared to what a perfect, noiseless machine would have returned.
+Because the decomposition is deterministic and the circuits are frozen, the
+**same 269 circuits are re-run in every repetition** — repetitions measure
+machine/shot variability, not training variability.
 
-### 6.2 Three ways to fix it, compared
+### 2.5 Single- vs multi-objective
 
-| Method | How it estimates the error | Extra hardware needed | Reusable across circuits? |
-|---|---|---|---|
-| **Raw** (no mitigation) | — | none | — (this is the baseline everything else is compared against) |
-| **Full MEM** | Prepare *every* possible `n`-qubit computational basis state (`2^n` circuits, e.g. 128 for 7 qubits), measure each many times, build the full `2^n × 2^n` "confusion matrix" describing exactly how measurements get mixed up | Once per distinct qubit width/mapping — **shared across every circuit using that mapping** | Yes — calibrate once, correct any number of already-collected raw counts afterwards, no new hardware runs needed per circuit |
-| **M3** | Same idea as MEM, but estimates each qubit's readout error *individually* (`2·n` circuits instead of `2^n`) instead of building the full matrix | Once per distinct qubit width — much cheaper than MEM | Yes, same as MEM |
-| **TREx** (measurement twirling) | Before measuring, randomly flip each qubit with an X gate, then classically un-flip the known random pattern from the result, and average over many random patterns. This turns a *systematic* (biased) readout error into *random* (unbiased) noise that cancels out on average — without ever needing a separate calibration matrix | **None as a separate step** — but every twirl pattern is a genuinely different circuit, so **every single one requires its own real hardware run** | **No** — cannot reuse previously collected raw counts; this is the expensive one |
-
-In plain terms: MEM and M3 are "measure the machine's mistakes once, then
-mathematically undo them on any data you already have." TREx is "don't
-bother measuring the mistakes separately — just run the real circuit many
-times with a different random disguise each time, so the mistakes average
-themselves out," at the cost of needing that many *extra* real hardware
-runs, every time.
-
-### 6.3 Why compare all three at all? (the research angle)
-
-If MEM and M3 (which *only* ever touch readout error) already recover most
-of the performance lost to noise, **and** TREx (a completely independent way
-of targeting the same readout error) recovers about the same amount and no
-more, that's evidence that readout error really is the dominant source of
-noise for these particular circuits — plausible, since every circuit here is
-shallow (only 7 qubits, `p=1` QAOA depth). If TREx recovered *much more* than
-MEM/M3, that would suggest something beyond readout error (e.g. gate-level
-noise) is also significant. This is exactly **RQ3a** in §11.
-
-### 6.4 A subtlety this section glossed over — and has since been fixed: which physical qubits?
-
-Everything above assumes the calibration circuits (for MEM/M3) and the real
-QAOA/TREx circuits land on the *same* physical qubits — otherwise you'd be
-correcting a circuit's counts using a confusion matrix measured on entirely
-different hardware. Until recently, nothing guaranteed this: both the real
-execution and the calibration circuits let the transpiler pick a physical
-layout automatically, independently of each other, with no check that they
-agreed.
-
-Fixed by pinning an explicit, shared layout: `piastq_execution/qubit_layout.py`
-defines, once, which physical qubits a circuit of a given width uses
-(configurable in `configs/backend.yaml`'s `physical_qubits` list — defaults
-to `[0..6]`), and every caller — the real execution, the TREx twirl passes,
-*and* the MEM/M3 calibration circuits — now pins that exact layout via
-`sampler.set_transpile_options(initial_layout=...)` before submitting
-anything. This was verified end-to-end against the real
-`AQTSampler`/`offline_simulator_no_noise` stack with a deliberately
-non-default layout (physical qubits `[3, 4]` instead of `[0, 1]`), not just
-in a synthetic unit test.
-
-### 6.5 A second gap this section didn't mention: the machine's *own* calibration data
-
-MEM/M3 above are readout-error calibrations *we* measure ourselves, from
-shots we run. Separately, real quantum hardware also publishes its own
-characterization data — T1 (how long a qubit holds its state before
-decaying), T2 (how long it holds phase coherence), per-qubit frequency, etc.
-This is useful independent context for interpreting RQ3a (§6.3): if T1/T2
-stayed stable across every session, that supports treating differences
-between sessions as noise-mitigation effects rather than machine drift.
-
-`piastq_execution/backend_calibration_snapshot.py` reads whatever the
-backend itself reports (via the standard `qubit_properties` hook every
-`BackendV2`-style backend exposes — AQT's real backend object has it, exact
-population unknown until real hardware is actually used) and saves a new,
-timestamped snapshot automatically at the start of every hardware-execution
-script — so every real-hardware session, from the very first one onward,
-gets its own dated record under `calibration/backend_snapshots/`, without
-anyone having to remember to trigger it separately.
+* **Single-objective** (`gsdtsr`, `paintcontrol`): one weighted objective
+  `α·(normalized cost) − (1−α)·failure_rate`; the output is one suite.
+* **Multi-objective** (`flex`, `gzip`; SIR benchmark programs): the same kind
+  of per-cluster QAOA solving, but the merged selection is turned into a
+  **Pareto front** by the "Additional-Greedy" prefix method: every growing
+  prefix of the selected-test list is a candidate sub-suite, scored on
+  `(−execution_cost, statement_coverage, fault_coverage)` (cost negated so all
+  three are maximized), and the non-dominated candidates form the front
+  (`multi_obj.build_pareto_front`).
 
 ---
 
-## 7. Raw-counts persistence — the fix that makes any of this possible
+## 3. What was studied: scope, subjects, research questions
 
-Before this round of work, every execution script threw away almost all of
-its own output: it ran a circuit, took the single *most frequent* bitstring
-("argmax"), and discarded the rest of the distribution. That's a dead end
-for mitigation — MEM/M3/TREx all need the **full distribution** (every
-bitstring and how many times it came up), not just the winner.
+### 3.1 Goal
 
-Now, every execution path goes through one shared function,
-`piastq_execution.raw_counts.run_circuit_with_batching_recorded()`, which:
+To evaluate QAOA-based test case selection on real quantum hardware and to
+quantify how much readout-error mitigation improves it, and at what cost.
 
-1. Runs the circuit in ≤200-shot batches (the hardware limit, §5),
-2. keeps the **full** bitstring → count distribution (not just the argmax),
-3. and writes one record per circuit execution containing: the full raw
-   counts, a circuit/cluster/(iteration+subproblem) id, which
-   algorithm/objective-mode/dataset it's from, shots requested vs. actually
-   returned, which physical qubits were used, the backend's name/version,
-   a timestamp, and how long the batch took.
+### 3.2 Research questions (final numbering)
 
-These records are appended to a `.jsonl` file (one JSON object per line) —
-`<dataset>-rep-N-raw_counts.jsonl` for the baseline, and a **separate**
-`<dataset>-rep-N-trex-raw_counts.jsonl` for TREx's twirled runs (since those
-are extra hardware passes, not part of the baseline — see §6.2). Existing
-derived outputs (the final selected suite, subsuite/cluster assignments,
-Pareto fronts) are unchanged in format — the raw counts are additional data
-saved *alongside* them, not a replacement.
-
-This is what lets MEM/M3 correction happen **after the fact**, from data
-already sitting on disk, with zero additional real-hardware time.
-
----
-
-## 8. The full pipeline, end to end
-
-```mermaid
-flowchart TD
-    DS["Dataset CSVs / JSON\n(datasets/)"] --> CLU["Decompose into <=7-qubit\nsubproblems\n(clustering or impact-order,\n§2.3 — code, always the same)"]
-    CLU --> QUBO["Formulate each subproblem\nas a QUBO\n(§2.1 — code, always the same)"]
-    QUBO --> TRAIN["TRAIN: ideal-simulator QAOA\noptimizes circuit parameters\n(COBYLA, no hardware)"]
-    TRAIN --> QPY[".qpy trained circuits +\n*_qubos.json coefficients\n(trained_qaoa_circuits/)"]
-
-    QPY --> EXEC["EXECUTE: run trained circuit\non the configured backend,\n<=200 shots/batch (§5, §7)"]
-    EXEC --> RAW["raw_counts.jsonl\n(full bitstring distributions)"]
-    EXEC --> TREXRUN["TREx twirl pass:\nre-run with random X-masks,\nundo classically (§6.2)"]
-    TREXRUN --> TREXRAW["trex-raw_counts.jsonl"]
-
-    CAL["run_calibration.py:\nprepare every basis state,\nbuild confusion matrix (§6.2)"] --> CALSTORE["calibration/*.json\n(MEM + M3 calibration)"]
-
-    RAW --> CORRECT["Mitigation correction\n(local math, no hardware):\nMEM / M3 use CALSTORE;\nTREx aggregates its own twirl runs"]
-    TREXRAW --> CORRECT
-    CALSTORE --> CORRECT
-
-    CORRECT --> EVAL["evaluate_all.py:\nQUBO energy, P(optimal),\neffectiveness/cost, HV/IGD,\nmitigation overhead, timings"]
-    EVAL --> COMPARE["compare_all.py:\nShapiro-Wilk -> ANOVA/Kruskal-Wallis\n-> Tukey or Dunn+Bonferroni\n-> Cohen's d or Vargha-Delaney A12"]
-    COMPARE --> REPORT["comparison_report.txt/json\n(RQ1/RQ2/RQ3a/RQ3b/RQ4)"]
-
-    PLAN["budget_planner.py:\nreads real circuit counts,\nfits repetitions/shots/methods\ninto configs/execution_plan.yaml's\ntime pools (§10)"] -.->|"decides how much\nof EXEC to actually run"| EXEC
-
-    classDef done fill:#1a7a3c,color:#fff,stroke:#0d4a24;
-    classDef ready fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef todo fill:#b91c1c,color:#fff,stroke:#7f1d1d;
-
-    class CLU,QUBO,TRAIN,QPY,PLAN done
-    class EXEC,RAW,TREXRUN,TREXRAW,CAL,CALSTORE,CORRECT,EVAL,COMPARE,REPORT ready
-```
-
-- 🟩 **Green** = code exists **and** has real output on disk today.
-- 🟦 **Blue** = code exists, is unit-tested, but has **not actually been run**
-  yet (waiting on real/placeholder hardware access on "the other machine" —
-  see §12).
-- 🟥 **Red** = would indicate something not yet built at all — there is
-  currently nothing in that state; every stage of the pipeline has its code
-  written.
-
----
-
-## 9. The 14-combo matrix
-
-| # | Algorithm | Mode | Dataset | Circuits | Status |
-|---|---|---|---|---|---|
-| 1 | QAOA-TCS | single | gsdtsr | 79 | ✅ trained |
-| 2 | QAOA-TCS | single | iofrol | 443 | ✅ trained |
-| 3 | QAOA-TCS | single | paintcontrol | 24 | ✅ trained |
-| 4 | QAOA-TCS | single | elevator (o2) | 881 | ✅ trained |
-| 5 | QAOA-TCS | single | elevator2 (o3) | 56 | ✅ trained |
-| 6 | QAOA-TCS | multi | flex | 105 | ✅ trained |
-| 7 | QAOA-TCS | multi | grep | 139 | ✅ trained |
-| 8 | QAOA-TCS | multi | gzip | 61 | ✅ trained |
-| 9 | QAOA-TCS | multi | sed | 77 | ✅ trained |
-| 10 | IGDec-QAOA | single | iofrol | 10 samplings × 1230 | ✅ trained |
-| 11 | IGDec-QAOA | single | paintcontrol | 10 samplings × 30 | ✅ trained |
-| 12 | IGDec-QAOA | single | gsdtsr | *to do* | ⏳ training code ready, not run |
-| 13 | IGDec-QAOA | single | elevator_o2 | *to do* | ⏳ training code ready, not run |
-| 14 | IGDec-QAOA | single | elevator_o3 | *to do* | ⏳ training code ready, not run |
-
-QAOA-TCS keeps one **reusable** circuit set per dataset (the same trained
-circuits get re-run every repetition). IGDec-QAOA keeps a **fresh, one-off**
-circuit set per random-initial-solution sampling (10 samplings per dataset)
-— nothing is reused between samplings, which is why its circuit counts are
-so much larger for the bigger datasets.
-
-**Retraining is possible for all 14 today** — every training function lives
-in this repo now (`... train` mode, §13); nothing is "ported circuits only"
-anymore, even for combos 1–11 which already have circuits sitting on disk.
-
----
-
-## 10. Budget planning — turning limited hardware time into a concrete plan
-
-Real PIAST-Q time is scarce (200 shots/run, 18.4974 billed seconds/batch, measured). Before
-spending any of it, `src/piastq_execution/budget_planner.py` answers: *given
-this many hours, and this many combos/methods, what repetitions/shots/methods
-can I actually afford?* It reads the **real** circuit counts from
-`trained_qaoa_circuits/` (nothing hardcoded) and degrades gracefully, in this
-order, until the plan fits the budget:
-
-1. Drop TREx first (it's the single most expensive method — 32 extra
-   hardware passes per circuit, by default),
-2. reduce repetitions,
-3. reduce shots per circuit (never below one 200-shot batch),
-4. as an absolute last resort, drop/subsample circuits (reported explicitly).
-
-**The cost model itself, in full** — this is the one formula everything else
-is built from: every circuit costs `ceil(shots / 200) × 18.4974 seconds`
-(the billed time measured on PIAST-Q on 2026-10-29 — the same for 1-, 3- and
-7-qubit circuits; the operators' original figure was ~15 s, and the cost
-tables in this section were computed with it: multiply them by 1.233). Shots
-are requested in batches of at most 200 (the hardware limit), and *every*
-batch costs the same regardless of how full it is — so 201 shots costs exactly
-as much as 400, because it rounds up to a second whole batch. From there:
-**raw** cost for a combo = (circuits × repetitions) × per-circuit cost;
-**TREx** cost = that *same* raw cost again, multiplied by
-`trex_twirl_instances` (32 by default, §5) — a full second (and third, and
-...) set of hardware passes per circuit, not a flat surcharge; **MEM**
-calibration = `2^width` circuits, **M3** = `2×width` — both charged *once
-per distinct circuit width present in a pool*, shared across every combo/
-repetition using that width, never per combo. Everything sums per pool; if
-it exceeds the pool's hours, the four-step degradation above kicks in.
-
-**Is there a "no-TREx" mode?** No dedicated toggle exists. TREx inclusion is
-controlled entirely by whether `"trex"` appears in each combo's `methods:`
-list in `configs/execution_plan.yaml` (every combo lists it by default
-today). The planner always *attempts* whatever's listed at full target
-quality first, and automatically drops TREx — before touching repetitions
-or shots, since it's checked first as the single biggest lever — if the
-pool can't afford it. So in practice it already behaves as "always included,
-shut off automatically if the budget doesn't allow it." There's no flag to
-force "no TREx everywhere" in one shot; that means editing every combo's
-`methods:` list by hand, or trusting the automatic drop.
-
-**The plan now actually reaches execution, not just the printed report.**
-Until recently, this was purely descriptive: the plan would correctly say
-"TREx dropped for X," but every execution script still hardcoded
-`shots_per_batch=80, num_batches=1` and always ran the TREx loop regardless
-— the plan and what would actually run on hardware were disconnected. Fixed
-via `resolve_all_combo_settings()` (same module): it runs the full planner
-once and returns, per combo, exactly what to execute — repetitions, shots
-(pre-split into batches + remainder), methods, and a `trex_enabled` flag.
-Every execution script now calls this once and uses the resolved values
-instead of the old placeholder, and skips the TREx loop entirely when
-`trex_enabled` is `False` rather than running it anyway. This doesn't touch
-the QAOA circuit-depth `p` parameter or IGDec-QAOA's impact-reordering
-iteration count — both are untouched, paper-inherited parameters, separate
-from the hardware-execution repetition count this resolves.
-
-The budget is organized into **pools** — a pool is a named time budget
-(default 15h) with an explicit list of which combos share it. The shipped
-`configs/execution_plan.yaml` uses **7 pools × 15h = 105h total**, one pool
-per QAOA-TCS objective-mode and one pool per IGDec-QAOA dataset — but you can
-just as easily make it one giant pool covering all 14 combos ("global"), or
-14 separate pools of one combo each ("per_combo"): it's the same config
-shape either way, just a different `pools:` list.
-
-This has actually already been run once (safe — it only reads local `.qpy`
-files, no hardware, no AQT) and produced a real report,
-`execution_plan/execution_plan_report.txt`. A few real numbers from it, so
-this isn't hypothetical:
-
-```
-Pool: qaoa_tcs_single_objective   Budget: 15h  Estimated: 13.65h  Fits: True
-  Repetitions: 1   Shots/circuit: 248
-  Dropped TREx for all 5 combos (TREx alone wasn't enough to fit; more degradation still needed)
-
-Pool: qaoa_tcs_multi_objective    Budget: 15h  Estimated: 14.03h  Fits: True
-  Repetitions: 1   Shots/circuit: 1448
-  Dropped TREx for all 4 combos
-
-Pool: igdec_qaoa_iofrol          Budget: 15h  Estimated: 10.84h  Fits: True
-  Repetitions: 1   Shots/circuit: 248
-  Dropped TREx (insufficient alone; repetitions/shots also had to shrink)
-
-Pool: igdec_qaoa_paintcontrol     Budget: 15h  Estimated: 14.34h  Fits: True
-  Repetitions: 10  Shots/circuit: 2048
-  Dropped TREx (only method dropped — repetitions/shots stayed at target)
-
-Pool: igdec_qaoa_gsdtsr / elevator_o2 / elevator_o3   Estimated: 0.00h
-  (these combos have NO trained circuits yet — an empty inventory costs 0h,
-  which is a false positive, not a real budget win, once trained circuits
-  exist there TREx will very likely be dropped there too)
-
-Summary: Total budget 105.00h, total estimated 52.86h, all pools fit.
-```
-
-**Takeaway**: even 105 hours of pooled real-hardware time isn't enough to
-keep TREx everywhere at the "target" repetitions/shots — this is a concrete,
-already-measured illustration of §6.2's point that TREx is expensive. If you
-need TREx data for a specific combo, give it its own pool with more hours, or
-lower `trex_twirl_instances` (currently 32) for that run.
-
-### 10.0 QAOA-TCS-only feasibility at a fixed repetitions count, varying TREx strength
-
-This is a narrower scenario than the rest of §10: a fixed set of choices,
-with only one thing varied, to see exactly where the line falls.
-
-**What's fixed in this scenario:**
-- **Scope: QAOA-TCS only, 9 combos** (5 single-objective: `gsdtsr`, `iofrol`,
-  `paintcontrol`, `elevator`, `elevator2`; 4 multi-objective: `flex`, `grep`,
-  `gzip`, `sed`). IGDec-QAOA's 2 currently-trained combos (`iofrol`,
-  `paintcontrol`) are excluded entirely from this scenario — not included at
-  reduced quality, simply not considered at all.
-- **Repetitions = 5.** This is how many times QAOA-TCS's (reusable) trained
-  circuit set for a combo gets re-submitted to hardware — the statistical-
-  robustness repeat count (§10's cost model), fixed here at 5 rather than
-  the paper's own target of 10 (§16) or degraded further to 1.
-- **Shots per circuit = 200**, the hardware floor — one full 200-shot batch
-  per circuit, the minimum meaningful measurement, not reduced or increased
-  further in this scenario.
-- **Every included combo gets all four methods together**: raw + MEM + M3 +
-  TREx. "Included" means the combo's full raw+MEM+M3+TREx run fits the
-  budget at the fixed repetitions/shots above — not a partial run.
-
-**What's varied: `trex_twirl_instances`, called `T` below, from 1 to 10.**
-This is the number of independently-randomized measurement-twirl passes
-TREx runs per circuit (§5/§6.2) — each one applies a different random
-bit-flip mask right before measurement, gets undone classically, and the
-results are averaged together to cancel out systematic readout bias. `T` is
-*not* the same thing as repetitions: repetitions re-run the same circuit for
-statistical robustness of the selection outcome; `T` is how many *extra*
-hardware passes TREx itself needs per circuit per repetition, on top of that,
-purely for its own correction method. `T=32` is this repo's shipped default
-(`configs/execution_plan.yaml`); this scenario asks what happens at each
-whole-number value from 1 up to 10 instead.
-
-**The two budgets, 15h and 24h**, are each their own independent single-pool
-question — "if I only had this many hours for this scenario, which combos
-would fit" — not a combined 39h pool.
-
-**How "which combos fit" is decided**: for each `T`, every one of the 9
-combos' full raw+MEM+M3+TREx cost is computed via the real cost model
-(`budget_planner._pool_seconds`, same as everywhere else in this document,
-not hand arithmetic). Then, for each budget, combos are added starting from
-the cheapest, and a swap pass checks whether trading an already-chosen combo
-for a cheaper unchosen one allows fitting more combos in overall — the same
-method used in §10.1's TREx subset.
-
-| T | 15h: combos included | 24h: combos included |
+| RQ | Question | Metrics |
 |---|---|---|
-| 1 | 5: `elevator2`, `gsdtsr`, `gzip`, `paintcontrol`, `sed` | 7: `elevator2`, `flex`, `grep`, `gsdtsr`, `gzip`, `paintcontrol`, `sed` (23.83h) |
-| 2 | 4: `elevator2`, `gzip`, `paintcontrol`, `sed` | 5: `elevator2`, `gsdtsr`, `gzip`, `paintcontrol`, `sed` (19.85h) |
-| 3 | 3: `elevator2`, `gzip`, `paintcontrol` | 4: `elevator2`, `gzip`, `paintcontrol`, `sed` (19.46h) |
-| 4 | 2: `elevator2`, `paintcontrol` | 4: `elevator2`, `gzip`, `paintcontrol`, `sed` (24.00h) |
-| 5 | 2: `elevator2`, `paintcontrol` | 3: `elevator2`, `gzip`, `paintcontrol` (18.92h) |
-| 6 | 2: `elevator2`, `paintcontrol` | 3: `elevator2`, `gzip`, `paintcontrol` (21.85h) |
-| 7 | 2: `elevator2`, `paintcontrol` | 2: `elevator2`, `paintcontrol` (14.62h) |
-| 8 | 1: `paintcontrol` | 2: `elevator2`, `paintcontrol` (16.29h) |
-| 9 | 1: `paintcontrol` | 2: `elevator2`, `paintcontrol` (17.96h) |
-| 10 | 1: `paintcontrol` | 2: `elevator2`, `paintcontrol` (19.62h) |
+| **RQ1** | Does mitigation (MEM, M3, TREx) improve solution **quality** over raw hardware output? | single-objective: QUBO energy of the selected solution, probability of the optimal bitstring; multi-objective: hypervolume (HV), inverted generational distance (IGD), number of non-dominated solutions |
+| **RQ2** | Does better quality translate into a better **selected test suite**? | single-objective: `execution_cost` and the dataset effectiveness indicator (`failure_rate`) of the final suite. Multi-objective programs have no separate suite-level indicator beyond RQ1's Pareto metrics |
+| **RQ3** | Which technique gives the best **improvement per second of billed QPU time**? | billed QPU seconds of the executions and of the calibration, related by hand to RQ1/RQ2 gains |
 
-### 10.1 So what does a realistic TREx subset actually look like?
+History (useful when reading older commits/docs): an earlier design had RQ3a
+("which method improves quality most, regardless of cost"), RQ3b (cost) and RQ4
+(QAOA-TCS vs IGDec-QAOA). RQ3a was merged into RQ1 as a discussion point (it is
+the same comparison), RQ3b became RQ3, and RQ4 was dropped because IGDec-QAOA
+was not executed (§3.4).
 
-Picking up the point above with real numbers, computed via the planner's own
-cost model (`budget_planner._pool_seconds`), not hand arithmetic: the full
-TREx-inclusive cost (raw pass + all 32 twirl instances) of every combo that
-currently has trained circuits, at one repetition and the 200-shot floor:
+### 3.3 Subjects and why these four
 
-| Combo | Circuits (rep=1) | Hours (TREx incl., floor shots) | Hours (TREx incl., target 2048 shots) |
-|---|---|---|---|
-| paintcontrol (QAOA-TCS) | 24 | 3.3h | 36.3h |
-| paintcontrol (IGDec-QAOA) | 30 | 4.1h | 45.4h |
-| elevator2 (QAOA-TCS) | 56 | 7.7h | 84.7h |
-| gzip (multi-obj) | 61 | 8.4h | 92.3h |
-| sed (multi-obj) | 77 | 10.6h | 116.5h |
-| gsdtsr (QAOA-TCS) | 79 | 10.9h | 119.5h |
-| flex (multi-obj) | 105 | 14.4h | 158.8h |
-| grep (multi-obj) | 139 | 19.1h | 210.2h |
-| iofrol (QAOA-TCS) | 443 | 60.9h | 670.0h |
-| elevator (QAOA-TCS) | 881 | 121.1h | 1332.5h |
-| iofrol (IGDec-QAOA) | 1230 | 169.1h | 1860.4h |
+QAOA-TCS on `gsdtsr` and `paintcontrol` (single-objective) and `flex` and
+`gzip` (multi-objective). Two of each type so conclusions are not tied to one
+problem type. They were the subset that fits the 25-QPU-hour allowance and the
+6 Nov deadline: `iofrol` (443 circuits), `elevator` (881) and `grep`/`sed`
+need several times the machine time; `elevator2`'s 56 saved circuits do not
+match the current clustering (800 target clusters) and cannot be evaluated.
 
-Six combos fit a full TREx pass inside one ~15h overnight session each
-(paintcontrol ×2, elevator2, gzip, gsdtsr, sed — roughly 45h combined),
-`grep` is borderline (~19h), and the three large combos (`iofrol` under
-both algorithms, `elevator`) are a journal-scale ask — many dedicated
-sessions, or a much lower `trex_twirl_instances` than 32.
+### 3.4 What is explicitly out of scope
 
-**A realistic conference-scope choice**: the six comfortably-fitting combos,
-given their own dedicated pool(s) with enough hours to actually keep TREx —
-rather than the shipped default, which spreads a fixed 15h thin across
-every combo and drops TREx everywhere real circuits currently exist.
+* **IGDec-QAOA** (the second algorithm of the original study) is implemented
+  and unit-tested here (§18) but was **not run on the hardware**, so no
+  algorithm comparison is made.
+* Mitigation scope is **readout error only**. Gate-error mitigation is not
+  studied.
+* Only `p = 1` circuits (`rep_1`) are used.
 
-**A gap worth knowing about before relying on this**: while verifying the
-qubit-layout fix (§6.4), we found that `paintcontrol`'s path through
-`loch_qaoa_tcm_extract_circuits.py` (the "small dataset" branch,
-`problem_size <= 0.15 * len(df)`) never runs a TREx pass — only the "large
-dataset" branch (which `iofrol`/`gsdtsr` go through) does. So **IGDec-QAOA's
-`paintcontrol` combo cannot produce TREx data today, regardless of
-budget**, until that's fixed separately — not done as part of this round.
+---
 
-No code changes were made for this subsection — it's planning information
-only, computed from the already-implemented cost model.
+## 4. Subjects in detail: datasets, QUBOs, clustering, circuits
 
-### 10.2 The complete table: every single dataset and every meaningful combination
+### 4.1 Datasets (`datasets/`)
 
-Everything below is computed by actually calling the planner's own
-`_pool_seconds`/`plan_pool` functions against the real, currently-trained
-circuit inventory — not hand arithmetic. Only the 11 combos that have real
-trained circuits today are included (`gsdtsr`, `elevator_o2`, `elevator_o3`
-for IGDec-QAOA have none yet — an empty inventory would show as a misleading
-0.00h, not a real number, so they're left out rather than shown wrong).
-
-**"Hours to do everything"** here means the *full, undegraded target*: 10
-repetitions, 2048 shots/circuit (`configs/execution_plan.yaml`'s own
-`target_repetitions`/`target_shots_per_circuit`) — i.e. what it would really
-cost with no compromises at all, shown both without and with TREx, so the
-table also directly shows how much of that cost TREx alone is responsible
-for.
-
-**Every single dataset/algorithm combo:**
-
-| Combo | Circuits (1 rep) | Hours — no TREx | Hours — with TREx |
-|---|---|---|---|
-| paintcontrol (QAOA-TCS) | 24 | 12.2h | 364.2h |
-| paintcontrol (IGDec-QAOA) | 30 | 14.3h | 454.3h |
-| elevator2 (QAOA-TCS) | 56 | 27.0h | 848.3h |
-| gzip (multi-obj) | 61 | 29.3h | 923.9h |
-| sed (multi-obj) | 77 | 36.6h | 1,165.9h |
-| gsdtsr (QAOA-TCS) | 79 | 37.5h | 1,196.2h |
-| flex (multi-obj) | 105 | 49.4h | 1,589.4h |
-| grep (multi-obj) | 139 | 65.0h | 2,103.7h |
-| iofrol (QAOA-TCS) | 443 | 204.3h | 6,701.7h |
-| elevator (QAOA-TCS) | 881 | 405.1h | 13,326.4h |
-| iofrol (IGDec-QAOA) | 1,230 | 564.3h | 18,604.3h |
-
-**Meaningful combinations** (natural groupings a study would actually
-compare — not every one of the 2,047 possible subsets of 11 combos, which
-wouldn't be a useful table):
-
-| Combination | # combos | Circuits (1 rep) | Hours — no TREx | Hours — with TREx |
+| Subject | Mode | Source | Tests | Attributes used |
 |---|---|---|---|---|
-| QAOA-TCS, single-objective (5) | 5 | 1,483 | 681.0h | 22,431.7h |
-| QAOA-TCS, multi-objective (4) | 4 | 382 | 176.4h | 5,779.0h |
-| QAOA-TCS, everything (9) | 9 | 1,865 | 856.1h | 28,209.4h |
-| IGDec-QAOA, everything trained (2) | 2 | 1,260 | 578.1h | 19,058.1h |
-| `iofrol`, both algorithms | 2 | 1,673 | 768.1h | 25,305.4h |
-| `paintcontrol`, both algorithms | 2 | 54 | 26.0h | 818.0h |
-| **Everything trained today (11)** | **11** | **3,125** | **1,433.6h** | **47,266.9h** |
+| `gsdtsr` | single | Google shared test-suite results (CSV, rows with failure rate > 0 only) | 287 | execution time (`cost`), failure rate |
+| `paintcontrol` | single | ABB Robotics painting-robot suite (CSV, rate > 0) | 89 | execution time, failure rate |
+| `flex` | multi | SIR benchmark C program (`datasets/sir_programs`) | 567 | cost, fault coverage, statement coverage |
+| `gzip` | multi | SIR benchmark C program | 214 | cost, fault coverage, statement coverage |
 
-The scale here is exactly why the budget planner exists at all: "everything,
-no compromises, with TREx" is ~47,267 hours — over 5 years of continuous
-machine time. This table is the reference ceiling, not a real plan; §10.1
-and §10.3 below are the real plans.
+(`single_obj.get_data` filters `rate > 0` for the TCM datasets; for `gsdtsr`
+the raw CSV has 5,555 rows, 287 remain.)
 
-### 10.3 Within 15h and within 24h: the most complete thing actually achievable
+### 4.2 QUBO formulations (inherited, not changed here)
 
-The intuitive framing — "which combos do we have to drop to fit?" — turns
-out to be the wrong question. Computed via the real cost model: **all 11
-currently-trained combos together, at 1 repetition and the 200-shot floor,
-with no TREx anywhere, cost only 14.31h.** Nothing has to be dropped for
-either budget — the real question becomes what quality (reps/shots/TREx)
-that 14.31h baseline can be improved to with the rest of the budget.
+* **Single-objective** (`make_linear_terms_bootqa`): for test `t` in a cluster,
+  `l_t = α · cost_t / max_cost − (1 − α) · failure_rate_t`, **linear terms
+  only**. α per dataset: `gsdtsr` **0**, `paintcontrol` **0.45** (also
+  `iofrol` 0.50, `elevator` 0.20, `elevator2` (0.1, 0.9, 0.9), unused here).
+  Per the original paper these α values come from an Optuna search; the exact
+  final values are carried over as-is.
+  * **Consequence for interpretation:** with α = 0 (`gsdtsr`) the QUBO ignores
+    cost entirely, so QUBO energy = −(summed failure rate of the selected
+    tests) *exactly*. For `gsdtsr` the RQ2 indicator `failure_rate` is therefore
+    **the energy with the opposite sign — not independent evidence** — and a
+    higher suite `execution_cost` simply means more tests were selected.
+    For `paintcontrol` (α = 0.45) energy and failure rate are different.
+* **Multi-objective** (`multi_obj.make_linear_terms` /
+  `make_quadratic_terms`, α = 0.5): linear term
+  `0.5·cost_t/max_cost − 0.5·fault_t`; a quadratic penalty
+  (`2·penalty` per pair, with `penalty = max single-test term + 1`) between two
+  tests of the same cluster that cover the same statement, discouraging
+  redundant coverage.
+  * **Inherited quirk (observation, not verified against the original
+    paper):** `make_quadratic_terms` tests `i not in variables`, comparing a
+    *global* test id with the cluster's *local* variable indices `0..k−1`, so
+    most pairs are skipped. This matches what is observed in the saved QUBOs:
+    non-empty quadratic parts in only 1 of 105 `flex` clusters and 1 of 61
+    `gzip` clusters. The multi-objective QUBOs are therefore effectively linear.
+    The saved trained circuits were used exactly as they are.
 
-That answer turns out to be almost entirely constrained by shot-batch
-quantization, not the 15h-vs-24h difference itself: going from 200 shots/
-circuit to the very next tier (248) requires a *second* full 200-shot batch
-for every one of the 3,125 circuits in the pool — which alone costs 27.3h,
-already over **both** 15h and 24h. So neither budget can afford more
-repetitions or more shots for the complete 11-combo set; the only lever
-left is spending whatever's left over on TREx for a few of the cheapest
-combos.
+### 4.3 Clustering (deterministic)
 
-| Budget | Base (11 combos, 1 rep, 200 shots, no TREx) | Leftover | TREx added, cheapest-first | Final total | Leftover unused |
-|---|---|---|---|---|---|
-| **15h** | 14.31h (all 11 combos, Raw+MEM+M3) | 0.69h | *none* — the cheapest possible TREx add-on (`paintcontrol_igdec_qaoa`) needs ~3.4h more than that | **14.31h** | 0.69h |
-| **24h** | 14.31h (all 11 combos, Raw+MEM+M3) | 9.69h | `paintcontrol_igdec_qaoa`, then `paintcontrol_qaoa_tcs` | **21.51h** | 2.49h (not enough for the next-cheapest, `elevator2_qaoa_tcs`) |
+Ward linkage on the standardized attributes, `fcluster(maxclust)` with target
+cluster counts `gsdtsr` 60, `paintcontrol` 16, SIR programs 50, then splitting
+of clusters larger than 7 into balanced parts. These cluster counts are
+inherited engineering defaults (not derived in the paper); after splitting the
+final numbers of clusters/circuits are 79, 24, 105 and 61.
 
-**In plain terms:**
-- **Within 15h**, the most complete run achievable is: *all 11 combos*, 1
-  repetition, 200 shots/circuit, Raw+MEM+M3 for every one of them, no TREx
-  anywhere. 14.31h of a 15h budget, no room for anything more.
-- **Within 24h**, the same *all 11 combos* at the same 1 repetition/200
-  shots/Raw+MEM+M3 baseline, **plus a full TREx pass on both `paintcontrol`
-  combos** (the two cheapest in the whole matrix) — 21.51h of a 24h budget,
-  with about 2.5h left over (not quite enough for a third).
+### 4.4 Resulting circuits (measured from `trained_qaoa_circuits/`)
 
-This isn't something the shipped `configs/execution_plan.yaml` produces
-automatically today — the planner's built-in degradation is all-or-nothing
-per pool (it drops TREx for *every* combo in a pool at once, §10, phase 2),
-not "keep TREx for the cheap ones, drop it for the expensive ones within the
-same pool." Getting exactly this plan means hand-picking which combos'
-`methods:` list includes `trex` before running the planner (or running it
-programmatically the way this section did) — worth doing deliberately if
-this is the plan you want to execute, rather than assuming the shipped
-config already produces it.
+Circuit widths (number of circuits with that many qubits):
 
----
+| Subject | clusters = circuits | 1q | 2q | 3q | 4q | 5q | 6q | 7q | circuits with a 2-qubit gate | circuits with a non-empty quadratic QUBO part |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `gsdtsr` | 79 | 22 | 11 | 7 | 8 | 10 | 7 | 14 | 0 | 0 |
+| `paintcontrol` | 24 | 6 | 4 | 0 | 3 | 5 | 4 | 2 | 0 | 0 |
+| `flex` | 105 | 4 | 5 | 1 | 12 | 25 | 29 | 29 | 1 | 1 |
+| `gzip` | 61 | 13 | 7 | 6 | 18 | 10 | 2 | 5 | 1 | 1 |
 
-## 11. Evaluation & statistics — what gets measured, and why
+After unrolling, the circuits consist of single-qubit `u3`/`u` gates (plus
+`cx`/`u1` in the two circuits that have a quadratic part), followed by
+measurement.
 
-`piastq_execution/evaluation.py` computes, per combo × per mitigation method
-(raw/MEM/M3/TREx):
+**Noiseless reference** (computed from the exact statevectors of the saved
+circuits by `src/piastq_execution/ideal_reference.py`, file
+`results/evaluation/ideal_reference.json`; infinite shots, no noise):
 
-- **Single-objective combos**: QUBO energy of the final solution, the
-  probability that the *actual optimal* bitstring was returned (computed by
-  brute force — only 128 possibilities for 7 qubits, trivial), the final
-  suite's execution cost and dataset-specific effectiveness metric (failure
-  rate / input diversity / passenger-count+distance), quantum execution time,
-  mitigation overhead (calibration circuits + measured wall-clock time), and
-  classical post-processing time.
-- **Multi-objective combos**: number of non-dominated solutions contributed
-  to a shared reference Pareto frontier, **Hypervolume (HV)** (how much of
-  the "good" region of objective-space your frontier covers) and **Inverted
-  Generational Distance (IGD)** (how far your frontier is from the best
-  frontier anyone achieved), plus the same timing/overhead metrics as above.
+| Subject | mean P(optimal) | clusters where the most likely bitstring is the optimum | Σ QUBO energy of the argmax bitstrings | Σ energy of the brute-force optima |
+|---|---|---|---|---|
+| `gsdtsr` | 0.3770 | 79 / 79 | −8.7432 | −8.7432 |
+| `paintcontrol` | 0.7884 | 24 / 24 | −8.5357 | −8.5357 |
+| `flex` | 0.9301 | 105 / 105 | −304.0214 | −304.0214 |
+| `gzip` | 0.7531 | 60 / 61 | −120.0745 | −190.6219 |
 
-One point worth knowing about **IGDec-QAOA**: its subproblem sequence
-(each circuit's `case_list`) is fixed by training, and the hardware scripts
-execute exactly that sequence (they read `case_list` from the circuit's own
-metadata; an earlier version recomputed it from the hardware solution, which
-diverges from training and wrote circuits' bits onto the wrong tests). Since
-the sequence is the same for every method, raw/MEM/M3/TREx each get a real
-final suite by replaying it with their own per-circuit bitstrings, starting
-from the sampling's initial random solution (`merge_igdec_solution`). So RQ2
-works for IGDec-QAOA too. The price: each circuit's QUBO stays conditioned on
-the ideal-simulator solution it was trained on, so the hardware run is "ideal
-trajectory, hardware-filled bits", not a fully adaptive re-ranking. Say this
-in the paper.
+Two take-aways: (i) an ideal machine would recover the exact optimum in every
+cluster of three subjects, so any shortfall on hardware is attributable to
+noise and finite shots; (ii) in `gzip` one trained circuit (the one with the
+quadratic term) does not reach its optimum even noiselessly and accounts for
+the whole energy gap. Note that the *probability* of the optimum is not close to
+1 even without noise (`gsdtsr` 0.377), because the `p = 1` QAOA output is
+spread over many bitstrings: **the argmax is robust while P(optimal) is a
+noisy, low-contrast indicator.**
 
-`piastq_execution/statistics.py` then statistically compares methods:
-Shapiro-Wilk checks whether each group of results looks normally
-distributed; if so, ANOVA + Tukey HSD + Cohen's d; if not,
-Kruskal-Wallis + Dunn's test (Bonferroni-corrected) + Vargha-Delaney Â₁₂.
-This mirrors the statistical methodology of the original paper this whole
-project builds on.
+### 4.5 Persisted QUBO coefficients (`*_qubos.json`)
 
-**The four research questions this whole package exists to answer:**
-
-- **RQ1**: does mitigation (MEM/M3/TREx) actually improve solution quality
-  (QUBO energy, probability of the true optimum) on real hardware?
-- **RQ2**: does that translate into a practically better test suite
-  (lower cost, higher effectiveness / better Pareto frontier)?
-- **RQ3a**: among the three methods, which improves quality the most,
-  regardless of cost? (§6.3's readout-vs-other-noise question lives here.)
-- **RQ3b**: normalizing RQ3a by what each method actually costs in measured
-  hardware time — which gives the best quality-per-second?
-- **RQ4** (not addressed by the planned run, which excludes IGDec-QAOA): how
-  do QAOA-TCS and IGDec-QAOA compare on the same dataset/metric, with and
-  without mitigation?
+Evaluation needs each circuit's QUBO. The originally ported circuits had none,
+so `single_obj.py qubos` / `multi_obj.py qubos` ("QUBO backfill", stage 1b of
+`run_all.py`) rebuild them from the deterministic clustering **without
+retraining** and verify them against the saved circuits (cluster count and
+every circuit's qubit count must match, otherwise nothing is written). The
+files `trained_qaoa_circuits/qaoa_tcs/<subject>/rep_1/<subject>_rep1_qubos.json`
+are required for `evaluate_all.py`; they are part of the committed package.
 
 ---
 
-## 12. What has actually been run, right now
+## 5. Training of the circuits (offline, before the study)
 
-This is the section to trust over any assumption. Verified directly against
-the files on disk (not just what the code is *capable* of):
+Circuit training is **not** part of the hardware study and was done earlier
+(ported from the original `SelectQAOA/MOQ-Pipeline.ipynb`). For reproducibility
+the training code lives in `single_obj.py train` / `multi_obj.py train`:
 
-| Stage | Code exists? | Actually executed? | Evidence |
+* ideal noiseless simulator (`qiskit_aer` `Sampler`, `shots = None`),
+* `qiskit_algorithms.QAOA(sampler, COBYLA(maxiter=500), reps=1)`,
+* one optimization per cluster; the optimal point is bound into the ansatz and
+  saved as `.qpy`.
+
+**Reproducibility caveat:** QAOA-TCS's training is not explicitly seeded, so
+re-running `train` is not guaranteed to reproduce the same `.qpy` files. The
+committed `.qpy` files are the artifacts the study used. (IGDec-QAOA's training
+*is* seeded, via `seeding.seed_for_sampling`.)
+
+---
+
+## 6. The machine and how it is reached
+
+### 6.1 PIAST-Q
+
+A 20-qubit trapped-ion quantum computer reached through the PCSS (Poznań)
+service. The Python access library is `pcss-qapi` (0.3.2), which exposes an
+AQT-style resource; circuits are submitted through `qiskit-aqt-provider`
+(`AQTSampler`). Constraints: **at most 200 shots per run**; **25 QPU hours** of
+*billed* time for the study. Records report the backend as `direct-access`,
+version `2`.
+
+### 6.2 Billing and latency — the measurements that shaped the design
+
+Measured on 29 Oct 2026 from the service's usage counter (`/me/usage`):
+
+* A **200-shot job is billed 18.4974 s regardless of the number of qubits**
+  (1, 3 and 7 qubits all identical); a 100-shot job 10.0774 s. Fitted model:
+  `1.6574 + 0.0842 × shots` (`qpu_usage.py`). The operators had announced "about
+  15 s"; the measurement supersedes it.
+* Idle time inside a session is not billed; failed jobs bill 0.
+* **Wall-clock is the real bottleneck.** Every job occupies the machine for
+  roughly 2–5 minutes of unbilled overhead and waits in a shared queue. A
+  one-circuit-per-job run (≈ 4,400 jobs) would take 9–15 days. Jobs outside a
+  session have priority 1, session jobs 20, but sessions gave no speed-up.
+* The service API supports cancelling queued jobs (`POST /jobs/{id}/cancel`,
+  409 if running).
+
+### 6.3 Where the code runs
+
+* Reaching the machine needs a VPN, a token and Python ≥ 3.11. The study ran on
+  the PCSS **Slurm cluster** (login `150.254.192.221`; the VPN is only needed to
+  reach the login node, the compute node reaches the service API), in a
+  Python 3.12 virtual environment (`requirements.txt` pins `qiskit==1.4.6`,
+  `qiskit-aqt-provider==1.15.0`, `pcss-qapi==0.3.2`, …; `qiskit` must stay < 2).
+* `run_cluster.sh` is the Slurm launcher (1 node, 4 CPUs, 16 GB, partition
+  `all`, no time limit). **It alone switches on the real machine** via
+  environment variables (`PIASTQ_BACKEND_NAME=piast_q`,
+  `PIASTQ_ALLOW_REAL_HARDWARE=1`, `PIASTQ_API_TOKEN` read from
+  `~/.piastq_token`, chmod 600). The committed repo files stay on the safe
+  offline simulator (`configs/backend.yaml`: `offline_simulator_no_noise`), so
+  nothing real can start by accident. The token is never committed; the
+  `piastq_vpn/` folder with VPN credentials is git-ignored.
+
+---
+
+## 7. Execution design: how circuits were run on the hardware
+
+### 7.1 Per-circuit protocol
+
+For every subject and every repetition (`iteration_id` 1…10) and every cluster:
+
+1. load the frozen `.qpy` circuit;
+2. **raw pass:** the circuit with its measurement, 200 shots (one batch);
+3. **TREx passes:** 3 independent copies, each with a fresh random X-twirl mask
+   before measurement (§8.4), 200 shots each (600 shots in total);
+4. every circuit is transpiled with `optimization_level=3` to the machine's
+   native gates, with an explicit `initial_layout` (the physical qubits it was
+   assigned), so the execution and its calibration use the same qubits.
+
+Record naming: files are called `<subject>-rep-1-…`. **"rep-1" is the QAOA
+depth `p = 1`, not a repetition.** The 10 repetitions are the `iteration_id`
+values 1…10 inside the files.
+
+### 7.2 Packing: several circuits per job
+
+Because wall-clock was the bottleneck and the billed time per job does not
+depend on qubit count (§6.2), the 20 qubits are split into three fixed
+**slots**: `pack_slots: [[0,7],[7,7],[14,6]]` (`configs/backend.yaml`;
+first qubit, width). `src/piastq_execution/packing.py`:
+
+* `plan_packs` places circuits with a deterministic **first-fit-decreasing**
+  rule: widest first, each into the first job whose slot still has room,
+  several circuits can follow one another inside a slot; observed fill
+  90–98 % of the 20 qubits.
+* `build_packed_circuit` composes the member circuits side by side on disjoint
+  qubits of one combined circuit (dropping their own measurements and measuring
+  every qubit once), and returns the physical layout.
+* After the run, `marginalize_counts` splits the joint counts per circuit by
+  marginalizing the classical bits of its window.
+* Each circuit keeps **its own 200 shots, its own counts and its own
+  `RawCountsRecord`**, with `physical_qubit_mapping` pointing at its real
+  window. The job's billed time is **shared among members in proportion to
+  their qubit share** (`member_record_from_joint`); consequently
+  `execution_time_seconds` of a subject depends slightly on the packing mix
+  (TREx/raw ratios are 3.0–3.1×, not exactly 3).
+
+Within one (subject, repetition) the raw circuits of all clusters and all their
+TREx copies are packed together, so a job mixes raw and TREx circuits. The
+statistical independence of circuits is by construction (disjoint qubits), but
+neighbours run simultaneously (possible readout crosstalk; MEM/M3 were
+calibrated with all slots active, §9.1, to reflect this).
+
+### 7.3 Concurrency, retries, resume, safety stops
+
+* **Concurrency.** Up to `MAX_JOBS_IN_FLIGHT = 16` jobs are submitted at once
+  (thread pool, one sampler per job). They wait in the shared queue together;
+  the machine still runs them one at a time. This overlaps queue waits.
+* **Retries.** A job that comes back `status: failed` is resubmitted up to
+  `MAX_JOB_ATTEMPTS = 3` (`raw_counts._submit_and_wait`); failed jobs bill 0.
+  Transport errors while waiting for a result are retried every 5 s for about
+  30 minutes without resubmitting (`backend_config._harden_pcss_backend`); a
+  *submit* that times out or fails to connect is also retried (this was added
+  during the study after a `ReadTimeout`, §11.2; at worst it leaves one orphan
+  job of ≈ 18.5 s).
+* **Resume.** `python run_all.py --resume` (env `PIASTQ_RESUME=1`) reuses every
+  circuit already in the raw-counts files, skips fully finished jobs, skips a
+  finished calibration and drift check, and skips the pilot gate. A half-written
+  last line of a `.jsonl` file (interrupted write) is repaired before appending.
+  Records are keyed by `(circuit_id, iteration_id)`; **this is what let the
+  study be extended from 5 to 10 repetitions**: repetitions 1–5 were reused
+  and only 6–10 were executed (verified on a simulator copy before the real
+  extension: no duplicates, first records unchanged).
+* **Budget stop.** Before every batch, `qpu_usage.check_budget` reads the
+  account's billed time from the service and refuses to submit if the next
+  batch would cross `PIASTQ_QPU_LIMIT_SECONDS` (25 h minus a margin of
+  `(16 + 2) × 18.4974 s` for jobs already in flight).
+* **Pilot gate.** After calibration, `run_all.py` projects the whole run from
+  the billed seconds per calibration job and aborts if the projection exceeds
+  25 h (skipped on resume, because nothing is billed then and wall-clock on the
+  real machine is queue wait, not QPU time).
+
+### 7.4 Pipeline orchestration (`run_all.py`)
+
+Stages, in order: (1) unit tests; (1b) QUBO backfill; (2) budget plan;
+(3) calibration (also saves a backend-properties snapshot); (4) pilot gate;
+(5) QAOA-TCS single-objective; (6) QAOA-TCS multi-objective; (7) IGDec-QAOA
+(only if planned — not in this study); (8) end-of-session drift check;
+(9) evaluation and statistical comparison. A failing stage stops the run;
+`--resume` continues. The unit-test stage runs with every `PIASTQ_*` variable
+stripped so tests can never reach the real service. Output: console,
+`logs/run_all_<time>.log`, `logs/run_summary_<time>.json` (the `logs/` folder
+is git-ignored, so those files are not in a clone; the facts they held are
+recorded in §11).
+
+### 7.5 Budget planner (`budget_planner.py`)
+
+Converts a time budget into an execution plan using the cost model
+`ceil(shots/200) × 18.4974 s` per circuit execution. For this study
+(`configs/execution_plan.yaml`: one pool `reduced_scope_run`, the four
+subjects, all four methods, 10 repetitions, 200 shots, 3 twirls) its
+one-circuit-per-job **upper bound** is ≈ 56.9 h; the cap `total_hours: 80` is
+only the planner's own ceiling and must stay above that bound, otherwise the
+planner would silently drop TREx or repetitions. The real need, thanks to
+packing, was ≈ 13.6 h. (`execution_plan/execution_plan_report.*` is the output
+of the planner for the shipped configuration.)
+
+---
+
+## 8. The four methods: raw, MEM, M3, TREx — as implemented
+
+All four are evaluated on the same circuits; the "answer" of a cluster is the
+**argmax** of the (corrected) distribution, with a deterministic,
+method-independent tie-break (highest probability rounded to 12 digits, then
+smallest bitstring) so floating-point noise cannot create a spurious effect.
+
+### 8.1 Raw (baseline)
+
+The normalized counts of the raw pass (200 shots).
+
+### 8.2 MEM — full measurement-error mitigation
+
+`mitigation.build_confusion_matrix` builds the full `2^w × 2^w` assignment
+matrix `A[measured, prepared]` from the calibration; the corrected
+distribution solves `A x = p_noisy` by **non-negative least squares**
+(`scipy.optimize.nnls`) and is renormalized (fallback: pseudo-inverse with
+clipping). It uses the **same raw counts as raw** (no extra execution).
+
+### 8.3 M3 — matrix-free measurement mitigation
+
+Per-qubit 2×2 assignment matrices are combined as a tensor product restricted
+to the observed outcomes; the correction is computed with the `mthree` package
+(iterative solver; a reduced-support NNLS fallback exists if `mthree` is
+missing — not used in the study). `mthree` returns a *quasi-probability* distribution (entries can be slightly negative; it is not clipped), which is what the evaluation uses for `probability_of_optimal`; the argmax is taken on it. Again **same raw counts as raw**. Tiny
+numerical differences between runs (≈ 1e-8 in probabilities) come from the
+iterative solver's tolerance; no argmax changed.
+
+### 8.4 TREx — measurement twirling, **without rescaling**
+
+For each of the 3 passes a random mask `m ∈ {0,1}^w` is drawn
+(`generate_random_twirl_mask`, from an **unseeded** `random.Random()`; the mask
+is stored in the record, so the analysis is reproducible even though the draw
+is not), an `X` gate is applied to the masked qubits right before measurement
+(`build_trex_twirled_circuit`), the measured bits are XOR-ed back with the mask
+(`undo_trex_twirl`) and the three corrected count dictionaries are **summed**
+(`aggregate_trex_instances`; 600 shots). **No calibration and no rescaling step
+is applied.** This is the twirling half of TREx only: it converts a systematic
+(here, one-sided 1→0) readout bias into a symmetric one but does not invert it,
+so it can at best change which bitstring wins the argmax in ways that are not
+guaranteed to be improvements. All TREx findings in this study apply to *this*
+variant. TREx also receives 3× the shots of raw (a confound, §14).
+
+---
+
+## 9. Calibration design and what it measured
+
+### 9.1 Design (`run_calibration.py`)
+
+Calibration is measured on the same slots the packed jobs use and under the
+same conditions (all slots active at once):
+
+* **M3: 2 jobs** — every qubit prepared in |0⟩, then every qubit in |1⟩ — give
+  each of the 20 qubits its 2×2 assignment matrix (one record, qubits 0–19).
+* **MEM: 128 jobs** (2^widest-slot). In job `j` each slot prepares basis state
+  `j mod 2^(slot width)`, so after 128 jobs every slot has seen all of its own
+  basis states: **one full confusion matrix per slot** (3 records: qubits
+  0–6, 7–13, 14–19).
+* 200 shots per calibration job.
+* The matrix of any circuit window inside a slot is derived by
+  **marginalization** (`marginal_confusion_matrix`,
+  `CalibrationStore.load_window`; M3: select the per-qubit matrices). The
+  marginalization was verified against exact tensor products.
+* Files: `calibration/m3_q0-1-…-19.json`, `calibration/mem_q0-1-2-3-4-5-6.json`,
+  `…q7-8-…-13.json`, `…q14-15-…-19.json`, each with timestamp, shots,
+  `calibration_billed_seconds` and the number of jobs.
+
+### 9.2 Cost accounting used in the evaluation
+
+A derived window carries the cost of the **stored calibration it comes from**,
+not a per-window share: the calibration is a one-off cost shared by every
+circuit, subject and repetition, and it is what the study actually spent.
+Billed seconds: **M3 36.99 s (2 jobs)**, **MEM 2,367.67 s (128 jobs, shared by
+all 3 slots)**. (An earlier version of the evaluator charged each subject only
+the cost of calibrating its *first cluster's* window — 37 s/74 s — and did not
+report any calibration cost for the multi-objective subjects; both defects were
+found and fixed during the final audit, see §20.) The `calibration_wall_clock_seconds`
+field is the *sum* of the wall-clock of 16 concurrently submitted jobs and has
+no physical meaning on the real machine (≈ 249,000 s for MEM); the evaluation
+uses the billed seconds.
+
+### 9.3 What the machine's readout error actually is
+
+From `calibration/m3_q0-…-19.json` (30 Oct 2026, 200 shots per state, so the
+resolution is 1 count = 0.5 %):
+
+* P(read 1 | prepared 0): **0 on all 20 qubits**.
+* P(read 0 | prepared 1): min 0, **mean 0.005**, max 0.015.
+* MEM, slot 0: mean diagonal 0.977; P(all 7 qubits correct | |1…1⟩) = 0.93.
+
+So readout error is small, one-sided (|1⟩ decays to 0) and near the resolution
+of the calibration. This is the single most important fact for interpreting
+the results.
+
+### 9.4 Drift
+
+`run_calibration.py drift` re-measured M3 (2 jobs) at the end of the first
+5-repetition phase (4 Nov 2026 02:57 UTC), 4.7 days after the initial
+calibration: the **maximum absolute change of any per-qubit readout
+probability is 0.01** (1–2 counts of 200, i.e. within calibration resolution).
+Report: `calibration/drift/m3_drift_report.json` (plus
+`calibration/drift/m3_q0-…-19.json`, the second calibration). **The drift check
+was not repeated after repetitions 6–10** (executed 4–6 Nov; the resumed run
+skips it when its report exists), so drift during the extension is not
+directly measured.
+
+### 9.5 Backend snapshots
+
+`calibration/backend_snapshots/*.json` hold timestamped copies of the
+properties the backend itself reports (taken at the start of every
+hardware-execution script). On PIAST-Q **T1, T2 and frequency are `null`** — the
+service does not expose them — so the snapshots only document the sessions
+(timestamps, 20 qubits), not machine coherence.
+
+---
+
+## 10. Evaluation: metrics, statistics, how RQs are answered
+
+All of this is classical post-processing (`evaluate_all.py`, `evaluation.py`,
+`compare_all.py`, `statistics.py`); no backend is touched and it can be re-run
+anywhere (§17).
+
+### 10.1 Per-repetition metrics (one value per subject × method × repetition)
+
+Single-objective (`evaluate_single_objective_combo`):
+
+* **`qubo_energy`**: sum over clusters of the QUBO energy of the cluster's
+  selected (argmax) bitstring. *Lower is better.* Noiseless optimum: see §4.4.
+* **`probability_of_optimal`**: mean over clusters of the (corrected)
+  probability of the brute-forced optimal bitstring (≤ 128 states per cluster).
+  *Higher is better.*
+* **`execution_cost`**: summed dataset cost of the final merged suite (union of
+  selected tests).
+* **`effectiveness.failure_rate`**: summed failure rate of the final suite.
+  *Higher = more faults revealed.*
+* **`execution_time_seconds`**: sum over the repetition's circuit records of
+  their **billed QPU seconds** (wall-clock only on simulators). For TREx this
+  includes the 3 passes.
+* **`mitigation_overhead`**: calibration jobs/circuits, total shots and the
+  billed calibration seconds (§9.2); zero for raw and TREx.
+* **`classical_post_processing_seconds`**: local time of the correction (not a
+  QPU quantity).
+
+Multi-objective (`evaluate_multi_objective_combo`): each method's merged
+selection is turned into a Pareto front (§2.5). Reference points are 3-tuples
+`(−cost, statement coverage, fault coverage)`.
+
+* **`hypervolume`** of the method's front with a reference point strictly worse
+  than every observed point (cost margin 1, coverage 0). *Higher is better.*
+* **`igd`**: inverted generational distance of the method's front to the
+  **a-posteriori reference front = non-dominated union of all four methods'
+  fronts for that repetition**. *Lower is better.* (It is relative to the
+  methods being compared, not to an external optimum.)
+* **`num_non_dominated`**: how many of the method's front points are on that
+  reference front.
+* execution time and overhead as above.
+
+Note: raw, MEM and M3 are computed from **the same counts** of the same
+repetition, so their results are *paired by construction*; TREx comes from its
+own passes.
+
+### 10.2 Statistics (`statistics.py`, `compare_all.py`)
+
+Per subject and metric, the four methods (10 samples each) are compared with:
+Shapiro–Wilk (α = 0.05) on each group; if all groups are normal, **one-way
+ANOVA + Tukey HSD + Cohen's d**, otherwise **Kruskal–Wallis + Dunn's test with
+Bonferroni adjustment + Vargha–Delaney Â12**. Reported: omnibus p, adjusted
+pairwise p, effect size. There is **no correction across metrics or subjects**
+(§14). The tests treat the four groups as independent (they do not exploit the
+raw/MEM/M3 pairing).
+
+**Cost (RQ3) is not tested.** Billed QPU time is a deterministic function of the
+shots and the packing, not a random variable; a significance test on zero
+variance only produces meaningless astronomical effect sizes (an earlier report
+showed Cohen's d ≈ 1e15). The report gives mean, standard deviation and ratio to
+raw instead.
+
+### 10.3 Outputs
+
+`results/evaluation/<subject>_qaoa_tcs.json` (per-repetition metrics),
+`comparison_report.txt/.json` (RQ1, RQ2 tests and RQ3 cost summary per subject),
+`ideal_reference.json` (noiseless reference).
+
+---
+
+## 11. What was actually run: configuration and chronology
+
+### 11.1 Final configuration
+
+| Item | Value |
+|---|---|
+| Subjects | `gsdtsr`, `paintcontrol` (single); `flex`, `gzip` (multi) — QAOA-TCS |
+| Circuits per repetition | 79 + 24 + 105 + 61 = 269 raw, + 3 × 269 TREx copies |
+| Methods | raw, MEM, M3, TREx |
+| Repetitions | **10** (1–5 first, 6–10 added by `--resume`) |
+| Shots per circuit | 200 (one batch; hardware cap and floor) |
+| TREx passes | 3 (600 shots) |
+| Packing | slots `[[0,7],[7,7],[14,6]]`, FFD, ≤ 16 jobs in flight |
+| Calibration | M3 2 jobs, MEM 128 jobs, 200 shots each |
+| Jobs | ≈ 2,510 execution (≈ 1,255 per 5 repetitions), 130 calibration, 2 drift |
+| Billed QPU time | **≈ 13.6 h** by the study (account counter 13.67 h at the end, 205 s were already billed before launch); limit 25 h |
+| Unit tests | 235 (all passing) |
+
+### 11.2 Chronology (all times CET)
+
+* **29 Oct** — timing and billing measurements (§6.2) and the decision to pack.
+* **Fri 30 Oct, 11:26** — launch (Slurm job 1960) after the PCSS maintenance
+  window (9–10). Calibration ran 11:33–16:08 (M3 first, then the 128 MEM jobs).
+  Initial plan: 5 repetitions, 3 twirls (≈ 7.1 billed hours projected).
+* **30 Oct, 16:40** — the stage died on an `httpx.ReadTimeout` raised by a job
+  *submission*. Fix: submit-time timeouts are retried. Relaunched with
+  `--resume`.
+* **30 Oct, ≈ 17:10** — a second stop: the pilot gate projected 575 h because on
+  resume no calibration is billed and the gate fell back to wall-clock (queue
+  wait). Fix: skip the gate on resume. Relaunched (job 1969) at 17:11.
+* **30 Oct – 1 Nov** — `gsdtsr` completed (5 repetitions) on Sat 31 Oct at 03:57
+  and `paintcontrol` at 10:05; `flex` (multi-objective) was in progress when a
+  job came back `status: failed` three times in a row and the run stopped at
+  **Sun 1 Nov 02:41**, with `flex` at 116 of 525 raw records (cause on the
+  service side, not analysed; the billed counter did not move after Sat ≈15:40). The run was
+  **not resumed until Mon 2 Nov 20:12** (≈ 41 h lost, ≈ 53 h of idle time since
+  the last billed job).
+* **Mon 2 Nov – Wed 4 Nov (≈ 04:00)** — `flex` finished (Tue evening), `gzip`
+  ran, and the 5-repetition phase completed ("ALL STAGES COMPLETED"), including
+  the drift check (§9.4) and a first evaluation. A first analysis (R = 5)
+  showed low power.
+* **Wed 4 Nov, 20:41** — decision to extend to 10 repetitions
+  (`target_repetitions: 10`, `total_hours: 80`, `--resume`; job 1990). Only
+  repetitions 6–10 were executed.
+* **Fri 6 Nov, ≈ 19:03** — run finished and the final evaluation/comparison
+  were generated.
+* **Final audit (9 Nov)** — the evaluator was corrected (§20) and the
+  evaluation/comparison re-run on the unchanged raw data (quality metrics
+  identical up to 1e-8; calibration-overhead and report format changed).
+
+Observed throughput: a job started every ≈ 2–3 minutes on average, with
+slow periods of ≈ 7 minutes per job; ≈ 7.3 days wall-clock in total.
+
+---
+
+## 12. Results
+
+All numbers are from `results/evaluation/` (10 repetitions per cell; mean ± sd,
+median where noted). "p_adj" is the adjusted pairwise p from the test chosen by
+the Shapiro gate (§10.2).
+
+### 12.1 Readout error on the machine (context)
+
+See §9.3: mean P(0|1) = 0.5 %, P(1|0) = 0, max drift 0.01 over 4.7 days.
+
+### 12.2 Single-objective subjects
+
+`gsdtsr` (79 circuits, noiseless optimum energy −8.7432, noiseless mean
+P(optimal) 0.3770):
+
+| Metric | raw | MEM | M3 | TREx |
+|---|---|---|---|---|
+| QUBO energy (↓) | −8.5166 ± 0.020 | −8.5602 ± 0.018 | −8.5617 ± 0.024 | −8.5615 ± 0.019 |
+| P(optimal) (↑) | 0.38658 ± 0.0025 | 0.39083 ± 0.0026 | 0.38921 ± 0.0026 | 0.38221 ± 0.0009 |
+| suite `execution_cost` | 4.118e7 ± 2.3e6 | 4.252e7 ± 1.3e6 | 4.251e7 ± 1.3e6 | 4.314e7 ± 6.4e5 |
+| suite `failure_rate` (= −energy) | 8.5166 | 8.5602 | 8.5617 | 8.5615 |
+
+Tests: energy ANOVA p = 1.5e-5, raw vs MEM / M3 / TREx p_adj = 0.0002 / 0.0001 /
+0.0001 (Cohen's d = 2.28 / 2.00 / 2.30), MEM, M3, TREx indistinguishable from
+each other (p_adj > 0.99). P(optimal) ANOVA p = 2.2e-9: raw vs MEM p_adj = 0.001
+(d = −1.65, MEM higher), raw vs M3 p_adj = 0.065 (n.s.), raw vs TREx p_adj =
+0.0007 (d = +2.30, TREx **lower**), TREx vs MEM and vs M3 p_adj < 1e-6.
+`execution_cost` ANOVA p = 0.041; only raw vs TREx is significant (p_adj = 0.028).
+Effectiveness `failure_rate`: identical to the energy test (α = 0).
+
+`paintcontrol` (24 circuits, noiseless optimum −8.5357, noiseless P(optimal)
+0.7884):
+
+| Metric | raw | MEM | M3 | TREx |
+|---|---|---|---|---|
+| QUBO energy (↓) | −8.5339 ± 0.0031 | −8.5343 ± 0.0021 | −8.5339 ± 0.0031 | −8.5348 ± 0.0021 |
+| P(optimal) (↑) | 0.8187 ± 0.0100 | 0.8331 ± 0.0100 | 0.8289 ± 0.0100 | 0.8018 ± 0.0035 |
+| suite `execution_cost` | 2.401e6 ± 1.8e4 | 2.405e6 ± 9.7e3 | 2.401e6 ± 1.8e4 | 2.401e6 ± 1.3e4 |
+| suite `failure_rate` | 19.646 ± 0.036 | 19.654 ± 0.019 | 19.646 ± 0.036 | 19.648 ± 0.024 |
+
+Tests: energy Kruskal–Wallis p = 0.86 (no difference; raw is already within
+0.0018 of the noiseless optimum — a **ceiling effect**), `execution_cost` and
+`failure_rate` p = 0.87 (no difference). P(optimal) ANOVA p = 1.2e-8: raw vs MEM
+p_adj = 0.0056 (d = −1.40), raw vs M3 p_adj = 0.073 (n.s.), raw vs TREx p_adj =
+0.001 (d = +2.23, TREx lower).
+
+Observation not explained: for both subjects the hardware P(optimal) of raw
+and MEM is *at or above* the noiseless value (0.387/0.391 vs 0.377;
+0.819/0.833 vs 0.788). Correcting readout therefore does not move the
+probability towards the ideal one; the deviations from the ideal circuit are
+not (only) readout error. This was not investigated further.
+
+### 12.3 Multi-objective subjects
+
+`flex` (105 circuits):
+
+| Metric | raw | MEM | M3 | TREx |
+|---|---|---|---|---|
+| Hypervolume (↑) | 2.516e14 ± 2.8e12 | 2.510e14 ± 3.4e12 | 2.509e14 ± 3.0e12 | 2.509e14 ± 3.2e12 |
+| IGD (↓), mean (median) | 1.80e5 (1.77e4) | 1.78e5 (1.77e4) | 1.79e5 (1.76e4) | 2.01e5 (4.98e4) |
+| non-dominated points | 459 ± 180 | 410 ± 230 | 435 ± 180 | 443 ± 220 |
+
+Tests: hypervolume ANOVA p = 0.95; IGD Kruskal–Wallis p = 0.12; non-dominated
+p = 0.54. **No significant difference anywhere.** (The IGD distribution is
+heavy-tailed: sd ≈ 5e5 against medians of ≈ 2e4.)
+
+`gzip` (61 circuits):
+
+| Metric | raw | MEM | M3 | TREx |
+|---|---|---|---|---|
+| Hypervolume (↑) | 2.810e13 ± 3.8e12 | 2.818e13 ± 3.8e12 | 2.811e13 ± 3.8e12 | 2.781e13 ± 5.6e12 |
+| IGD (↓), mean (median) | 5.75e5 (5.49e5) | 5.86e5 (6.04e5) | 5.91e5 (6.02e5) | **3.18e6 (3.75e6)** |
+| non-dominated points | 158 ± 31 | 135 ± 55 | 108 ± 67 | 144 ± 64 |
+
+Tests: hypervolume p = 0.92; non-dominated p = 0.087; **IGD Kruskal–Wallis p =
+0.019 and raw vs TREx p_adj = 0.033 (Â12 = 0.16)**: TREx's front is much
+further from the union reference front (both mean and median, ≈ 6× raw). The
+cause was not investigated (TREx selects different bitstrings in the one
+cluster with a quadratic term, or elsewhere; unconfirmed).
+
+### 12.4 Cost (RQ3)
+
+Billed QPU seconds **per repetition** (all 4 methods share the same raw
+circuits; TREx adds its passes):
+
+| Subject | raw = MEM = M3 | TREx | TREx / raw |
 |---|---|---|---|
-| Clustering / QUBO formulation | ✅ | N/A (pure math, runs instantly every time other stages run) | — |
-| Circuit training (QAOA-TCS, all 9 dataset/mode combos) | ✅ (`... train`) | ✅ for all 9 — circuits sit in `trained_qaoa_circuits/qaoa_tcs/` | `ls trained_qaoa_circuits/qaoa_tcs/` → all 9 folders present |
-| Circuit training (IGDec-QAOA: iofrol, paintcontrol) | ✅ | ✅ | `trained_qaoa_circuits/igdec_qaoa/{iofrol,paintcontrol}/` present |
-| Circuit training (IGDec-QAOA: gsdtsr, elevator_o2, elevator_o3) | ✅ (`... train`) | ❌ **not yet run** | `trained_qaoa_circuits/igdec_qaoa/` has no `gsdtsr`/`elevator_two`/`elevator_three` folder |
-| Hardware execution (any combo, with raw-counts + TREx) | ✅ | ✅ **dry-run on `offline_simulator_no_noise`** through `run_all.py` (all stages, evaluation and comparison produce a full report); ❌ **not yet on real PIAST-Q** | the old `results/` files predate the feature and must be removed before a real run (§13) |
-| Real vs. placeholder backend | — | Still the **placeholder** (`offline_simulator_no_noise`) | `configs/backend.yaml`; real runs also need `ALLOW_REAL_HARDWARE = True` in `run_all.py` |
-| MEM/M3 calibration | ✅ (`run_calibration.py`; `drift` mode for the end-of-session check) | ✅ dry-run only | `calibration/` is regenerated by every run |
-| Backend calibration snapshot (T1/T2/etc., §6.5) | ✅ | ✅ dry-run only (contents depend on what PIAST-Q reports) | `calibration/backend_snapshots/` |
-| QUBO backfill for the already-trained circuits | ✅ (`... qubos` mode of the three scripts, a stage of `run_all.py`) | ✅ | the old circuits had no QUBO coefficients, so evaluation could not run; they are rebuilt without retraining and checked against the saved circuits (QAOA-TCS: cluster and qubit counts; IGDec-QAOA: the replay must reproduce each sampling's recorded `best_fval`) |
-| Evaluation (`evaluate_all.py`) / comparison (`compare_all.py`) | ✅ | ✅ dry-run only | evaluates only the combos in the plan's pools |
-| Budget planning (`budget_planner.py`) | ✅ | ✅ | `execution_plan/execution_plan_report.{txt,json}` |
-| Unit tests | ✅ | ✅ passing | `./qiskit_env/bin/python -m unittest discover -s tests` → **232 tests, all pass, ~2 seconds**, entirely synthetic (tiny 1–3 qubit toy circuits/QUBOs, no AQT, no real circuits) |
-| Qubit-layout pinning + calibration snapshot (§6.4/§6.5) | ✅ | ✅ **verified end-to-end against the real `offline_simulator_no_noise` backend** (not just synthetic tests) | a real execution and a real MEM/M3 calibration circuit, pinned to a deliberately non-default layout (`[3, 4]`), independently confirmed to land on the same physical qubits — see the git history for the exact verification script; not committed to the repo since it's a one-off check, not a permanent test |
-| Plan-to-execution wiring (`resolve_all_combo_settings()`, §10) | ✅ | ✅ **verified against the real config/circuits** | calling it against the real repo reproduces the exact repetitions/shots/dropped-TREx numbers already in `execution_plan/execution_plan_report.txt` for all 14 combos, confirming the resolver and the planner agree; the execution scripts calling it have not been run for real yet (same "never run" status as the row above) |
+| `gsdtsr` | 268.2 s | 804.6 s | 3.00× |
+| `paintcontrol` | 85.9 s | 265.5 s | 3.09× |
+| `flex` | 585.3 s | 1,763.9 s | 3.01× |
+| `gzip` | 215.2 s | 654.2 s | 3.04× |
 
-**In one sentence**: the whole pipeline is coded, unit-tested and has been run
-end to end on the free simulator through `run_all.py`; what has not happened
-is any run on the real PIAST-Q machine.
+(The ratios deviate from 3 because a job's billed time is shared by qubit
+share inside mixed packs.) One-off calibration cost (shared by all subjects):
+**M3 37.0 s (2 jobs); MEM 2,367.7 s (128 jobs).** Relative to a subject's raw
+QPU time over the 10 repetitions (`gsdtsr` 2,682 s, `paintcontrol` 859 s,
+`flex` 5,853 s, `gzip` 2,152 s):
 
----
+| Subject | + M3 | + MEM | + TREx |
+|---|---|---|---|
+| `gsdtsr` | +1.4 % | +88 % | +200 % |
+| `paintcontrol` | +4.3 % | +276 % | +209 % |
+| `flex` | +0.6 % | +40 % | +201 % |
+| `gzip` | +1.7 % | +110 % | +204 % |
 
-## 13. How to actually run this, step by step
-
-**Cleanup first (real run):**
-1. Move or delete the old result files: `results/qaoa_tcs/*` and
-   `results/igdec_qaoa/*` (April outputs, tracked in git, so recoverable).
-   They use experiment numbers the new run does not overwrite.
-2. Delete `calibration/*.json`, `calibration/drift/` and
-   `calibration/backend_snapshots/` if present from a dry run, and `logs/`.
-   (`run_all.py` itself moves any leftover `*raw_counts.jsonl` to
-   `results/_archive_<time>/`.)
-
-**Steps:**
-1. `configs/backend.yaml`: `backend_name: piast_q` (reached through the PCSS
-   service; needs the VPN, the single Python 3.12 environment (README §2), and the
-   token in the `PIASTQ_API_TOKEN` env var — see README §10 C); check
-   `physical_qubits`.
-2. `run_all.py`: set `ALLOW_REAL_HARDWARE = True`.
-3. Press play on `run_all.py` (or `python run_all.py`). It runs, in order:
-   tests, QUBO backfill, budget plan, calibration, pilot gate, QAOA-TCS
-   single-objective, QAOA-TCS multi-objective, (IGDec-QAOA only if planned), drift check,
-   evaluation, comparison. If the pilot gate projects more than 25 h at the
-   measured (billed) seconds/batch, it stops before the main execution. During
-   execution each batch is checked against the account's billed QPU time and
-   refused if it would cross 25 h. If anything interrupts the run, `python
-   run_all.py --resume` continues without repeating finished circuits.
-4. Read `logs/run_summary_*.json` (measured vs. predicted QPU hours) and
-   `results/evaluation/comparison_report.txt`. How to read each output:
-   README §0.
-
-Training (only needed for circuits that do not exist yet; not part of
-`run_all.py`): `python single_obj.py train`, `python multi_obj.py train`,
-`python loch_qaoa_*_extract_circuits.py train`.
+(These are amortization views computed in this document from the numbers
+above; the report itself lists the cost components separately.)
 
 ---
 
-## 14. Repository map
+## 13. Answers to the research questions
 
-```
-PiastQ4QAOA/
-├── run_all.py                   # one-click full pipeline (§13)
-├── logs/                        # run_all.py log + run summary
-├── src/
-│   ├── qaoa_tcs/
-│   │   ├── single_obj.py        # QAOA-TCS, single-objective, 5 datasets
-│   │   └── multi_obj.py         # QAOA-TCS, multi-objective, 4 SIR datasets
-│   ├── igdec_qaoa/
-│   │   ├── loch_qaoa_tcm_extract_circuits.py        # iofrol, gsdtsr, paintcontrol
-│   │   ├── loch_qaoa_elev_two_extract_circuits.py   # elevator_o2
-│   │   └── loch_qaoa_elev_three_extract_circuits.py # elevator_o3
-│   └── piastq_execution/        # shared library used by every script above
-│       ├── raw_counts.py        # shot-batched execution + full raw-data capture (§7)
-│       ├── mitigation.py        # MEM / M3 / TREx (§6)
-│       ├── qubo_io.py           # save/load a trained circuit's QUBO coefficients
-│       ├── sir_metrics.py       # static SIR cost/fault/coverage data + Pareto helpers
-│       ├── seeding.py           # deterministic seeds for IGDec-QAOA's random sampling
-│       ├── backend_config.py    # the one place the real API token/backend name is read (§5.1)
-│       ├── qubit_layout.py      # which physical qubits a width-w circuit uses (§6.4)
-│       ├── backend_calibration_snapshot.py # T1/T2/etc. snapshot, once per session (§6.5)
-│       ├── run_calibration.py   # MEM/M3 calibration entry point (§6.2, §13 step 7)
-│       ├── budget_planner.py    # hardware-time budget planning (§10)
-│       ├── evaluation.py        # per-combo x per-method metrics (§11)
-│       ├── evaluate_all.py      # runs evaluation.py across every combo (§13 step 8)
-│       ├── compare_all.py       # runs statistics.py across every combo, RQ report
-│       └── statistics.py        # Shapiro-Wilk-gated statistical comparison (§11)
-├── datasets/                    # input CSVs/JSON (unchanged, original data)
-├── trained_qaoa_circuits/       # .qpy circuits + QUBO coefficients (§9)
-├── results/                     # execution output (§7, §12) + evaluation/ (§11)
-├── calibration/                 # MEM/M3 calibration + backend_snapshots/ (empty today, §12)
-├── execution_plan/              # budget_planner.py output (has real data, §10)
-├── configs/
-│   ├── execution_plan.yaml      # budget planner + evaluate_all.py configuration
-│   └── backend.yaml             # real PIAST-Q API token/backend name (§5.1)
-└── tests/                       # 184 synthetic unit tests, no AQT, no real hardware
-```
+**RQ1 — Does mitigation improve quality?** *Only marginally, and only on one
+of four subjects.* On `gsdtsr` MEM, M3 and TREx all improve the energy (≈ 0.044
+lower, p_adj ≤ 0.0002, d ≈ 2), closing ≈ 19 % of the gap between raw
+(−8.517) and the noiseless optimum (−8.743); MEM also raises P(optimal) by
+0.4 pp. On `paintcontrol` energy is unchanged (ceiling effect) and MEM raises
+P(optimal) by 1.4 pp (M3 +1.0 pp, n.s.). On `flex` and `gzip` there is no
+benefit on any Pareto metric. TREx never improves P(optimal) and lowers it on
+both single-objective subjects; on `gzip` it significantly degrades IGD.
+*Interpretation:* readout error on this machine is tiny and one-sided (§9.3),
+the circuits are shallow and non-entangling, and the argmax is robust; the
+effects are therefore small. Whether mitigation matters more on noisier
+hardware or deeper circuits is not answered by this study.
+
+**RQ2 — Does it translate to the selected suite?** *No consistent effect.* The
+only significant suite-level result is `gsdtsr`'s effectiveness
+(`failure_rate` up by 0.044 for MEM/M3/TREx), which restates RQ1 because α = 0
+makes it the same quantity as the energy. `execution_cost` of the `gsdtsr`
+suite is higher with mitigation (more tests selected; only raw vs TREx
+significant). `paintcontrol`: no difference.
+
+**RQ3 — Improvement per QPU second?** TREx: +200 % QPU time, no gain, some harm
+→ dominated. MEM: the same energy gain as M3 (and a slightly larger, significant
+P(optimal) gain) at +40 % to +276 % amortized over 10 repetitions per subject
+(one-off 2,368 s). M3: the energy gain at +0.6 % to +4.3 % (one-off 37 s).
+**M3 gives the best improvement per billed second**; MEM only pays if its
+128-job calibration is amortized over many more circuits.
+
+Sentences that can be defended: "mitigation of readout error provided at most
+a small benefit for QAOA-TCS on this device"; "M3 achieved MEM's energy gain at
+1/64 of the calibration cost"; "twirling-only TREx at 3 passes was not
+beneficial". Sentences that cannot be defended from this data: general claims
+about the value of mitigation on noisier devices; claims about TREx
+as published (rescaled) rather than the twirling-only variant implemented here;
+claims about subjects other than the four.
 
 ---
 
-## 15. Glossary
+## 14. Threats to validity and known limitations
 
-- **Qubit**: the quantum equivalent of a bit; here, one qubit represents one
-  "include this test, yes/no" decision.
-- **Shot**: one execution of a quantum circuit, producing one measured
-  bitstring. Many shots build up a distribution.
-- **QUBO**: Quadratic Unconstrained Binary Optimization — the "shape" every
-  problem here is translated into (§2.1).
-- **Ansatz**: the parameterized quantum circuit template QAOA optimizes.
-- **`.qpy` file**: Qiskit's serialization format for a (trained, parameter-
-  frozen) quantum circuit.
-- **Argmax**: "the single most frequent outcome" — what old code kept, and
-  what mitigation needs *more* than (§7).
-- **Confusion / assignment matrix**: a table describing how often the
-  hardware reports state B when the qubit was really in state A (§6.2).
-- **Twirling**: randomizing something (here: which qubits get bit-flipped
-  right before measurement) so a systematic error becomes a random,
-  averaged-out one (§6.2).
-- **Pareto frontier**: the set of solutions where none is strictly better
-  than another on *every* objective at once (§3).
-- **Hypervolume (HV) / IGD**: two standard ways of scoring how good a Pareto
-  frontier is, used for multi-objective combos only (§11).
-- **`.jsonl`**: "JSON lines" — a text file with one JSON object per line,
-  used here for raw-counts logs that grow one record at a time (§7).
+**Internal / construct**
+
+1. **TREx implementation** is twirling-only (no learned scaling, §8.4); it
+   gets 3× the shots of raw — the comparison is confounded by shot count.
+2. **Paired vs unpaired:** raw/MEM/M3 share counts; the omnibus tests treat the
+   groups as independent, so power for those comparisons is understated.
+   A paired analysis was not performed.
+3. **No multiple-comparison correction across metrics/subjects.** With ≈ 30
+   tests, a p_adj of 0.03–0.06 (e.g. `gzip` IGD, `gsdtsr` execution_cost) should
+   be read as suggestive only.
+4. **Packing:** circuits run next to each other (crosstalk is possible) and not
+   only on qubits 0–6; MEM/M3 were calibrated under the same packed conditions
+   to mitigate this.
+5. **Billed-time sharing:** a circuit's execution time is its qubit share of a
+   job's billed time, not an independent measurement.
+6. **Calibration resolution:** 200 shots per calibration state → 0.5 %
+   quantization of the assignment probabilities, comparable to the errors
+   being corrected.
+7. **Repetitions are not time-homogeneous:** repetitions 1–5 and 6–10 ran days
+   apart with the same calibration; drift was measured only up to 4 Nov (max
+   change 0.01, at resolution).
+8. **Single machine, one calibration set, one set of trained circuits;**
+   QAOA-TCS training is not seeded, so the circuits cannot be regenerated
+   bit-for-bit.
+9. **Inherited quirks:** multi-objective quadratic terms effectively absent
+   (§4.2); cluster counts and α values inherited without derivation;
+   `trex_twirl_instances` default 32 in code (the study config sets 3);
+   `DEFAULT_TREX_TWIRL_INSTANCES` is used only when the key is missing.
+10. **Observed but unexplained:** hardware P(optimal) at/above the noiseless
+    value; TREx degradation on `gzip`; `flex` IGD heavy tails.
+
+**External**
+
+11. Four subjects, `p = 1`, ≤ 7 qubits, mostly non-entangling circuits.
+12. Readout error on this machine is atypically small and one-sided.
+
+**Conclusion / operational**
+
+13. The 41-hour stall and the two code fixes during the run (§11.2) did not
+    alter data already saved (resume reuses records verbatim) but mean that
+    repetitions 1–5 were collected under slightly different code revisions
+    (retry behaviour only; no change to circuits, shots or analysis).
+14. `status: failed` jobs (billed 0) were retried; their rate was not tabulated.
 
 ---
 
-## 16. Every parameter, and why it has that value
+## 15. Every parameter and why it has that value
 
-Every numeric knob in this repo, organized by where its value actually comes
-from — verified against the code and the paper, not assumed.
-
-**A. Given by the PIAST-Q team (hardware constraints, not a choice made
-here):**
+**A. Given by the platform/operators**
 
 | Parameter | Value | Source |
 |---|---|---|
-| `shots_per_batch_cap` | 200 | Machine operators' email: "there is a constraint of 200 shots per run" |
-| `seconds_per_batch` | 18.4974 | Measured billed time of a 200-shot batch (account usage counter, 2026-10-29). The operators' email said "around 15 seconds" |
+| `shots_per_batch_cap` | 200 | operators: "a constraint of 200 shots per run" |
+| `seconds_per_batch` | 18.4974 | measured billing of a 200-shot job (29 Oct); operators said ~15 s |
+| QPU allowance | 25 h billed | project allocation |
 
-**B. Inherited from the original QAOA-TCS/IGDec-QAOA paper (grounded there,
-not re-derived in this replication package):**
+**B. Inherited from the original QAOA-TCS paper / code (not re-derived)**
 
-| Parameter | Value | Source |
+| Parameter | Value | Note |
 |---|---|---|
-| Max cluster/subproblem size | 7 qubits | Paper: chosen "consistently with the prior work on IGDec-QAOA (Wang et al., 2024a), to make fair comparisons" |
-| QAOA circuit depth `p` (`TRAINING_REPS`/`reps` in the training loop) | 1 | Paper's own RQ1 finding (Takeaway #1): depth doesn't significantly affect quality, so `p=1` minimizes cost "without compromising effectiveness" — a real, statistically-tested result, not a guess |
-| Repetitions per algorithm (the paper's own established convention) | 10 | Paper: "we ran all stochastic algorithms ten times, consistent with Wang et al. (2024b); Trovato et al. (2024)" |
-| IGDec-QAOA decomposition window threshold | `problem_size > 0.15 × len(df)` | Inherited from the original SelectQAOA implementation. Not found derived or explained anywhere in the paper text or code comments — reads as an implementation-level heuristic, not a cited design decision. Flagged as unverified provenance rather than asserting a reason that can't be backed up. |
-| Per-dataset QUBO weight `alpha` (e.g. paintcontrol=0.45, iofrol=0.50, gsdtsr=0, elevator=0.20, elevator2=(0.1,0.9,0.9)) | dataset-specific | Paper: "we employed the Optuna framework... to investigate the influence of these weights" — these are that search's output values, carried over as-is. The paper doesn't tabulate the exact final numbers in the text, so *how* they were chosen is confirmed (Optuna hyperparameter search) but each specific value isn't independently verifiable against a published table. |
-| Per-dataset Ward-clustering target cluster count (elevator=800, iofrol=324, gsdtsr=60, paintcontrol=16, SIR programs=50) | dataset-specific | Not explained anywhere in code or paper. Roughly tracks dataset size divided by ~5 (keeping pre-split clusters already close to the 7-qubit ceiling), but that's inference from the numbers, not a documented rule — an empirically-tuned engineering default. |
-| `COBYLA(maxiter=500)` | 500 | Not discussed in the paper or in any code comment. A common, unremarkable default for COBYLA-based QAOA training in the broader literature, inherited as an engineering default with no specific citation for *this* choice. |
+| Max cluster size | 7 qubits | consistency with prior IGDec-QAOA work |
+| QAOA depth `p` | 1 | paper: depth did not significantly affect quality |
+| `COBYLA(maxiter=500)` | 500 | engineering default, no cited reason |
+| α single-objective | `gsdtsr` 0, `paintcontrol` 0.45 | Optuna search in the paper; values carried over |
+| α multi-objective | 0.5 | inherited |
+| Ward target clusters | 60 / 16 / 50 | inherited engineering defaults |
+| Repetitions "convention" | 10 | paper: stochastic algorithms run ten times |
 
-**C. Decided for this replication package, with real (if modest)
-justification:**
+**C. Chosen for this study**
 
 | Parameter | Value | Reasoning |
 |---|---|---|
-| `min_shots_per_circuit` | 200 | Matches the hardware floor — one full batch, can't go lower |
-| `target_shots_per_circuit` | 2048 | Traced to the *original* SelectQAOA script's own comment ("Total target shots = 2048 × 30 = 61,440") — inherited from the pre-hardware-constrained design's own shot target, not newly derived |
-| `target_repetitions` | 10 | Matches item B (paper convention), reused as the planner's "ideal" target |
-| `calibration_shots_per_circuit` | 200 | Same floor logic as `min_shots_per_circuit` — one batch is enough to characterize a basis-state preparation |
-| `physical_qubits` default | `[0,1,2,3,4,5,6]` | Arbitrary placeholder (identity mapping) until real PIAST-Q qubit numbers are known — explicitly documented as such in `configs/backend.yaml` |
-| `optimization_level=3` | 3 | Qiskit's own highest built-in transpiler optimization level — standard practice for real hardware (fewer gates → less noise), not something needing separate justification |
-
-**D. Still not rigorously justified:**
-
-| Parameter | Value | Status |
-|---|---|---|
-| `trex_twirl_instances` | 32 | `configs/execution_plan.yaml`'s comment claims `load_trex_twirl_instances()`'s docstring explains the rationale — it doesn't; that docstring only explains why the value is centralized (so the plan and execution never disagree), not why 32 specifically. The value does appear as an example `num_randomizations` configuration in TREx tutorial code (e.g. Mitiq's own TREx documentation uses `num_randomizations=32` with `shots_per_randomization=100`), but the earlier claim in this repo that it "matches the commonly used default for measurement-twirling randomizations in Qiskit Runtime's twirled-readout implementations" doesn't hold up: Qiskit Runtime's actual default for `num_randomizations` is `"auto"`, computed as `max(64, ceil(shots / 32))` — a *shots-per-randomization divisor* in that formula, not a twirl-instance count, and a different parameter being conflated with this one. Treat `trex_twirl_instances=32` as a reasonable, round, precedented-in-tutorial-examples starting point — not a value derived from this study's own noise characteristics or statistical requirements. |
-
-**What used to be a placeholder and is now fixed**: `shots_per_batch=80` was
-hardcoded at every one of the 15 hardware-execution call sites across all 5
-execution scripts, completely disconnected from what `budget_planner.py`
-actually recommended for that combo's pool — running any script for real
-would have executed every circuit at a flat 80 shots regardless of whether
-the plan said 200, 1448, or 2048. Fixed via `resolve_all_combo_settings()`
-(§10): every script now resolves and uses the plan's actual
-`shots_per_circuit`/`repetitions`/`trex_enabled` per combo, verified to
-reproduce the exact numbers already in `execution_plan/execution_plan_report.txt`
-(§12).
+| Subjects | 4 | fits the allowance and deadline; two per objective mode (§3.3) |
+| `target_shots_per_circuit` | 200 | hardware floor and cap: one batch; billed cost per job is constant |
+| `target_repetitions` | 10 | paper convention; 5 first, extended once 5 proved low-powered and wall-clock allowed |
+| `trex_twirl_instances` | 3 | cheapest setting that still averages several masks; 32 (the old default) was unaffordable (§20) |
+| `pack_slots` | `[[0,7],[7,7],[14,6]]` | 7 = widest circuit; 7+7+6 = 20 qubits; slots keep calibration windows fixed |
+| `MAX_JOBS_IN_FLIGHT` | 16 | overlap queue waits; margin of the budget stop covers them |
+| `MAX_JOB_ATTEMPTS` | 3 | retry transient `failed` jobs (they bill 0) |
+| Transport retry | every 5 s, ≈ 30 min | survive VPN/network blips without resubmitting |
+| `optimization_level` | 3 | highest standard transpiler optimization for hardware |
+| `calibration_shots_per_circuit` | 200 | one batch per calibration state |
+| `total_hours` (planner cap) | 80 | only a ceiling above the planner's 56.9 h upper bound |
+| `QPU_HOURS_LIMIT` | 25 | allowance; stop margin (16+2)×18.4974 s |
+| `physical_qubits` | `[0..6]` | only for single un-packed circuits; not used for the results |
 
 ---
 
-## 17. The reduced run actually planned (25 QPU-hours)
+## 16. Repository map and data dictionary
 
-Everything in §10 shows the full 14-combo study is far beyond 25 QPU-hours,
-so `configs/execution_plan.yaml` is set to one feasible, complete-but-narrow
-run: **QAOA-TCS only** — `gzip` + `flex` (multi-objective) and `paintcontrol`
-+ `gsdtsr` (single-objective); raw + MEM + M3 + TREx; 5 repetitions; 200
-shots/circuit; 3 TREx twirls. At the measured billed 18.4974 s per job the
-planner's one-circuit-per-job upper bound is ~29 h (3 twirls). The
-real bottleneck turned out to be wall-clock (about 3-5 minutes of unbilled
-machine overhead per job), so circuits are packed side by side into 20-qubit
-jobs (README section 0): about 1,390 jobs, ~7.1 billed hours, ~78 hours of
-wall-clock. The pilot gate checks the billed rate against the 25 h limit. Repetitions were preferred over twirls (each extra
-repetition costs ~4.1 h, each extra twirl ~6.9 h); T=3 was chosen over R=6/7 with T=2 as the
-best use of the ~80 h of wall-clock window. (An earlier plan with R=6 assumed the
-operators' ~15 s per batch, 21.7 h; the measurement showed 18.5 s.)
+```
+PiastQ4QAOA/
+├── README.md                    # user guide: setup, run, reproduce
+├── EXPLAINATION.md              # this document
+├── PROJECT_SUMMARY.md           # short project/RQ/limitations summary
+├── requirements.txt             # pinned environment (Python 3.12)
+├── run_all.py                   # full pipeline, stages in §7.4
+├── run_cluster.sh               # Slurm launcher; the only place that enables the real machine
+├── configs/
+│   ├── backend.yaml             # simulator by default; pack_slots; env vars override
+│   └── execution_plan.yaml      # budget planner + evaluation configuration (10 reps, 3 twirls)
+├── datasets/                    # input data (unchanged)
+├── trained_qaoa_circuits/       # frozen .qpy circuits + *_qubos.json (QUBO coefficients)
+├── src/
+│   ├── qaoa_tcs/                # single_obj.py, multi_obj.py: clustering, QUBO, train/qubos/execute
+│   ├── igdec_qaoa/              # implemented, not run on hardware (§18)
+│   └── piastq_execution/        # shared library
+│       ├── backend_config.py    # backend/token resolution, PCSS hardening (retries)
+│       ├── packing.py           # slots, first-fit-decreasing, joint circuits, marginalization
+│       ├── raw_counts.py        # batches, records, concurrency, packed execution, resume
+│       ├── qpu_usage.py         # billed-time reading and budget stop
+│       ├── run_calibration.py   # M3 (2 jobs) + MEM (128 jobs) + drift check
+│       ├── mitigation.py        # MEM, M3, TREx, CalibrationStore (windows by marginalization)
+│       ├── evaluation.py, evaluate_all.py, compare_all.py, statistics.py
+│       ├── ideal_reference.py   # noiseless reference values (§4.4)
+│       ├── budget_planner.py, backend_calibration_snapshot.py, qubit_layout.py,
+│       ├── qubo_io.py, sir_metrics.py, seeding.py
+├── results/
+│   ├── qaoa_tcs/<subject>/      # raw data (below)
+│   └── evaluation/              # evaluation + report (below)
+├── calibration/                 # MEM/M3 matrices, drift/, backend_snapshots/
+├── execution_plan/              # planner report
+├── tests/                       # 235 unit tests (no real hardware)
+└── logs/                        # git-ignored run logs (not in a clone)
+```
 
-IGDec-QAOA is excluded: only `paintcontrol` is affordable for it (`iofrol`
-alone is ~25 h of raw runs; the other IGDec datasets are untrained), so RQ4 is
-out of scope and the study concentrates on the mitigation strategies
-(RQ1/RQ2/RQ3a/RQ3b). `elevator2` is not usable (its 56 saved circuits do not
-match the current clustering), and `iofrol`/`elevator` need hundreds of
-circuits. With 5 repetitions the tests have low power (report effect sizes);
-TREx at three twirls is a modest test of that technique, and it receives T x 200
-shots against raw's 200. Other combos stay defined in the config but are
-skipped.
+**`results/qaoa_tcs/<subject>/`**
+
+* `<subject>-rep-1-raw_counts.jsonl` — one JSON record per circuit execution
+  (raw pass): `circuit_id`, `cluster_id`, `iteration_id` (= repetition 1…10),
+  `physical_qubit_mapping` (its real window), `batches` (counts, job id,
+  billed seconds, timestamp), `aggregated_counts`, `total_billed_seconds`, … .
+  Record counts: `gsdtsr` 790, `paintcontrol` 240, `flex` 1,050, `gzip` 610
+  (= circuits × 10).
+* `<subject>-rep-1-trex-raw_counts.jsonl` — same for the TREx passes, with
+  `twirl_mask`; 3× as many records (2,370 / 720 / 3,150 / 1,830).
+* `<subject>-rep-1.json`, `<subject>-rep-1-subsuites.json` — per-repetition
+  selected suites / cluster assignments from the raw pass (single-objective:
+  `selected_test_suite_i`; multi-objective: Pareto fronts).
+
+**`results/evaluation/`** — `<subject>_qaoa_tcs.json` (per method, list of the
+10 per-repetition metric records), `comparison_report.txt/.json`,
+`ideal_reference.json`.
+
+**`calibration/`** — see §9.1, §9.4, §9.5.
+
+---
+
+## 17. How to reproduce, re-evaluate or extend
+
+**Environment.** `python3.12 -m venv qiskit_env && source qiskit_env/bin/activate
+&& pip install -r requirements.txt`.
+
+**Re-evaluate from the stored data (no hardware, ~1 minute).**
+
+```bash
+cd src/piastq_execution
+python evaluate_all.py      # -> results/evaluation/<subject>_qaoa_tcs.json
+python compare_all.py       # -> results/evaluation/comparison_report.{txt,json}
+python ideal_reference.py   # -> results/evaluation/ideal_reference.json
+```
+
+**Free dry run of the whole pipeline on a simulator** (never touches hardware;
+uses the committed defaults): `python run_all.py` from the repository root. To
+avoid mixing a dry run with the study's data, run it in a **copy** of the
+repository (the writers append, and `run_all.py` moves leftover raw-counts files
+to `results/_archive_<time>/` on a fresh start).
+
+**Real machine** (needs account, VPN, token): copy the repo and `~/.piastq_token`
+to the cluster, then `sbatch run_cluster.sh` (fresh) or
+`sbatch run_cluster.sh --resume`. Do **not** edit `configs/backend.yaml` or
+`run_all.py` to switch on hardware. **Do not run it inside this repository
+without moving `results/` and `calibration/` away first**: a fresh run
+archives/appends over the study's data.
+
+**Extending the repetitions.** Raise `target_repetitions` (and keep
+`total_hours` above the planner's upper bound), then `--resume`: finished
+repetitions are reused, new ones appended. Extending the number of twirls would
+require re-running every TREx pass (the masks are part of each record) and is
+wasteful.
+
+**Unit tests.** `python -m unittest discover -s tests` (235 tests, a few
+seconds, entirely synthetic).
+
+---
+
+## 18. Out of scope but implemented (IGDec-QAOA, other datasets)
+
+`src/igdec_qaoa/` holds IGDec-QAOA (impact-guided decomposition: a random
+initial solution, repeated re-ranking of tests by impact, QAOA on the next 7
+highest-impact tests, keep the best solution). Its trained circuits exist for
+`iofrol` (10 samplings × 1,230 circuits) and `paintcontrol` (10 × 30); training
+code for `gsdtsr`, `elevator_o2`, `elevator_o3` exists but was not run. The
+hardware and evaluation scripts support it (with a replay of the training-fixed
+subproblem sequence for the final suite), and it is covered by unit tests, but
+it was **not executed on PIAST-Q** and `results/igdec_qaoa/` is empty. Other
+QAOA-TCS datasets (`iofrol` 443 circuits, `elevator` 881, `elevator2` 56 — not
+evaluable, `grep` 139, `sed` 77) are defined in the config but excluded from the
+plan. The full study design (14 dataset × algorithm combinations) is described
+in `README.md` §11 ("Out-of-scope combinations").
+
+---
+
+## 19. Glossary
+
+* **Argmax** — the most frequent bitstring; the cluster's answer.
+* **Billed time** — QPU seconds counted against the allowance; independent of
+  queue wait and (here) of the qubit count.
+* **Confusion/assignment matrix** — `P(measured | prepared)`; MEM uses the full
+  one, M3 per-qubit ones.
+* **Hypervolume (HV) / IGD** — scores of a Pareto front (higher HV better; lower
+  IGD better; IGD here is relative to the union of the compared methods' fronts).
+* **Packing / slot** — several independent circuits on disjoint qubits of one
+  job / the fixed qubit ranges used for it.
+* **p** — QAOA depth (`rep_1` in file names = p = 1).
+* **Repetition** — one full re-execution of all circuits (`iteration_id`).
+* **TREx** — here: measurement twirling with classical un-flipping, no rescaling.
+* **Twirl pass / mask** — one extra execution with a random X pattern before
+  measurement.
+
+---
+
+## 20. Decision log
+
+| # | Decision | Why |
+|---|---|---|
+| 1 | QAOA-TCS only, 4 subjects | allowance and deadline; two per objective mode |
+| 2 | Billed time as the budget, wall-clock as the real constraint | measured 18.4974 s/job independent of qubits; queue overhead 2–5 min/job |
+| 3 | Pack circuits into 20-qubit jobs | 5× fewer jobs; same shots and independence per circuit |
+| 4 | Calibrate MEM per slot (128 jobs) and M3 for all qubits (2 jobs) | consistent with packed execution; windows by marginalization |
+| 5 | Up to 16 jobs in flight | overlap queue waits; the machine still runs them serially |
+| 6 | 3 TREx twirls (not 32) | affordability: each twirl is a full extra pass over all circuits |
+| 7 | 5 repetitions first, then 10 via `--resume` | first results had low power; time allowed; resume makes extension exact |
+| 8 | Real-machine switches only in `run_cluster.sh` | repo stays on the simulator; no accidental hardware use |
+| 9 | Retry submit-time timeouts (during the run) | a `ReadTimeout` killed the run once; cost of an orphan job ≈ 18 s |
+| 10 | Skip pilot gate on resume (during the run) | gate used wall-clock (queue wait) and falsely projected 575 h |
+| 11 | RQ3a merged into RQ1; RQ3b → RQ3; RQ4 dropped | same comparison; IGDec-QAOA not run |
+| 12 | Final audit fixes (9 Nov): (a) calibration overhead = cost of the stored shared calibration, also reported for multi-objective subjects; (b) `compare_all` no longer treats its own report as a subject; (c) RQ3 cost reported descriptively (zero variance) with RQ1/RQ2/RQ3 labels; (d) QUBO coefficient files added to the package; (e) docs and stale comments refreshed | found while auditing code and results; the quality metrics were unchanged by the re-evaluation (max difference 1.6e-8, no argmax changed) |

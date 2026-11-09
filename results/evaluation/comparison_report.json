@@ -1,14 +1,8 @@
 {
   "per_combo": [
     {
-      "combo": "comparison_report",
-      "rq1_rq3a_quality": {},
-      "rq2_effectiveness": {},
-      "rq3b_cost": {}
-    },
-    {
       "combo": "flex_qaoa_tcs",
-      "rq1_rq3a_quality": {
+      "rq1_quality": {
         "hypervolume": {
           "normal": true,
           "omnibus_test": "anova",
@@ -17,24 +11,24 @@
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.9654637729984795,
-              "p_adjusted": 0.9654637729984795,
+              "p_value": 0.965463772998479,
+              "p_adjusted": 0.965463772998479,
               "effect_size_name": "cohens_d",
               "effect_size": 0.20873524603127833
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.9571965243423353,
-              "p_adjusted": 0.9571965243423353,
+              "p_value": 0.9571965243423347,
+              "p_adjusted": 0.9571965243423347,
               "effect_size_name": "cohens_d",
               "effect_size": 0.24396545761793997
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.9611430190383616,
-              "p_adjusted": 0.9611430190383616,
+              "p_value": 0.9611430190383611,
+              "p_adjusted": 0.9611430190383611,
               "effect_size_name": "cohens_d",
               "effect_size": 0.22798456258643698
             },
@@ -67,7 +61,7 @@
         "igd": {
           "normal": false,
           "omnibus_test": "kruskal_wallis",
-          "omnibus_p_value": 0.12164896932285714,
+          "omnibus_p_value": 0.12164896932285738,
           "pairwise": [
             {
               "group_a": "raw",
@@ -176,148 +170,90 @@
         }
       },
       "rq2_effectiveness": {},
-      "rq3b_cost": {
+      "rq3_cost": {
         "execution_time_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -6954042063462489.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -6954042063462489.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -6954042063462489.0
-            }
-          ]
+          "raw": {
+            "mean": 585.3190849373433,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "mem": {
+            "mean": 585.3190849373433,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "m3": {
+            "mean": 585.3190849373433,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "trex": {
+            "mean": 1763.8507150626567,
+            "sd": 2.2737367544323206e-13,
+            "n": 10,
+            "ratio_vs_raw": 3.0134857387256933
+          }
         },
         "mitigation_overhead.calibration_wall_clock_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": NaN,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            }
-          ]
+          "raw": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "mem": {
+            "mean": 2367.6672,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "m3": {
+            "mean": 36.9948,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "trex": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          }
         }
       }
     },
     {
       "combo": "gsdtsr_qaoa_tcs",
-      "rq1_rq3a_quality": {
+      "rq1_quality": {
         "qubo_energy": {
           "normal": true,
           "omnibus_test": "anova",
-          "omnibus_p_value": 1.5250840159977123e-05,
+          "omnibus_p_value": 1.525084015997718e-05,
           "pairwise": [
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.00017777309370714534,
-              "p_adjusted": 0.00017777309370714534,
+              "p_value": 0.0001777730936930455,
+              "p_adjusted": 0.0001777730936930455,
               "effect_size_name": "cohens_d",
               "effect_size": 2.2767042106012547
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.00010711521680006886,
-              "p_adjusted": 0.00010711521680006886,
+              "p_value": 0.00010711521678596903,
+              "p_adjusted": 0.00010711521678596903,
               "effect_size_name": "cohens_d",
               "effect_size": 2.0047560598714043
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.00011426515010537486,
-              "p_adjusted": 0.00011426515010537486,
+              "p_value": 0.000114265150091164,
+              "p_adjusted": 0.000114265150091164,
               "effect_size_name": "cohens_d",
               "effect_size": 2.2964414335871415
             },
@@ -350,55 +286,55 @@
         "probability_of_optimal": {
           "normal": true,
           "omnibus_test": "anova",
-          "omnibus_p_value": 2.2197424611533915e-09,
+          "omnibus_p_value": 2.2197506362472568e-09,
           "pairwise": [
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.0010313130460544162,
-              "p_adjusted": 0.0010313130460544162,
+              "p_value": 0.0010313120292044786,
+              "p_adjusted": 0.0010313120292044786,
               "effect_size_name": "cohens_d",
               "effect_size": -1.6531180199566882
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.06459057338590357,
-              "p_adjusted": 0.06459057338590357,
+              "p_value": 0.06459123119680943,
+              "p_adjusted": 0.06459123119680943,
               "effect_size_name": "cohens_d",
-              "effect_size": -1.0288400394719353
+              "effect_size": -1.0288382591242557
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.0007062234972867731,
-              "p_adjusted": 0.0007062234972867731,
+              "p_value": 0.0007062227721259529,
+              "p_adjusted": 0.0007062227721259529,
               "effect_size_name": "cohens_d",
               "effect_size": 2.303525113755636
             },
             {
               "group_a": "mem",
               "group_b": "m3",
-              "p_value": 0.40089062763992545,
-              "p_adjusted": 0.40089062763992545,
+              "p_value": 0.4008878921169414,
+              "p_adjusted": 0.4008878921169414,
               "effect_size_name": "cohens_d",
-              "effect_size": 0.6195471768386068
+              "effect_size": 0.6195491332172409
             },
             {
               "group_a": "mem",
               "group_b": "trex",
-              "p_value": 2.6620974313829038e-09,
-              "p_adjusted": 2.6620974313829038e-09,
+              "p_value": 2.662078002479973e-09,
+              "p_adjusted": 2.662078002479973e-09,
               "effect_size_name": "cohens_d",
               "effect_size": 4.388116474541657
             },
             {
               "group_a": "m3",
               "group_b": "trex",
-              "p_value": 2.837771976293979e-07,
-              "p_adjusted": 2.837771976293979e-07,
+              "p_value": 2.837808177336143e-07,
+              "p_adjusted": 2.837808177336143e-07,
               "effect_size_name": "cohens_d",
-              "effect_size": 3.592503613011864
+              "effect_size": 3.5925019071706763
             }
           ]
         }
@@ -407,29 +343,29 @@
         "execution_cost": {
           "normal": true,
           "omnibus_test": "anova",
-          "omnibus_p_value": 0.04076003517531212,
+          "omnibus_p_value": 0.040760035175312126,
           "pairwise": [
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.2036597896491893,
-              "p_adjusted": 0.2036597896491893,
+              "p_value": 0.20365978964917797,
+              "p_adjusted": 0.20365978964917797,
               "effect_size_name": "cohens_d",
               "effect_size": -0.7273078259205835
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.21244286770979304,
-              "p_adjusted": 0.21244286770979304,
+              "p_value": 0.21244286770978182,
+              "p_adjusted": 0.21244286770978182,
               "effect_size_name": "cohens_d",
               "effect_size": -0.7115429816781291
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.028478767371711955,
-              "p_adjusted": 0.028478767371711955,
+              "p_value": 0.028478767371698188,
+              "p_adjusted": 0.028478767371698188,
               "effect_size_name": "cohens_d",
               "effect_size": -1.1670004214646306
             },
@@ -444,16 +380,16 @@
             {
               "group_a": "mem",
               "group_b": "trex",
-              "p_value": 0.7930129719541077,
-              "p_adjusted": 0.7930129719541077,
+              "p_value": 0.7930129719541047,
+              "p_adjusted": 0.7930129719541047,
               "effect_size_name": "cohens_d",
               "effect_size": -0.6195945607981198
             },
             {
               "group_a": "m3",
               "group_b": "trex",
-              "p_value": 0.7802055654918284,
-              "p_adjusted": 0.7802055654918284,
+              "p_value": 0.7802055654918253,
+              "p_adjusted": 0.7802055654918253,
               "effect_size_name": "cohens_d",
               "effect_size": -0.614580296633246
             }
@@ -467,24 +403,24 @@
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.00017777309370736738,
-              "p_adjusted": 0.00017777309370736738,
+              "p_value": 0.00017777309369326755,
+              "p_adjusted": 0.00017777309369326755,
               "effect_size_name": "cohens_d",
               "effect_size": -2.276704210601094
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.00010711521680006886,
-              "p_adjusted": 0.00010711521680006886,
+              "p_value": 0.00010711521678596903,
+              "p_adjusted": 0.00010711521678596903,
               "effect_size_name": "cohens_d",
               "effect_size": -2.004756059871413
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.00011426515010537486,
-              "p_adjusted": 0.00011426515010537486,
+              "p_value": 0.00011426515009138605,
+              "p_adjusted": 0.00011426515009138605,
               "effect_size_name": "cohens_d",
               "effect_size": -2.2964414335870167
             },
@@ -515,122 +451,64 @@
           ]
         }
       },
-      "rq3b_cost": {
+      "rq3_cost": {
         "execution_time_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -5662128817200859.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -5662128817200859.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -5662128817200859.0
-            }
-          ]
+          "raw": {
+            "mean": 268.21229999999997,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "mem": {
+            "mean": 268.21229999999997,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "m3": {
+            "mean": 268.21229999999997,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "trex": {
+            "mean": 804.6369,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 3.0
+          }
         },
         "mitigation_overhead.calibration_wall_clock_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            }
-          ]
+          "raw": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "mem": {
+            "mean": 2367.6672,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "m3": {
+            "mean": 36.9948,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "trex": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          }
         }
       }
     },
     {
       "combo": "gzip_qaoa_tcs",
-      "rq1_rq3a_quality": {
+      "rq1_quality": {
         "hypervolume": {
           "normal": false,
           "omnibus_test": "kruskal_wallis",
@@ -689,7 +567,7 @@
         "igd": {
           "normal": false,
           "omnibus_test": "kruskal_wallis",
-          "omnibus_p_value": 0.019008093050735753,
+          "omnibus_p_value": 0.01900809305073577,
           "pairwise": [
             {
               "group_a": "raw",
@@ -744,12 +622,12 @@
         "num_non_dominated": {
           "normal": false,
           "omnibus_test": "kruskal_wallis",
-          "omnibus_p_value": 0.08650919275629486,
+          "omnibus_p_value": 0.08650919275629483,
           "pairwise": [
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.29170984967727054,
+              "p_value": 0.29170984967727076,
               "p_adjusted": 1.0,
               "effect_size_name": "a12",
               "effect_size": 0.635
@@ -798,122 +676,64 @@
         }
       },
       "rq2_effectiveness": {},
-      "rq3b_cost": {
+      "rq3_cost": {
         "execution_time_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            }
-          ]
+          "raw": {
+            "mean": 215.18642,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "mem": {
+            "mean": 215.18642,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "m3": {
+            "mean": 215.18642,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "trex": {
+            "mean": 654.19138,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 3.0401146131805157
+          }
         },
         "mitigation_overhead.calibration_wall_clock_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": NaN,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            }
-          ]
+          "raw": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "mem": {
+            "mean": 2367.6672,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "m3": {
+            "mean": 36.9948,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "trex": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          }
         }
       }
     },
     {
       "combo": "paintcontrol_qaoa_tcs",
-      "rq1_rq3a_quality": {
+      "rq1_quality": {
         "qubo_energy": {
           "normal": false,
           "omnibus_test": "kruskal_wallis",
@@ -972,55 +792,55 @@
         "probability_of_optimal": {
           "normal": true,
           "omnibus_test": "anova",
-          "omnibus_p_value": 1.1977940861851511e-08,
+          "omnibus_p_value": 1.1977944889561176e-08,
           "pairwise": [
             {
               "group_a": "raw",
               "group_b": "mem",
-              "p_value": 0.005606768279167618,
-              "p_adjusted": 0.005606768279167618,
+              "p_value": 0.005606767233170218,
+              "p_adjusted": 0.005606767233170218,
               "effect_size_name": "cohens_d",
-              "effect_size": -1.4016808692547407
+              "effect_size": -1.40168086925474
             },
             {
               "group_a": "raw",
               "group_b": "m3",
-              "p_value": 0.07330450033698876,
-              "p_adjusted": 0.07330450033698876,
+              "p_value": 0.07330458581223664,
+              "p_adjusted": 0.07330458581223664,
               "effect_size_name": "cohens_d",
-              "effect_size": -1.0030127105062916
+              "effect_size": -1.003012509130945
             },
             {
               "group_a": "raw",
               "group_b": "trex",
-              "p_value": 0.000988193799030035,
-              "p_adjusted": 0.000988193799030035,
+              "p_value": 0.0009881935682350962,
+              "p_adjusted": 0.0009881935682350962,
               "effect_size_name": "cohens_d",
               "effect_size": 2.226057653001699
             },
             {
               "group_a": "mem",
               "group_b": "m3",
-              "p_value": 0.7282951418803103,
-              "p_adjusted": 0.7282951418803103,
+              "p_value": 0.7282947906890759,
+              "p_adjusted": 0.7282947906890759,
               "effect_size_name": "cohens_d",
-              "effect_size": 0.40794403828900727
+              "effect_size": 0.40794427961325413
             },
             {
               "group_a": "mem",
               "group_b": "trex",
-              "p_value": 2.1413156470195815e-08,
-              "p_adjusted": 2.1413156470195815e-08,
+              "p_value": 2.1413132933467693e-08,
+              "p_adjusted": 2.1413132933467693e-08,
               "effect_size_name": "cohens_d",
-              "effect_size": 4.035541436949634
+              "effect_size": 4.035541436949631
             },
             {
               "group_a": "m3",
               "group_b": "trex",
-              "p_value": 4.790445125024689e-07,
-              "p_adjusted": 4.790445125024689e-07,
+              "p_value": 4.790451584302247e-07,
+              "p_adjusted": 4.790451584302247e-07,
               "effect_size_name": "cohens_d",
-              "effect_size": 3.55708080660151
+              "effect_size": 3.5570806903093155
             }
           ]
         }
@@ -1137,116 +957,58 @@
           ]
         }
       },
-      "rq3b_cost": {
+      "rq3_cost": {
         "execution_time_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -1.6953970398280658e+16
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": 1.0,
-              "p_adjusted": 1.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -1.6953970398280658e+16
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 4.884981308350689e-15,
-              "p_adjusted": 4.884981308350689e-15,
-              "effect_size_name": "cohens_d",
-              "effect_size": -1.6953970398280658e+16
-            }
-          ]
+          "raw": {
+            "mean": 85.93583749999999,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "mem": {
+            "mean": 85.93583749999999,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "m3": {
+            "mean": 85.93583749999999,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 1.0
+          },
+          "trex": {
+            "mean": 265.5147625,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": 3.0896860986547092
+          }
         },
         "mitigation_overhead.calibration_wall_clock_seconds": {
-          "normal": true,
-          "omnibus_test": "anova",
-          "omnibus_p_value": 0.0,
-          "pairwise": [
-            {
-              "group_a": "raw",
-              "group_b": "mem",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "m3",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "raw",
-              "group_b": "trex",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "m3",
-              "p_value": NaN,
-              "p_adjusted": NaN,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "mem",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            },
-            {
-              "group_a": "m3",
-              "group_b": "trex",
-              "p_value": 0.0,
-              "p_adjusted": 0.0,
-              "effect_size_name": "cohens_d",
-              "effect_size": 0.0
-            }
-          ]
+          "raw": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "mem": {
+            "mean": 2367.6672,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "m3": {
+            "mean": 36.9948,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          },
+          "trex": {
+            "mean": 0.0,
+            "sd": 0.0,
+            "n": 10,
+            "ratio_vs_raw": null
+          }
         }
       }
     }

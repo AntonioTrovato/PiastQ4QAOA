@@ -19,12 +19,14 @@ hand; the first failing stage stops the run):
   8. end-of-session drift check       (re-measures M3)
   9. evaluation + statistical comparison  (local, no QPU)
 
-Which backend it uses is decided ONLY by configs/backend.yaml (or the
-PIASTQ_* env vars): the default `offline_simulator_no_noise` is a free local
-dry run. To run on the real machine, set `backend_name: piast_q` there (token
-via PIASTQ_API_TOKEN) AND flip ALLOW_REAL_HARDWARE below -- without it this
-script refuses to start on anything but an offline simulator. The real
-machine is reached through `pcss-qapi` (Python >= 3.11; README section 2).
+Which backend it uses is decided ONLY by configs/backend.yaml or the PIASTQ_*
+environment variables (which take precedence): the shipped default
+`offline_simulator_no_noise` is a free local dry run. The real machine
+(`piast_q`, reached through `pcss-qapi`, Python >= 3.11) is switched on by
+environment variables only -- PIASTQ_BACKEND_NAME=piast_q,
+PIASTQ_ALLOW_REAL_HARDWARE=1 and PIASTQ_API_TOKEN -- which run_cluster.sh sets
+on the cluster; no repo file is edited. Without PIASTQ_ALLOW_REAL_HARDWARE=1
+this script refuses to start on anything but an offline simulator.
 
 When does it stop?
   * a stage that fails (non-zero exit) stops the whole run -- no later stage
@@ -41,8 +43,8 @@ When does it stop?
   * It does NOT stop on its own for network trouble: dropped connections are
     retried for ~30 min per call; if that fails the stage dies, and
     `python run_all.py --resume` continues where it stopped (circuits already
-    in the raw-counts files are reused, not re-run; finished calibration
-    widths are skipped) instead of archiving the partial data and starting over.
+    in the raw-counts files are reused, not re-run; a finished calibration, a
+    finished drift check and the pilot gate are skipped) instead of archiving the partial data and starting over.
 
 Output: console + logs/run_all_<timestamp>.log, and a final
 logs/run_summary_<timestamp>.json (stage times, predicted vs measured QPU
@@ -66,9 +68,9 @@ from datetime import datetime
 # Settings
 # --------------------------------------------------------------------------
 ALLOW_REAL_HARDWARE = os.environ.get("PIASTQ_ALLOW_REAL_HARDWARE") == "1"
-                                   # off unless run_cluster.sh (or you) sets PIASTQ_ALLOW_REAL_HARDWARE=1 -- or edit to True
+                                   # off unless run_cluster.sh (or you) sets PIASTQ_ALLOW_REAL_HARDWARE=1
 RUN_UNIT_TESTS = True
-RUN_DRIFT_CHECK = True             # ~56 extra calibration circuits at the end
+RUN_DRIFT_CHECK = True             # 2 extra M3 calibration jobs at the end
 QPU_HOURS_LIMIT = 25.0             # total QPU time available (BILLED time, queue wait is free)
 MAX_JOBS_IN_FLIGHT = 16            # real machine only: circuits submitted at once (waits in the queue overlap)
 ABORT_IF_PROJECTION_EXCEEDS_LIMIT = True   # pilot gate (stage 4)
@@ -141,7 +143,7 @@ def _check_backend_allowed() -> str:
     if not is_offline and not ALLOW_REAL_HARDWARE:
         raise SystemExit(
             f"Refusing to start: backend '{backend_name}' is not an offline simulator and "
-            f"ALLOW_REAL_HARDWARE is False in run_all.py."
+            f"PIASTQ_ALLOW_REAL_HARDWARE is not set to 1."
         )
     if not is_offline:
         _check_real_backend_ready()

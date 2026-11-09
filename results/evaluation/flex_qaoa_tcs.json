@@ -12,7 +12,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.410348892211914
+      "classical_post_processing_seconds": 2.417098045349121
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -26,7 +26,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.55320405960083
+      "classical_post_processing_seconds": 2.5881359577178955
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -40,7 +40,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.4160842895507812
+      "classical_post_processing_seconds": 2.44277286529541
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -54,7 +54,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.5147998332977295
+      "classical_post_processing_seconds": 2.545675039291382
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -68,7 +68,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.0195765495300293
+      "classical_post_processing_seconds": 2.075230121612549
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -82,7 +82,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.663353443145752
+      "classical_post_processing_seconds": 2.626579999923706
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -96,7 +96,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.581298351287842
+      "classical_post_processing_seconds": 2.6297619342803955
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -110,7 +110,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.5559651851654053
+      "classical_post_processing_seconds": 2.6495180130004883
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -124,7 +124,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.096538543701172
+      "classical_post_processing_seconds": 2.1297447681427
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -138,7 +138,7 @@
         "total_shots": 21000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.5201635360717773
+      "classical_post_processing_seconds": 2.551934003829956
     }
   ],
   "mem": [
@@ -150,11 +150,11 @@
       "igd": 1604340.1355749632,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.438030481338501
+      "classical_post_processing_seconds": 2.4267640113830566
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -164,11 +164,11 @@
       "igd": 50359.89573424258,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.568143129348755
+      "classical_post_processing_seconds": 2.6129870414733887
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -178,11 +178,11 @@
       "igd": 39911.22689570297,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.402266025543213
+      "classical_post_processing_seconds": 2.413210868835449
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -192,11 +192,11 @@
       "igd": 18484.856110152232,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.471026659011841
+      "classical_post_processing_seconds": 2.563662052154541
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -206,11 +206,11 @@
       "igd": 913.5446379363576,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.0223162174224854
+      "classical_post_processing_seconds": 2.0862278938293457
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -220,11 +220,11 @@
       "igd": 16829.405621422728,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.5361716747283936
+      "classical_post_processing_seconds": 2.6157572269439697
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -234,11 +234,11 @@
       "igd": 24405.212086003987,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.5452163219451904
+      "classical_post_processing_seconds": 2.609999895095825
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -248,11 +248,11 @@
       "igd": 13659.31746156548,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.5501084327697754
+      "classical_post_processing_seconds": 2.617309093475342
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -262,11 +262,11 @@
       "igd": 0.6796447415624043,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.075303554534912
+      "classical_post_processing_seconds": 2.1343719959259033
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -276,11 +276,11 @@
       "igd": 15786.258093771476,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 128,
+        "total_shots": 46600,
+        "calibration_wall_clock_seconds": 2367.6672
       },
-      "classical_post_processing_seconds": 2.6122138500213623
+      "classical_post_processing_seconds": 2.556593894958496
     }
   ],
   "m3": [
@@ -292,11 +292,11 @@
       "igd": 1604340.1355749632,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.5228612422943115
+      "classical_post_processing_seconds": 2.404654026031494
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -306,11 +306,11 @@
       "igd": 50359.89573424258,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.5695793628692627
+      "classical_post_processing_seconds": 2.6133790016174316
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -320,11 +320,11 @@
       "igd": 40050.6221275052,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.3713388442993164
+      "classical_post_processing_seconds": 2.4114990234375
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -334,11 +334,11 @@
       "igd": 18429.08927009779,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.472552537918091
+      "classical_post_processing_seconds": 2.5267300605773926
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -348,11 +348,11 @@
       "igd": 605.4414796210441,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.0194075107574463
+      "classical_post_processing_seconds": 2.0650391578674316
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -362,11 +362,11 @@
       "igd": 16829.405621422728,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.549299716949463
+      "classical_post_processing_seconds": 2.5785326957702637
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -376,11 +376,11 @@
       "igd": 25161.894818127086,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.5446834564208984
+      "classical_post_processing_seconds": 2.6017541885375977
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -390,11 +390,11 @@
       "igd": 13659.31746156548,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.5552546977996826
+      "classical_post_processing_seconds": 2.6119678020477295
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -404,11 +404,11 @@
       "igd": 328.1259812467063,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.0758888721466064
+      "classical_post_processing_seconds": 2.1227028369903564
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -418,11 +418,11 @@
       "igd": 15786.258093771476,
       "execution_time_seconds": 585.3190849373433,
       "mitigation_overhead": {
-        "calibration_circuits": 0,
-        "total_shots": 21000,
-        "calibration_wall_clock_seconds": 0.0
+        "calibration_circuits": 2,
+        "total_shots": 21400,
+        "calibration_wall_clock_seconds": 36.9948
       },
-      "classical_post_processing_seconds": 2.61301851272583
+      "classical_post_processing_seconds": 2.5572638511657715
     }
   ],
   "trex": [
@@ -438,7 +438,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.480464220046997
+      "classical_post_processing_seconds": 2.4024770259857178
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -452,7 +452,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.595144271850586
+      "classical_post_processing_seconds": 2.6084768772125244
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -466,7 +466,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.3807880878448486
+      "classical_post_processing_seconds": 2.4234108924865723
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -480,7 +480,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.468777656555176
+      "classical_post_processing_seconds": 2.5302610397338867
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -494,7 +494,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.0208334922790527
+      "classical_post_processing_seconds": 2.0672760009765625
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -508,7 +508,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.5698835849761963
+      "classical_post_processing_seconds": 2.6200950145721436
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -522,7 +522,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.5440351963043213
+      "classical_post_processing_seconds": 2.612266778945923
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -536,7 +536,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.6531848907470703
+      "classical_post_processing_seconds": 2.642439126968384
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -550,7 +550,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.1524691581726074
+      "classical_post_processing_seconds": 2.1331818103790283
     },
     {
       "combo": "flex_qaoa_tcs",
@@ -564,7 +564,7 @@
         "total_shots": 63000,
         "calibration_wall_clock_seconds": 0.0
       },
-      "classical_post_processing_seconds": 2.625948190689087
+      "classical_post_processing_seconds": 2.568343162536621
     }
   ]
 }

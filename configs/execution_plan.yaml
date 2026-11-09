@@ -122,7 +122,7 @@ combos:
 # ONE pool, four QAOA-TCS combos (2 multi-objective: gzip, flex; 2 single-
 # objective: paintcontrol, gsdtsr), all four methods (raw+MEM+M3+TREx),
 # 10 repetitions (5, then extended with --resume), 200 shots/circuit, 3 TREx twirls. IGDec-QAOA is not part of
-# this run. The planner prices one circuit per job (an upper bound: ~58.5h at 10 repetitions, 29.2h at 5, at
+# this run. The planner prices one circuit per job (an upper bound: ~56.9h at 10 repetitions, 29.2h at 5, at
 # the measured 18.4974 s/job); the run packs circuits side by side, so it
 # really needs ~1,390 jobs, ~7.1 billed hours and ~78h of wall-clock.
 # total_hours is only the planner's cap and must stay above its upper-bound

@@ -304,6 +304,7 @@ def evaluate_qaoa_tcs_multi_objective_combo(
         # build the reference (union) frontier -- one pass per method first.
         points_by_method: Dict[str, List[Tuple[float, float, float]]] = {}
         records_by_method: Dict[str, List[RawCountsRecord]] = {}
+        calibration_by_method: Dict[str, Any] = {}
 
         for method in methods:
             keys = [(c["cluster_id"], iteration_id, None) for c in assignments_raw]
@@ -346,6 +347,7 @@ def evaluate_qaoa_tcs_multi_objective_combo(
 
             method_records = trex_records if method == "trex" else raw_records
             records_by_method[method] = [r for r in method_records if r.iteration_id == iteration_id]
+            calibration_by_method[method] = next((c for c in calibration_records if c is not None), None)
 
         # A reference point strictly worse than every real point in every
         # dimension: coverage/faults are non-negative, so 0 is a natural
@@ -363,6 +365,8 @@ def evaluate_qaoa_tcs_multi_objective_combo(
                 all_methods_points=points_by_method,
                 reference_point=reference_point,
                 raw_records=records_by_method[method],
+                calibration_record=calibration_by_method.get(method),
+                calibration_shots_per_circuit=200,
             )
             results_by_method[method].append(result)
 

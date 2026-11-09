@@ -291,13 +291,12 @@ def correct_counts_m3(
 # preserve the ideal unitary -- and is not implemented here; only the
 # measurement-twirling MVP described in the task is.
 
-# Default number of independent twirl instances (each a distinct hardware
-# execution) averaged together per circuit. 32 matches the commonly used
-# default for measurement-twirling randomizations in Qiskit Runtime's
-# twirled-readout implementations -- a reasonable balance between averaging
-# out readout bias and added hardware time. Configurable per study via
-# `trex_twirl_instances` in configs/execution_plan.yaml (see
-# load_trex_twirl_instances()) rather than hardcoded at every call site.
+# Fallback number of independent twirl instances (each a distinct hardware
+# execution) averaged per circuit, used only when `trex_twirl_instances` is
+# missing from configs/execution_plan.yaml (see load_trex_twirl_instances()).
+# 32 is a round starting value seen in measurement-twirling tutorial examples,
+# not a value derived from this study; the study's own configuration sets 3
+# (affordability: each instance is a full extra pass over every circuit).
 DEFAULT_TREX_TWIRL_INSTANCES = 32
 
 
@@ -556,8 +555,11 @@ class CalibrationStore:
         a packed job). An exact record wins; otherwise it is derived from a
         stored record covering those qubits: M3 -> pick the per-qubit matrices,
         MEM -> marginalise the slot's confusion matrix
-        (`marginal_confusion_matrix`). The derived record reports the cost of
-        calibrating that window on its own (2**w resp. 2w circuits)."""
+        (`marginal_confusion_matrix`). The derived record carries the cost of
+        the stored calibration it comes from (its jobs and billed seconds), not
+        a per-window share: that calibration is a one-off cost shared by every
+        circuit, repetition and subject that uses it, and it is what the study
+        actually spent to make this correction available."""
         exact = self.load(method, physical_qubits)
         if exact is not None:
             return exact
@@ -576,22 +578,18 @@ class CalibrationStore:
             if method == "mem":
                 data = {"confusion_matrix": marginal_confusion_matrix(
                     base.confusion_matrix(), base.num_qubits, positions).tolist()}
-                circuits = 2 ** width
             else:
                 cals = base.single_qubit_cals()
                 data = {"single_qubit_cals": [cals[i].tolist() for i in positions]}
-                circuits = 2 * width
-            jobs = max(1, int(base.data.get("calibration_jobs", 1)))
-            per_circuit_billed = (base.calibration_billed_seconds / jobs
-                                  if base.calibration_billed_seconds is not None else None)
+            data["calibration_jobs"] = base.data.get("calibration_jobs")
             return CalibrationRecord(
                 method=base.method, num_qubits=width, physical_qubits=wanted,
                 backend_name=base.backend_name, backend_version=base.backend_version,
                 calibration_timestamp=base.calibration_timestamp,
                 shots_per_calibration_circuit=base.shots_per_calibration_circuit,
-                calibration_wall_clock_seconds=base.calibration_wall_clock_seconds / jobs * circuits,
+                calibration_wall_clock_seconds=base.calibration_wall_clock_seconds,
                 data=data,
-                calibration_billed_seconds=(per_circuit_billed * circuits if per_circuit_billed is not None else None),
+                calibration_billed_seconds=base.calibration_billed_seconds,
             )
         return None
 

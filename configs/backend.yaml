@@ -15,14 +15,13 @@
 api_token: ACCESS_TOKEN
 backend_name: offline_simulator_no_noise
 
-# Ordered list of physical PIAST-Q qubits every circuit gets transpiled onto,
-# read by piastq_execution.qubit_layout. A width-`w` circuit always uses the
-# first `w` entries of this list -- real QAOA/TREx execution AND MEM/M3
-# calibration circuits alike -- so calibration is guaranteed to be built from
-# the *same* physical qubits the real circuits actually ran on, not merely
-# assumed to match. Defaults to [0, 1, 2, 3, 4, 5, 6] if this key is absent.
-# Update this list (not the code) if PIAST-Q's real qubit numbering, or which
-# specific physical qubits you want to dedicate to this study, changes.
+# Ordered list of physical PIAST-Q qubits used ONLY when a single circuit is
+# run on its own, without packing (piastq_execution.qubit_layout): a width-`w`
+# circuit then uses the first `w` entries, for the circuit and for its MEM/M3
+# calibration alike. The study itself ran PACKED (see `pack_slots` below), where
+# every circuit's physical qubits come from its slot and are recorded per
+# circuit in `physical_qubit_mapping`; this key was not used for the study's
+# results. Defaults to [0, 1, 2, 3, 4, 5, 6] if the key is absent.
 physical_qubits: [0, 1, 2, 3, 4, 5, 6]
 
 # Fixed qubit SLOTS used to pack several circuits into one hardware job
