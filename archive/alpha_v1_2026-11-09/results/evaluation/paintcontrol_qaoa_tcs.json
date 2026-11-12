@@ -1,0 +1,730 @@
+{
+  "raw": [
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8041666666666667,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010559558868408203
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8116666666666666,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010411739349365234
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8229166666666666,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010378360748291016
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.52610526731735,
+      "optimal_bitstring": "01+11+1+0+1+01+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.825625,
+      "execution_cost": 2355199.0,
+      "effectiveness": {
+        "failure_rate": 19.55342969043198
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0027790069580078125
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.80625,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010209083557128906
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8152083333333334,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0028829574584960938
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.532362440751998,
+      "optimal_bitstring": "11+11+1+0+1+00+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8179166666666666,
+      "execution_cost": 2383771.0,
+      "effectiveness": {
+        "failure_rate": 19.61395600622145
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010030269622802734
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8341666666666666,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010230541229248047
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8325,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010001659393310547
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "raw",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.816875,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 4800,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010199546813964844
+    }
+  ],
+  "mem": [
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8181509192311,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.017603635787963867
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8256290725211123,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.03799009323120117
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8370996945658806,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.017431974411010742
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.529679302872776,
+      "optimal_bitstring": "11+11+1+0+1+01+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8397755714555187,
+      "execution_cost": 2394256.0,
+      "effectiveness": {
+        "failure_rate": 19.627113900958292
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.01759791374206543
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8212424484315458,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.0189969539642334
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8284521152949056,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.025519847869873047
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.532362440751998,
+      "optimal_bitstring": "11+11+1+0+1+00+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8322330327771977,
+      "execution_cost": 2383771.0,
+      "effectiveness": {
+        "failure_rate": 19.61395600622145
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.02800726890563965
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8492931932370714,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.024740219116210938
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8474718737192498,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.027857065200805664
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "mem",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8319560061885326,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 128,
+        "total_shots": 30400,
+        "calibration_wall_clock_seconds": 2367.6672
+      },
+      "classical_post_processing_seconds": 0.019068002700805664
+    }
+  ],
+  "m3": [
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8154658252994219,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.006542682647705078
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8223896125952402,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.0027272701263427734
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.53305925375285,
+      "optimal_bitstring": "11+11+1+0+1+11+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8320818108816942,
+      "execution_cost": 2416752.0,
+      "effectiveness": {
+        "failure_rate": 19.671956950285647
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.007806062698364258
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.52610526731735,
+      "optimal_bitstring": "01+11+1+0+1+01+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8354762146870295,
+      "execution_cost": 2355199.0,
+      "effectiveness": {
+        "failure_rate": 19.55342969043198
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.0025789737701416016
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8166791262725989,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.0061681270599365234
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8251785822212696,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.00775599479675293
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.532362440751998,
+      "optimal_bitstring": "11+11+1+0+1+00+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8267384550223748,
+      "execution_cost": 2383771.0,
+      "effectiveness": {
+        "failure_rate": 19.61395600622145
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.002608060836791992
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8454064428806305,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.002599000930786133
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8434652984142303,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.0026078224182128906
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "m3",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8264253723124663,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 85.93583749999999,
+      "mitigation_overhead": {
+        "calibration_circuits": 2,
+        "total_shots": 5200,
+        "calibration_wall_clock_seconds": 36.9948
+      },
+      "classical_post_processing_seconds": 0.002624988555908203
+    }
+  ],
+  "trex": [
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.7961805555555556,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010869503021240234
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.7964583333333333,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0011179447174072266
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8066666666666666,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.00286102294921875
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8021527777777777,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010879039764404297
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.804236111111111,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.002905130386352539
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8007638888888889,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.001779794692993164
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8040277777777778,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010881423950195312
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.529679302872776,
+      "optimal_bitstring": "11+11+1+0+1+01+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.805138888888889,
+      "execution_cost": 2394256.0,
+      "effectiveness": {
+        "failure_rate": 19.627113900958292
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010619163513183594
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.532168356076644,
+      "optimal_bitstring": "01+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8024305555555555,
+      "execution_cost": 2367210.0,
+      "effectiveness": {
+        "failure_rate": 19.58511484502249
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010628700256347656
+    },
+    {
+      "combo": "paintcontrol_qaoa_tcs",
+      "method": "trex",
+      "qubo_energy": -8.535742391632072,
+      "optimal_bitstring": "11+11+1+0+1+10+11+1+0+1+1111111+1111111+11111+1111+111111+111111+111111+111111+1111+11111+11111+11111+11111+1111",
+      "probability_of_optimal": 0.8002777777777778,
+      "execution_cost": 2406267.0,
+      "effectiveness": {
+        "failure_rate": 19.658799055548805
+      },
+      "execution_time_seconds": 265.5147625,
+      "mitigation_overhead": {
+        "calibration_circuits": 0,
+        "total_shots": 14400,
+        "calibration_wall_clock_seconds": 0.0
+      },
+      "classical_post_processing_seconds": 0.0010707378387451172
+    }
+  ]
+}

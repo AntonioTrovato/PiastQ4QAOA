@@ -1,0 +1,3060 @@
+{
+  "per_repetition": {
+    "gsdtsr_qaoa_tcs": {
+      "ideal_exact": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -4.264395855392946,
+          "probability_of_optimal": 0.4103107094752965,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 4760360.114560648,
+          "effectiveness.failure_rate": 7.570571740216877
+        }
+      ],
+      "ideal_shots200": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -4.084259974623347,
+          "probability_of_optimal": 0.4097468354430379,
+          "argmax_is_optimal_fraction": 0.620253164556962,
+          "execution_cost": 7025443.940810948,
+          "effectiveness.failure_rate": 7.640648499259948
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -4.032997230270737,
+          "probability_of_optimal": 0.4116455696202532,
+          "argmax_is_optimal_fraction": 0.620253164556962,
+          "execution_cost": 7175463.277233213,
+          "effectiveness.failure_rate": 7.582404650933354
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -4.048549523632391,
+          "probability_of_optimal": 0.4116455696202532,
+          "argmax_is_optimal_fraction": 0.6329113924050633,
+          "execution_cost": 6920098.601460357,
+          "effectiveness.failure_rate": 7.566899969443121
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -4.057219104075249,
+          "probability_of_optimal": 0.40962025316455697,
+          "argmax_is_optimal_fraction": 0.6455696202531646,
+          "execution_cost": 6800791.772621188,
+          "effectiveness.failure_rate": 7.561900137942449
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -4.1000773719985615,
+          "probability_of_optimal": 0.40962025316455697,
+          "argmax_is_optimal_fraction": 0.6329113924050633,
+          "execution_cost": 6094169.919371027,
+          "effectiveness.failure_rate": 7.518714611442748
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -4.054741551434686,
+          "probability_of_optimal": 0.4120253164556962,
+          "argmax_is_optimal_fraction": 0.620253164556962,
+          "execution_cost": 6667925.920712965,
+          "effectiveness.failure_rate": 7.5369344904135955
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -4.110301100281728,
+          "probability_of_optimal": 0.4075949367088608,
+          "argmax_is_optimal_fraction": 0.6708860759493671,
+          "execution_cost": 6814764.962593159,
+          "effectiveness.failure_rate": 7.648977876290063
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -4.029410118784239,
+          "probability_of_optimal": 0.40772151898734177,
+          "argmax_is_optimal_fraction": 0.5949367088607594,
+          "execution_cost": 7667087.581877236,
+          "effectiveness.failure_rate": 7.654389325958255
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -4.074065490708282,
+          "probability_of_optimal": 0.4091139240506329,
+          "argmax_is_optimal_fraction": 0.6455696202531646,
+          "execution_cost": 6902630.512600353,
+          "effectiveness.failure_rate": 7.604934006255535
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -4.080420852453654,
+          "probability_of_optimal": 0.4091139240506329,
+          "argmax_is_optimal_fraction": 0.6455696202531646,
+          "execution_cost": 6233756.824962135,
+          "effectiveness.failure_rate": 7.509354299646443
+        }
+      ],
+      "ideal_shots600": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -4.153456895990633,
+          "probability_of_optimal": 0.41000000000000003,
+          "argmax_is_optimal_fraction": 0.7215189873417721,
+          "execution_cost": 5756564.388591446,
+          "effectiveness.failure_rate": 7.550687717233545
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -4.165741768629364,
+          "probability_of_optimal": 0.4085864978902954,
+          "argmax_is_optimal_fraction": 0.6962025316455697,
+          "execution_cost": 5405863.121857849,
+          "effectiveness.failure_rate": 7.514887448994654
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -4.127148566153642,
+          "probability_of_optimal": 0.41130801687763713,
+          "argmax_is_optimal_fraction": 0.6582278481012658,
+          "execution_cost": 6240638.030575957,
+          "effectiveness.failure_rate": 7.585151504734623
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -4.103523045443547,
+          "probability_of_optimal": 0.41257383966244726,
+          "argmax_is_optimal_fraction": 0.6708860759493671,
+          "execution_cost": 5607657.798329466,
+          "effectiveness.failure_rate": 7.447311976100427
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -4.132957817210844,
+          "probability_of_optimal": 0.4093459915611814,
+          "argmax_is_optimal_fraction": 0.6835443037974683,
+          "execution_cost": 5401239.5606777035,
+          "effectiveness.failure_rate": 7.461740765868222
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -4.163103784908696,
+          "probability_of_optimal": 0.41061181434599153,
+          "argmax_is_optimal_fraction": 0.6708860759493671,
+          "execution_cost": 5565929.225645311,
+          "effectiveness.failure_rate": 7.535974285981854
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -4.109259521918905,
+          "probability_of_optimal": 0.41006329113924056,
+          "argmax_is_optimal_fraction": 0.6708860759493671,
+          "execution_cost": 6677394.183354701,
+          "effectiveness.failure_rate": 7.625595923968692
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -4.142842337486147,
+          "probability_of_optimal": 0.40940928270042193,
+          "argmax_is_optimal_fraction": 0.6962025316455697,
+          "execution_cost": 5605296.681043865,
+          "effectiveness.failure_rate": 7.509803322994142
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -4.134476481199577,
+          "probability_of_optimal": 0.4104852320675106,
+          "argmax_is_optimal_fraction": 0.6708860759493671,
+          "execution_cost": 6044958.970532298,
+          "effectiveness.failure_rate": 7.56593306450853
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -4.145784706129904,
+          "probability_of_optimal": 0.4079324894514768,
+          "argmax_is_optimal_fraction": 0.7088607594936709,
+          "execution_cost": 5893542.299057799,
+          "effectiveness.failure_rate": 7.560075783753868
+        }
+      ]
+    },
+    "paintcontrol_qaoa_tcs": {
+      "ideal_exact": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -2.0804233691787988,
+          "probability_of_optimal": 0.45858612602813625,
+          "argmax_is_optimal_fraction": 1.0,
+          "execution_cost": 1165500.0,
+          "effectiveness.failure_rate": 14.455354423036184
+        }
+      ],
+      "ideal_shots200": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -2.047508972304137,
+          "probability_of_optimal": 0.464375,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1099140.0,
+          "effectiveness.failure_rate": 13.951477251671461
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -2.03340698054756,
+          "probability_of_optimal": 0.4535416666666667,
+          "argmax_is_optimal_fraction": 0.7916666666666666,
+          "execution_cost": 1137136.0,
+          "effectiveness.failure_rate": 14.117046938478111
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -2.0191716784103635,
+          "probability_of_optimal": 0.4658333333333333,
+          "argmax_is_optimal_fraction": 0.7916666666666666,
+          "execution_cost": 1163366.0,
+          "effectiveness.failure_rate": 14.214554243065777
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -2.042363382179035,
+          "probability_of_optimal": 0.45875,
+          "argmax_is_optimal_fraction": 0.7916666666666666,
+          "execution_cost": 1105065.0,
+          "effectiveness.failure_rate": 13.966301386263
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -2.056282349973522,
+          "probability_of_optimal": 0.46020833333333333,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1185333.0,
+          "effectiveness.failure_rate": 14.47916686022434
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -2.0675154138108063,
+          "probability_of_optimal": 0.463125,
+          "argmax_is_optimal_fraction": 0.875,
+          "execution_cost": 1078636.0,
+          "effectiveness.failure_rate": 13.908384490463188
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -2.0243698661086356,
+          "probability_of_optimal": 0.45875,
+          "argmax_is_optimal_fraction": 0.75,
+          "execution_cost": 1176449.0,
+          "effectiveness.failure_rate": 14.309077722338841
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -2.0430496657099613,
+          "probability_of_optimal": 0.46187500000000004,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1312799.0,
+          "effectiveness.failure_rate": 15.161751836774853
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -2.0433811549828387,
+          "probability_of_optimal": 0.4575,
+          "argmax_is_optimal_fraction": 0.7916666666666666,
+          "execution_cost": 1209640.0,
+          "effectiveness.failure_rate": 14.570609447087266
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -2.055152015774517,
+          "probability_of_optimal": 0.4652083333333333,
+          "argmax_is_optimal_fraction": 0.875,
+          "execution_cost": 1113147.0,
+          "effectiveness.failure_rate": 14.0604290897215
+        }
+      ],
+      "ideal_shots600": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -2.056845826208973,
+          "probability_of_optimal": 0.46055555555555555,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1050523.0,
+          "effectiveness.failure_rate": 13.707137672122922
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -2.0727963520433557,
+          "probability_of_optimal": 0.46118055555555554,
+          "argmax_is_optimal_fraction": 0.9583333333333334,
+          "execution_cost": 1162282.0,
+          "effectiveness.failure_rate": 14.40841703453903
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -2.0389524957261225,
+          "probability_of_optimal": 0.4551388888888889,
+          "argmax_is_optimal_fraction": 0.75,
+          "execution_cost": 1180627.0,
+          "effectiveness.failure_rate": 14.387480996961292
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -2.0601678150913294,
+          "probability_of_optimal": 0.45659722222222227,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1041128.0,
+          "effectiveness.failure_rate": 13.66558311404661
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -2.065317702515073,
+          "probability_of_optimal": 0.45895833333333336,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1203260.0,
+          "effectiveness.failure_rate": 14.615823934715953
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -2.0637849529081733,
+          "probability_of_optimal": 0.45708333333333334,
+          "argmax_is_optimal_fraction": 0.9166666666666666,
+          "execution_cost": 1183057.0,
+          "effectiveness.failure_rate": 14.494091333693952
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -2.075191079724941,
+          "probability_of_optimal": 0.45881944444444445,
+          "argmax_is_optimal_fraction": 0.9166666666666666,
+          "execution_cost": 1102901.0,
+          "effectiveness.failure_rate": 14.07636349308786
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -2.040549684831453,
+          "probability_of_optimal": 0.4546527777777778,
+          "argmax_is_optimal_fraction": 0.75,
+          "execution_cost": 1079233.0,
+          "effectiveness.failure_rate": 13.81119658032563
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -2.0533777962282374,
+          "probability_of_optimal": 0.4575694444444445,
+          "argmax_is_optimal_fraction": 0.8333333333333334,
+          "execution_cost": 1235806.0,
+          "effectiveness.failure_rate": 14.758164894009182
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -2.0747549686954665,
+          "probability_of_optimal": 0.4566666666666667,
+          "argmax_is_optimal_fraction": 0.9166666666666666,
+          "execution_cost": 1209505.0,
+          "effectiveness.failure_rate": 14.686898047197257
+        }
+      ]
+    },
+    "flex_qaoa_tcs": {
+      "raw": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.01945499312916,
+          "probability_of_optimal": 0.9050952380952381,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 257844902087795.0,
+          "igd": 144035.1431997704,
+          "num_non_dominated": 239
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -304.018279914027,
+          "probability_of_optimal": 0.900952380952381,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 549,
+          "hypervolume": 248522057639563.0,
+          "igd": 91781.70116274434,
+          "num_non_dominated": 17
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.0184621711708,
+          "probability_of_optimal": 0.8995714285714286,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 554,
+          "hypervolume": 247905527866930.0,
+          "igd": 65081.49233019461,
+          "num_non_dominated": 20
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.01854551143373,
+          "probability_of_optimal": 0.8983809523809524,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 554,
+          "hypervolume": 250955252342805.0,
+          "igd": 44539.87012032711,
+          "num_non_dominated": 548
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -304.0196543095733,
+          "probability_of_optimal": 0.9036190476190475,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 252977450310372.0,
+          "igd": 50354.96937224753,
+          "num_non_dominated": 522
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.018545308481,
+          "probability_of_optimal": 0.9013333333333333,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 551,
+          "hypervolume": 251140111512307.0,
+          "igd": 54774.291361533986,
+          "num_non_dominated": 527
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.0164003072478,
+          "probability_of_optimal": 0.9015714285714285,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 560,
+          "hypervolume": 254034896095700.0,
+          "igd": 62175.47086094812,
+          "num_non_dominated": 532
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -304.01857915084037,
+          "probability_of_optimal": 0.9010952380952381,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 554,
+          "hypervolume": 251603702594600.0,
+          "igd": 48636.50029894139,
+          "num_non_dominated": 530
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.01864339100104,
+          "probability_of_optimal": 0.9000952380952381,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 556,
+          "hypervolume": 252510567782296.0,
+          "igd": 66317.9489774241,
+          "num_non_dominated": 43
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.0198228899616,
+          "probability_of_optimal": 0.8976666666666666,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 550,
+          "hypervolume": 250308615450178.0,
+          "igd": 63038.30412161197,
+          "num_non_dominated": 525
+        }
+      ],
+      "mem": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.01945501567945,
+          "probability_of_optimal": 0.922293734716617,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 257843317226781.0,
+          "igd": 144035.08159590335,
+          "num_non_dominated": 255
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -268.8247503837074,
+          "probability_of_optimal": 0.917989807745815,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 557,
+          "hypervolume": 248487832734796.0,
+          "igd": 112169.46561683512,
+          "num_non_dominated": 18
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.0184621711708,
+          "probability_of_optimal": 0.917313284711889,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 554,
+          "hypervolume": 247905527866930.0,
+          "igd": 65081.49233019461,
+          "num_non_dominated": 20
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.0185459793524,
+          "probability_of_optimal": 0.9167377553898151,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 553,
+          "hypervolume": 247415970736457.0,
+          "igd": 44561.95173250096,
+          "num_non_dominated": 16
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -268.82683912758534,
+          "probability_of_optimal": 0.9206637148074229,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 252953561138640.0,
+          "igd": 50859.38052430485,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.01843850463337,
+          "probability_of_optimal": 0.9189396297691874,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 552,
+          "hypervolume": 251232660717879.0,
+          "igd": 54456.63531193673,
+          "num_non_dominated": 528
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.01072922870935,
+          "probability_of_optimal": 0.9184599700129695,
+          "argmax_is_optimal_fraction": 0.9047619047619048,
+          "num_selected_tests": 563,
+          "hypervolume": 254567337871807.0,
+          "igd": 61357.01670631798,
+          "num_non_dominated": 536
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -304.0185039681477,
+          "probability_of_optimal": 0.917436541549448,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 557,
+          "hypervolume": 251607277007017.0,
+          "igd": 48604.75502520678,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.01864339100104,
+          "probability_of_optimal": 0.9172216810022638,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 556,
+          "hypervolume": 252510567782296.0,
+          "igd": 66317.9489774241,
+          "num_non_dominated": 43
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.0198229745252,
+          "probability_of_optimal": 0.9162526093013291,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 550,
+          "hypervolume": 246768661482311.0,
+          "igd": 63027.50038925054,
+          "num_non_dominated": 229
+        }
+      ],
+      "m3": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.01945501567945,
+          "probability_of_optimal": 0.9191146903626976,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 257843317226781.0,
+          "igd": 144035.08159590335,
+          "num_non_dominated": 255
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -268.8247503837074,
+          "probability_of_optimal": 0.9149271748605229,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 557,
+          "hypervolume": 248487832734796.0,
+          "igd": 112169.46561683512,
+          "num_non_dominated": 18
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.01833171769846,
+          "probability_of_optimal": 0.9137746423394197,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 556,
+          "hypervolume": 248001365545727.0,
+          "igd": 64963.40892521293,
+          "num_non_dominated": 20
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.01854551143373,
+          "probability_of_optimal": 0.9125741643742437,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 554,
+          "hypervolume": 250955252342805.0,
+          "igd": 44539.87012032711,
+          "num_non_dominated": 548
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -304.01952429019417,
+          "probability_of_optimal": 0.9177790833104934,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 553,
+          "hypervolume": 252979290964154.0,
+          "igd": 50403.33969051582,
+          "num_non_dominated": 522
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.01843850463337,
+          "probability_of_optimal": 0.9161752397815387,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 552,
+          "hypervolume": 251232660717879.0,
+          "igd": 54456.63531193673,
+          "num_non_dominated": 528
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.0108919121948,
+          "probability_of_optimal": 0.9154339738855405,
+          "argmax_is_optimal_fraction": 0.9142857142857143,
+          "num_selected_tests": 560,
+          "hypervolume": 250392169356628.0,
+          "igd": 61870.16724402005,
+          "num_non_dominated": 296
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -304.0185039681477,
+          "probability_of_optimal": 0.914663692874213,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 557,
+          "hypervolume": 251607277007017.0,
+          "igd": 48604.75502520678,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.01851337162185,
+          "probability_of_optimal": 0.913196420758253,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 557,
+          "hypervolume": 252508838749186.0,
+          "igd": 66561.60964061655,
+          "num_non_dominated": 31
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.0198229745252,
+          "probability_of_optimal": 0.911876908565561,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 550,
+          "hypervolume": 246768661482311.0,
+          "igd": 63027.50038925054,
+          "num_non_dominated": 229
+        }
+      ],
+      "trex": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.0202564476234,
+          "probability_of_optimal": 0.9166349206349207,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 553,
+          "hypervolume": 251478769246315.0,
+          "igd": 104810.10917864097,
+          "num_non_dominated": 529
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -304.0199071265988,
+          "probability_of_optimal": 0.9141428571428571,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 549,
+          "hypervolume": 257821075354131.0,
+          "igd": 299054.0363033994,
+          "num_non_dominated": 549
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.02014294069977,
+          "probability_of_optimal": 0.913984126984127,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 552,
+          "hypervolume": 251825397974992.0,
+          "igd": 40880.98772452421,
+          "num_non_dominated": 551
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.0195119608189,
+          "probability_of_optimal": 0.9104126984126985,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 551,
+          "hypervolume": 247500168378805.0,
+          "igd": 53697.94312399776,
+          "num_non_dominated": 44
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -304.01440183221166,
+          "probability_of_optimal": 0.9154126984126985,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 552,
+          "hypervolume": 249322802834874.0,
+          "igd": 96567.6393608595,
+          "num_non_dominated": 11
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.02105176279906,
+          "probability_of_optimal": 0.9138253968253969,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 549,
+          "hypervolume": 247279964886116.0,
+          "igd": 67829.80454450751,
+          "num_non_dominated": 515
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.01998457559637,
+          "probability_of_optimal": 0.9154761904761904,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 553,
+          "hypervolume": 253311627747951.0,
+          "igd": 71745.90352494024,
+          "num_non_dominated": 547
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -268.8252151848067,
+          "probability_of_optimal": 0.9131904761904762,
+          "argmax_is_optimal_fraction": 0.9142857142857143,
+          "num_selected_tests": 554,
+          "hypervolume": 252048463757411.0,
+          "igd": 58312.807530808386,
+          "num_non_dominated": 517
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.0182503618618,
+          "probability_of_optimal": 0.9144920634920635,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 553,
+          "hypervolume": 249046809816050.0,
+          "igd": 72488.46843917022,
+          "num_non_dominated": 14
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.0202766696029,
+          "probability_of_optimal": 0.9134285714285714,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 554,
+          "hypervolume": 251384405239132.0,
+          "igd": 75513.73670689149,
+          "num_non_dominated": 532
+        }
+      ],
+      "ideal_exact": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253004042889513.0,
+          "igd": 166666.8169522795,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253408334591943.0,
+          "igd": 306653.6449568292,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253270414646703.0,
+          "igd": 2169851.383372643,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253109098182933.0,
+          "igd": 4529562.333552825,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 254374864301088.0,
+          "igd": 230288.30167826454,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253141785457938.0,
+          "igd": 793497.4224454884,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 255496731325443.0,
+          "igd": 1752267.6595127136,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 253266352201008.0,
+          "igd": 752567.1830899895,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 254181315198033.0,
+          "igd": 5752374.677328824,
+          "num_non_dominated": 540
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.0214161868856,
+          "probability_of_optimal": 0.9301374719337375,
+          "argmax_is_optimal_fraction": 1.0,
+          "num_selected_tests": 540,
+          "hypervolume": 252849478799448.0,
+          "igd": 202677.23985391285,
+          "num_non_dominated": 540
+        }
+      ],
+      "ideal_shots200": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.0125409534548,
+          "probability_of_optimal": 0.928952380952381,
+          "argmax_is_optimal_fraction": 0.9142857142857143,
+          "num_selected_tests": 554,
+          "hypervolume": 262771431903242.0,
+          "igd": 158982.27032712987,
+          "num_non_dominated": 538
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -304.0193262478419,
+          "probability_of_optimal": 0.9306190476190477,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 549,
+          "hypervolume": 262189619800068.0,
+          "igd": 303497.88322073803,
+          "num_non_dominated": 545
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.01958100419296,
+          "probability_of_optimal": 0.9305714285714285,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 550,
+          "hypervolume": 247691454419372.0,
+          "igd": 43902.95137472051,
+          "num_non_dominated": 542
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.01933520594764,
+          "probability_of_optimal": 0.9297142857142857,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 554,
+          "hypervolume": 248120602672684.0,
+          "igd": 51908.788641009145,
+          "num_non_dominated": 258
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -268.82585769916494,
+          "probability_of_optimal": 0.930952380952381,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 547,
+          "hypervolume": 255587718960850.0,
+          "igd": 240315.35687848495,
+          "num_non_dominated": 18
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -268.82637585990625,
+          "probability_of_optimal": 0.9315238095238095,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 250970751699885.0,
+          "igd": 73357.07565970205,
+          "num_non_dominated": 531
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.01990695747156,
+          "probability_of_optimal": 0.9298571428571429,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 546,
+          "hypervolume": 260423558561734.0,
+          "igd": 1757292.1616747011,
+          "num_non_dominated": 327
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -304.0193068151228,
+          "probability_of_optimal": 0.9307142857142856,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 550,
+          "hypervolume": 261989701411296.0,
+          "igd": 734354.7332791556,
+          "num_non_dominated": 538
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.01503544483984,
+          "probability_of_optimal": 0.9296190476190476,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 553,
+          "hypervolume": 252642107344341.0,
+          "igd": 68055.75564376221,
+          "num_non_dominated": 260
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.01794874599204,
+          "probability_of_optimal": 0.9310476190476191,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 550,
+          "hypervolume": 261533095257425.0,
+          "igd": 214037.7885709381,
+          "num_non_dominated": 530
+        }
+      ],
+      "ideal_shots600": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -304.01888942602443,
+          "probability_of_optimal": 0.9297301587301587,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 549,
+          "hypervolume": 247860714644525.0,
+          "igd": 131124.75896579935,
+          "num_non_dominated": 14
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -304.01879732497093,
+          "probability_of_optimal": 0.9303015873015874,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 551,
+          "hypervolume": 258351973093639.0,
+          "igd": 324070.47509431693,
+          "num_non_dominated": 16
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -304.0180174172862,
+          "probability_of_optimal": 0.9298888888888889,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 554,
+          "hypervolume": 248625767581174.0,
+          "igd": 76433.93580341885,
+          "num_non_dominated": 14
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -304.02057692117967,
+          "probability_of_optimal": 0.9304761904761905,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 550,
+          "hypervolume": 247442003967077.0,
+          "igd": 54808.83445025863,
+          "num_non_dominated": 549
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -304.01835295444135,
+          "probability_of_optimal": 0.9303333333333333,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 552,
+          "hypervolume": 263055107372108.0,
+          "igd": 241270.50785548805,
+          "num_non_dominated": 249
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -304.0177617025475,
+          "probability_of_optimal": 0.9297460317460318,
+          "argmax_is_optimal_fraction": 0.9333333333333333,
+          "num_selected_tests": 551,
+          "hypervolume": 261630570486145.0,
+          "igd": 810865.2037164038,
+          "num_non_dominated": 41
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -304.0208249237166,
+          "probability_of_optimal": 0.9307777777777778,
+          "argmax_is_optimal_fraction": 0.9619047619047619,
+          "num_selected_tests": 546,
+          "hypervolume": 260271708895085.0,
+          "igd": 1761682.4652336382,
+          "num_non_dominated": 323
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -268.82805583453717,
+          "probability_of_optimal": 0.9309999999999999,
+          "argmax_is_optimal_fraction": 0.9523809523809523,
+          "num_selected_tests": 548,
+          "hypervolume": 247179697203746.0,
+          "igd": 67643.21865736613,
+          "num_non_dominated": 524
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -304.02052832528807,
+          "probability_of_optimal": 0.9298253968253968,
+          "argmax_is_optimal_fraction": 0.9428571428571428,
+          "num_selected_tests": 552,
+          "hypervolume": 252304840314266.0,
+          "igd": 53265.76510848453,
+          "num_non_dominated": 552
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -304.01939541524257,
+          "probability_of_optimal": 0.9298095238095238,
+          "argmax_is_optimal_fraction": 0.9238095238095239,
+          "num_selected_tests": 553,
+          "hypervolume": 248037063714089.0,
+          "igd": 66139.0569773358,
+          "num_non_dominated": 313
+        }
+      ]
+    },
+    "gzip_qaoa_tcs": {
+      "raw": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.04968125440074,
+          "probability_of_optimal": 0.7377868852459016,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 180,
+          "hypervolume": 26581199694869.0,
+          "igd": 1871086.738881799,
+          "num_non_dominated": 153
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.03401313906338,
+          "probability_of_optimal": 0.7357377049180328,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 184,
+          "hypervolume": 26760278993447.0,
+          "igd": 1412113.0707312357,
+          "num_non_dominated": 170
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -120.05117319855856,
+          "probability_of_optimal": 0.7300819672131147,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 182,
+          "hypervolume": 35539138220099.0,
+          "igd": 632292.1914713444,
+          "num_non_dominated": 175
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.05230457330195,
+          "probability_of_optimal": 0.7400819672131148,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 178,
+          "hypervolume": 34858816901357.0,
+          "igd": 362966.1238117798,
+          "num_non_dominated": 173
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -164.40065356146576,
+          "probability_of_optimal": 0.7300819672131147,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 178,
+          "hypervolume": 36553130452606.0,
+          "igd": 298723.9061621827,
+          "num_non_dominated": 174
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.04426971131724,
+          "probability_of_optimal": 0.7318852459016393,
+          "argmax_is_optimal_fraction": 0.7377049180327869,
+          "num_selected_tests": 188,
+          "hypervolume": 37296631297260.0,
+          "igd": 298721.22608805756,
+          "num_non_dominated": 156
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.04141947597256,
+          "probability_of_optimal": 0.7387704918032787,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 181,
+          "hypervolume": 26471662194232.0,
+          "igd": 2100234.066703999,
+          "num_non_dominated": 153
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.04569521964348,
+          "probability_of_optimal": 0.7341803278688525,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 183,
+          "hypervolume": 26056601348742.0,
+          "igd": 2644408.678030482,
+          "num_non_dominated": 5
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.02092538714962,
+          "probability_of_optimal": 0.7357377049180328,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 185,
+          "hypervolume": 27816887076579.0,
+          "igd": 1610284.5203793969,
+          "num_non_dominated": 175
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.05605951367536,
+          "probability_of_optimal": 0.7381147540983606,
+          "argmax_is_optimal_fraction": 0.819672131147541,
+          "num_selected_tests": 180,
+          "hypervolume": 34191387628477.0,
+          "igd": 509250.960984054,
+          "num_non_dominated": 21
+        }
+      ],
+      "mem": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.04954873638205,
+          "probability_of_optimal": 0.7463409438862064,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 181,
+          "hypervolume": 26831014884917.0,
+          "igd": 1873253.6172392808,
+          "num_non_dominated": 154
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.02606102990585,
+          "probability_of_optimal": 0.7435054319048126,
+          "argmax_is_optimal_fraction": 0.7213114754098361,
+          "num_selected_tests": 186,
+          "hypervolume": 26898760950663.0,
+          "igd": 1414518.2691466191,
+          "num_non_dominated": 172
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -120.0498161656884,
+          "probability_of_optimal": 0.7393268235177484,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 185,
+          "hypervolume": 35513779438225.0,
+          "igd": 693409.9837668736,
+          "num_non_dominated": 9
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.0521694235098,
+          "probability_of_optimal": 0.7484661393794474,
+          "argmax_is_optimal_fraction": 0.819672131147541,
+          "num_selected_tests": 181,
+          "hypervolume": 34958665185091.0,
+          "igd": 362686.9046595147,
+          "num_non_dominated": 161
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -164.37719392449853,
+          "probability_of_optimal": 0.739805753543532,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 181,
+          "hypervolume": 36413601051001.0,
+          "igd": 361484.31054750975,
+          "num_non_dominated": 105
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.04426971131724,
+          "probability_of_optimal": 0.7417215723683409,
+          "argmax_is_optimal_fraction": 0.7377049180327869,
+          "num_selected_tests": 188,
+          "hypervolume": 37296631297260.0,
+          "igd": 298721.22608805756,
+          "num_non_dominated": 156
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.04141503485482,
+          "probability_of_optimal": 0.747198627211584,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 187,
+          "hypervolume": 26894956055668.0,
+          "igd": 2100024.428295714,
+          "num_non_dominated": 152
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.0416298533646,
+          "probability_of_optimal": 0.742328502964324,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 186,
+          "hypervolume": 26054023542876.0,
+          "igd": 2642148.807854423,
+          "num_non_dominated": 5
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.02079286913094,
+          "probability_of_optimal": 0.7445059705347152,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 186,
+          "hypervolume": 27900044570181.0,
+          "igd": 1612896.9584656819,
+          "num_non_dominated": 176
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.05605951367536,
+          "probability_of_optimal": 0.7467297415949232,
+          "argmax_is_optimal_fraction": 0.819672131147541,
+          "num_selected_tests": 180,
+          "hypervolume": 34191387628477.0,
+          "igd": 509250.960984054,
+          "num_non_dominated": 21
+        }
+      ],
+      "m3": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.04968125440074,
+          "probability_of_optimal": 0.7461084511863892,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 180,
+          "hypervolume": 26581199694869.0,
+          "igd": 1871086.738881799,
+          "num_non_dominated": 153
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.02619354792452,
+          "probability_of_optimal": 0.7414685908216433,
+          "argmax_is_optimal_fraction": 0.7377049180327869,
+          "num_selected_tests": 185,
+          "hypervolume": 26646902752199.0,
+          "igd": 1416060.8010343648,
+          "num_non_dominated": 56
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -120.0498161656884,
+          "probability_of_optimal": 0.7378582763256597,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 185,
+          "hypervolume": 35513779438225.0,
+          "igd": 693409.9837668736,
+          "num_non_dominated": 9
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.05230194152848,
+          "probability_of_optimal": 0.7474937208118986,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 180,
+          "hypervolume": 34858764814317.0,
+          "igd": 362975.20792998566,
+          "num_non_dominated": 12
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -164.37719481272208,
+          "probability_of_optimal": 0.738253151295615,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 181,
+          "hypervolume": 35980121994427.0,
+          "igd": 361494.3223523413,
+          "num_non_dominated": 105
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.04291394498807,
+          "probability_of_optimal": 0.7397798305285759,
+          "argmax_is_optimal_fraction": 0.7377049180327869,
+          "num_selected_tests": 189,
+          "hypervolume": 37604927611702.0,
+          "igd": 329249.48671160993,
+          "num_non_dominated": 155
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.04141503485482,
+          "probability_of_optimal": 0.7466730210991179,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 187,
+          "hypervolume": 26894956055668.0,
+          "igd": 2100024.428295714,
+          "num_non_dominated": 152
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.0416298533646,
+          "probability_of_optimal": 0.7415331386670959,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 186,
+          "hypervolume": 26054023542876.0,
+          "igd": 2642148.807854423,
+          "num_non_dominated": 5
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.02092538714962,
+          "probability_of_optimal": 0.7438295977037461,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 185,
+          "hypervolume": 27816887076579.0,
+          "igd": 1610284.5203793969,
+          "num_non_dominated": 175
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.05605903666641,
+          "probability_of_optimal": 0.7454883731352012,
+          "argmax_is_optimal_fraction": 0.819672131147541,
+          "num_selected_tests": 180,
+          "hypervolume": 34257086804619.0,
+          "igd": 514107.1385921637,
+          "num_non_dominated": 10
+        }
+      ],
+      "trex": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.05720533849995,
+          "probability_of_optimal": 0.7458469945355192,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 178,
+          "hypervolume": 32899219436617.0,
+          "igd": 3746787.851302143,
+          "num_non_dominated": 103
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.07041829703672,
+          "probability_of_optimal": 0.7467213114754098,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 177,
+          "hypervolume": 33960301013239.0,
+          "igd": 2873805.6896675956,
+          "num_non_dominated": 122
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -164.41440041637307,
+          "probability_of_optimal": 0.7437431693989071,
+          "argmax_is_optimal_fraction": 0.8524590163934426,
+          "num_selected_tests": 176,
+          "hypervolume": 25006925184531.0,
+          "igd": 2933261.79525634,
+          "num_non_dominated": 20
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.04789910787166,
+          "probability_of_optimal": 0.7421857923497268,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 180,
+          "hypervolume": 25292255671829.0,
+          "igd": 3139566.4271248137,
+          "num_non_dominated": 24
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -120.0743883602187,
+          "probability_of_optimal": 0.7462295081967214,
+          "argmax_is_optimal_fraction": 0.8852459016393442,
+          "num_selected_tests": 172,
+          "hypervolume": 23297673062712.0,
+          "igd": 347446.56945601007,
+          "num_non_dominated": 171
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.06099213978096,
+          "probability_of_optimal": 0.7409562841530054,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 179,
+          "hypervolume": 33591938610159.0,
+          "igd": 477293.9974488996,
+          "num_non_dominated": 176
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.0545940352895,
+          "probability_of_optimal": 0.7459289617486339,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 182,
+          "hypervolume": 33792963678793.0,
+          "igd": 3291509.6222674064,
+          "num_non_dominated": 116
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -164.41295798245372,
+          "probability_of_optimal": 0.7457103825136612,
+          "argmax_is_optimal_fraction": 0.8688524590163934,
+          "num_selected_tests": 176,
+          "hypervolume": 32365875197173.0,
+          "igd": 1882848.0971614202,
+          "num_non_dominated": 171
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.06183529420754,
+          "probability_of_optimal": 0.7443715846994535,
+          "argmax_is_optimal_fraction": 0.819672131147541,
+          "num_selected_tests": 177,
+          "hypervolume": 29763113075852.0,
+          "igd": 3492775.9740120084,
+          "num_non_dominated": 173
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.04435193778973,
+          "probability_of_optimal": 0.7447540983606558,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 181,
+          "hypervolume": 34353753421581.0,
+          "igd": 460053.7234398193,
+          "num_non_dominated": 26
+        }
+      ],
+      "ideal_exact": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 20999124038999.0,
+          "igd": 3952760.9159158426,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21287637874455.0,
+          "igd": 2953861.963829369,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 20806877488503.0,
+          "igd": 684564.4680155026,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21095822999511.0,
+          "igd": 524398.0748469596,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 20891611873623.0,
+          "igd": 347964.3133628278,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21022721426967.0,
+          "igd": 474111.66310798674,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21099035259639.0,
+          "igd": 3536436.1554185664,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21096396512759.0,
+          "igd": 1921646.6787334308,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 21352349908919.0,
+          "igd": 3674734.625399133,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.07448974929177,
+          "probability_of_optimal": 0.753073666568751,
+          "argmax_is_optimal_fraction": 0.9836065573770492,
+          "num_selected_tests": 166,
+          "hypervolume": 20759396713623.0,
+          "igd": 384716.8065840177,
+          "num_non_dominated": 166
+        }
+      ],
+      "ideal_shots200": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.05595108460822,
+          "probability_of_optimal": 0.7554918032786886,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 178,
+          "hypervolume": 24759000655999.0,
+          "igd": 2049111.6398719503,
+          "num_non_dominated": 25
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.05487919616965,
+          "probability_of_optimal": 0.7498360655737705,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 182,
+          "hypervolume": 35689591069218.0,
+          "igd": 2726560.667166911,
+          "num_non_dominated": 166
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -164.4092769620178,
+          "probability_of_optimal": 0.7516393442622951,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 178,
+          "hypervolume": 25512235921849.0,
+          "igd": 2975117.374061582,
+          "num_non_dominated": 12
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.04167654267088,
+          "probability_of_optimal": 0.7504098360655738,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 182,
+          "hypervolume": 25812407434621.0,
+          "igd": 3147700.344913656,
+          "num_non_dominated": 7
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -164.38851337136683,
+          "probability_of_optimal": 0.7507377049180328,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 184,
+          "hypervolume": 35409612393451.0,
+          "igd": 462256.4682912122,
+          "num_non_dominated": 39
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -164.4014048834467,
+          "probability_of_optimal": 0.7502459016393442,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 181,
+          "hypervolume": 25937805872045.0,
+          "igd": 3461658.8385757846,
+          "num_non_dominated": 15
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.04525035123496,
+          "probability_of_optimal": 0.751967213114754,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 180,
+          "hypervolume": 34083488714236.0,
+          "igd": 3197761.168772685,
+          "num_non_dominated": 175
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.0507163967022,
+          "probability_of_optimal": 0.75,
+          "argmax_is_optimal_fraction": 0.7704918032786885,
+          "num_selected_tests": 185,
+          "hypervolume": 35423542351014.0,
+          "igd": 1763258.0534886897,
+          "num_non_dominated": 160
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.04823628739936,
+          "probability_of_optimal": 0.7486065573770492,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 183,
+          "hypervolume": 35328612082045.0,
+          "igd": 3409045.488904507,
+          "num_non_dominated": 64
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -164.40429084511632,
+          "probability_of_optimal": 0.7510655737704918,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 179,
+          "hypervolume": 34654770158451.0,
+          "igd": 371743.14096478926,
+          "num_non_dominated": 176
+        }
+      ],
+      "ideal_shots600": [
+        {
+          "iteration_id": 1,
+          "qubo_energy": -120.07032045263357,
+          "probability_of_optimal": 0.7540437158469946,
+          "argmax_is_optimal_fraction": 0.8524590163934426,
+          "num_selected_tests": 178,
+          "hypervolume": 34010085999701.0,
+          "igd": 3906408.1315891542,
+          "num_non_dominated": 173
+        },
+        {
+          "iteration_id": 2,
+          "qubo_energy": -120.06011304519788,
+          "probability_of_optimal": 0.7534699453551913,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 181,
+          "hypervolume": 35621141953121.0,
+          "igd": 2811914.430760535,
+          "num_non_dominated": 77
+        },
+        {
+          "iteration_id": 3,
+          "qubo_energy": -120.06771021858107,
+          "probability_of_optimal": 0.7543169398907105,
+          "argmax_is_optimal_fraction": 0.8524590163934426,
+          "num_selected_tests": 179,
+          "hypervolume": 25116406279786.0,
+          "igd": 2965686.7868917948,
+          "num_non_dominated": 7
+        },
+        {
+          "iteration_id": 4,
+          "qubo_energy": -120.06218307484778,
+          "probability_of_optimal": 0.7542622950819672,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 179,
+          "hypervolume": 25447575315348.0,
+          "igd": 3144765.7095363876,
+          "num_non_dominated": 16
+        },
+        {
+          "iteration_id": 5,
+          "qubo_energy": -120.05830122542294,
+          "probability_of_optimal": 0.7527322404371585,
+          "argmax_is_optimal_fraction": 0.7868852459016393,
+          "num_selected_tests": 184,
+          "hypervolume": 25657867815741.0,
+          "igd": 3861576.407294086,
+          "num_non_dominated": 22
+        },
+        {
+          "iteration_id": 6,
+          "qubo_energy": -120.04762768978362,
+          "probability_of_optimal": 0.7516939890710382,
+          "argmax_is_optimal_fraction": 0.7540983606557377,
+          "num_selected_tests": 183,
+          "hypervolume": 25561001620169.0,
+          "igd": 3468602.8786976957,
+          "num_non_dominated": 17
+        },
+        {
+          "iteration_id": 7,
+          "qubo_energy": -120.06247850786876,
+          "probability_of_optimal": 0.7527595628415301,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 177,
+          "hypervolume": 33384106976053.0,
+          "igd": 3302125.052123299,
+          "num_non_dominated": 173
+        },
+        {
+          "iteration_id": 8,
+          "qubo_energy": -120.05751277076313,
+          "probability_of_optimal": 0.7515027322404372,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 179,
+          "hypervolume": 26519646064533.0,
+          "igd": 2549871.3501356845,
+          "num_non_dominated": 174
+        },
+        {
+          "iteration_id": 9,
+          "qubo_energy": -120.05230023087573,
+          "probability_of_optimal": 0.7526775956284153,
+          "argmax_is_optimal_fraction": 0.8032786885245902,
+          "num_selected_tests": 183,
+          "hypervolume": 36520366902681.0,
+          "igd": 3380510.5991071584,
+          "num_non_dominated": 170
+        },
+        {
+          "iteration_id": 10,
+          "qubo_energy": -120.069064767715,
+          "probability_of_optimal": 0.7528688524590164,
+          "argmax_is_optimal_fraction": 0.8360655737704918,
+          "num_selected_tests": 178,
+          "hypervolume": 24805471611063.0,
+          "igd": 2662660.4338545413,
+          "num_non_dominated": 20
+        }
+      ]
+    }
+  },
+  "comparison": {
+    "gsdtsr_qaoa_tcs": {
+      "descriptive": {
+        "ideal_exact": {
+          "qubo_energy": {
+            "mean": -4.264395855392946,
+            "sd": 0.0,
+            "median": -4.264395855392946,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.4103107094752965,
+            "sd": 0.0,
+            "median": 0.4103107094752965,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 1.0,
+            "sd": 0.0,
+            "median": 1.0,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 4760360.114560648,
+            "sd": 0.0,
+            "median": 4760360.114560648,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 7.570571740216877,
+            "sd": 0.0,
+            "median": 7.570571740216877,
+            "n": 10
+          }
+        },
+        "ideal_shots200": {
+          "qubo_energy": {
+            "mean": -4.067204231826286,
+            "sd": 0.02718694736790716,
+            "median": -4.065642297391765,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.40978481012658224,
+            "sd": 0.0015618085181460417,
+            "median": 0.40962025316455697,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.6329113924050633,
+            "sd": 0.02067079951715764,
+            "median": 0.6329113924050633,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 6830213.331424259,
+            "sd": 446710.99149699515,
+            "median": 6858697.737596756,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 7.5825157867585515,
+            "sd": 0.05336949048587815,
+            "median": 7.574652310188237,
+            "n": 10
+          }
+        },
+        "ideal_shots600": {
+          "qubo_energy": {
+            "mean": -4.137829492507125,
+            "sd": 0.020797297942162386,
+            "median": -4.138659409342862,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.4100316455696202,
+            "sd": 0.0013328573779446394,
+            "median": 0.4100316455696203,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.6848101265822786,
+            "sd": 0.02019153774515679,
+            "median": 0.6772151898734178,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 5819908.425966639,
+            "sd": 404791.91953242186,
+            "median": 5682111.093460456,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 7.535716179413856,
+            "sd": 0.05441186657171223,
+            "median": 7.543331001607699,
+            "n": 10
+          }
+        }
+      },
+      "tests": {}
+    },
+    "paintcontrol_qaoa_tcs": {
+      "descriptive": {
+        "ideal_exact": {
+          "qubo_energy": {
+            "mean": -2.0804233691787988,
+            "sd": 0.0,
+            "median": -2.0804233691787988,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.4585861260281362,
+            "sd": 5.851389114294502e-17,
+            "median": 0.45858612602813625,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 1.0,
+            "sd": 0.0,
+            "median": 1.0,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 1165500.0,
+            "sd": 0.0,
+            "median": 1165500.0,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 14.45535442303618,
+            "sd": 3.744889033148481e-15,
+            "median": 14.455354423036184,
+            "n": 10
+          }
+        },
+        "ideal_shots200": {
+          "qubo_energy": {
+            "mean": -2.0432201479801377,
+            "sd": 0.014728633682140094,
+            "median": -2.0432154103464,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.4609166666666667,
+            "sd": 0.003891616107213793,
+            "median": 0.4610416666666667,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.8166666666666668,
+            "sd": 0.04025382429497068,
+            "median": 0.8125,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 1158071.1,
+            "sd": 68926.67466300691,
+            "median": 1150251.0,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 14.273879926608837,
+            "sd": 0.3837763942303198,
+            "median": 14.165800590771944,
+            "n": 10
+          }
+        },
+        "ideal_shots600": {
+          "qubo_energy": {
+            "mean": -2.060173867397312,
+            "sd": 0.0130369940007783,
+            "median": -2.0619763839997516,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.45772222222222225,
+            "sd": 0.0021506112156368423,
+            "median": 0.4573263888888889,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.8541666666666666,
+            "sd": 0.07149743153463194,
+            "median": 0.8333333333333334,
+            "n": 10
+          },
+          "execution_cost": {
+            "mean": 1144832.2,
+            "sd": 70419.20239820954,
+            "median": 1171454.5,
+            "n": 10
+          },
+          "effectiveness.failure_rate": {
+            "mean": 14.261115710069967,
+            "sd": 0.41422233241794426,
+            "median": 14.39794901575016,
+            "n": 10
+          }
+        }
+      },
+      "tests": {}
+    },
+    "flex_qaoa_tcs": {
+      "descriptive": {
+        "raw": {
+          "qubo_energy": {
+            "mean": -304.0186387946866,
+            "sd": 0.0009598245882075498,
+            "median": -304.01856233113705,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9009380952380951,
+            "sd": 0.002232860025883318,
+            "median": 0.9010238095238094,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9323809523809524,
+            "sd": 0.008339000340675334,
+            "median": 0.9333333333333333,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 553.2,
+            "sd": 3.190262963734773,
+            "median": 553.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 251780308368254.6,
+            "sd": 2843054915903.245,
+            "median": 251371907053453.5,
+            "n": 10
+          },
+          "igd": {
+            "mean": 69073.56918057436,
+            "sd": 29471.015217553348,
+            "median": 62606.88749128004,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 350.3,
+            "sd": 240.97581713616916,
+            "median": 523.5,
+            "n": 10
+          }
+        },
+        "mem": {
+          "qubo_energy": {
+            "mean": -296.97941907445124,
+            "sd": 14.838263103372661,
+            "median": -304.0184830696593,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9183308729006757,
+            "sd": 0.0018729900489257586,
+            "median": 0.9177131746476315,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9295238095238096,
+            "sd": 0.011178931340735866,
+            "median": 0.9333333333333333,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 554.6,
+            "sd": 3.777124126457412,
+            "median": 553.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 251129271456491.4,
+            "sd": 3536274642857.9805,
+            "median": 251419968862448.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 71047.1228209875,
+            "sd": 31837.03104300129,
+            "median": 62192.258547784266,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 270.7,
+            "sd": 239.79437950970504,
+            "median": 242.0,
+            "n": 10
+          }
+        },
+        "m3": {
+          "qubo_energy": {
+            "mean": -300.4986777649836,
+            "sd": 11.129083959617757,
+            "median": -304.0185086698848,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9149515991112483,
+            "sd": 0.0022781878836067846,
+            "median": 0.914795433867368,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9295238095238096,
+            "sd": 0.008031181359157783,
+            "median": 0.9333333333333333,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 554.8,
+            "sd": 3.0840089349921005,
+            "median": 555.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 251077666612728.4,
+            "sd": 3108523267791.2007,
+            "median": 251093956530342.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 71063.1833559825,
+            "sd": 31853.228094478774,
+            "median": 62448.83381663529,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 297.8,
+            "sd": 224.46271652795951,
+            "median": 275.5,
+            "n": 10
+          }
+        },
+        "trex": {
+          "qubo_energy": {
+            "mean": -300.4998998862619,
+            "sd": 11.129349916110616,
+            "median": -304.0199458510976,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9141,
+            "sd": 0.0016720422254422021,
+            "median": 0.914063492063492,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9342857142857144,
+            "sd": 0.010480999377282006,
+            "median": 0.9333333333333333,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 552.0,
+            "sd": 1.8257418583505538,
+            "median": 552.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 251101948523577.7,
+            "sd": 3102682121338.815,
+            "median": 251431587242723.5,
+            "n": 10
+          },
+          "igd": {
+            "mean": 94090.14364377396,
+            "sd": 74442.07337738723,
+            "median": 72117.18598205523,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 380.9,
+            "sd": 247.43010236338574,
+            "median": 523.0,
+            "n": 10
+          }
+        },
+        "ideal_exact": {
+          "qubo_energy": {
+            "mean": -304.02141618688563,
+            "sd": 5.99182245303757e-14,
+            "median": -304.0214161868856,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9301374719337374,
+            "sd": 1.1702778228589004e-16,
+            "median": 0.9301374719337375,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 1.0,
+            "sd": 0.0,
+            "median": 1.0,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 540.0,
+            "sd": 0.0,
+            "median": 540.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 253610241759405.0,
+            "sd": 827375900545.0754,
+            "median": 253268383423855.5,
+            "n": 10
+          },
+          "igd": {
+            "mean": 1665640.6662743771,
+            "sd": 1973541.0538960407,
+            "median": 773032.3027677389,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 537.3,
+            "sd": 4.347413023856832,
+            "median": 540.0,
+            "n": 10
+          }
+        },
+        "ideal_shots200": {
+          "qubo_energy": {
+            "mean": -296.97952149339346,
+            "sd": 14.838147317858231,
+            "median": -304.0186277805574,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.9303571428571429,
+            "sd": 0.0007899118276043646,
+            "median": 0.930595238095238,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9390476190476191,
+            "sd": 0.012046772038736666,
+            "median": 0.9428571428571428,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 550.5,
+            "sd": 2.758824226207808,
+            "median": 550.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 256392004203089.7,
+            "sd": 6115028263076.472,
+            "median": 258005638761292.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 364570.4765270342,
+            "sd": 530599.3574576605,
+            "median": 186510.029449034,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 408.7,
+            "sd": 183.66578947158948,
+            "median": 530.5,
+            "n": 10
+          }
+        },
+        "ideal_shots600": {
+          "qubo_energy": {
+            "mean": -300.5001200245234,
+            "sd": 11.128429058140554,
+            "median": -304.0188433754977,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.930188888888889,
+            "sd": 0.00045866943325448446,
+            "median": 0.9300952380952381,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.940952380952381,
+            "sd": 0.013318207595811421,
+            "median": 0.9380952380952381,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 550.6,
+            "sd": 2.4129281427805145,
+            "median": 551.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 253475944727185.4,
+            "sd": 6585130176095.702,
+            "median": 250465303947720.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 358730.422186251,
+            "sd": 545202.5656772968,
+            "median": 103779.34738460911,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 259.5,
+            "sd": 229.46955740964373,
+            "median": 281.0,
+            "n": 10
+          }
+        }
+      },
+      "tests": {
+        "raw vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.47267559351158717,
+            "effect_size": 0.4,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 2.2734862025713933e-13,
+            "effect_size": -17.5661548950136,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.12301415694315124,
+            "effect_size": 0.3,
+            "effect_size_name": "a12"
+          },
+          "num_selected_tests": {
+            "p_value": 0.05835159135470604,
+            "effect_size": 0.9053246611223262,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.05024680794409529,
+            "effect_size": -0.967123607752576,
+            "effect_size_name": "cohens_d"
+          },
+          "igd": {
+            "p_value": 0.031209012771740218,
+            "effect_size": 0.21,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.2895555434161676,
+            "effect_size": 0.355,
+            "effect_size_name": "a12"
+          }
+        },
+        "mem vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.7913367801006604,
+            "effect_size": 0.54,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 2.6659256116381783e-10,
+            "effect_size": -8.366870266096617,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.0835597916192239,
+            "effect_size": -0.8195375470622276,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.0133339370286243,
+            "effect_size": 1.239644766364554,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.033113645460602456,
+            "effect_size": -1.0536132509971166,
+            "effect_size_name": "cohens_d"
+          },
+          "igd": {
+            "p_value": 0.031209012771740218,
+            "effect_size": 0.21,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.0690128524127314,
+            "effect_size": 0.255,
+            "effect_size_name": "a12"
+          }
+        },
+        "m3 vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.9097218891455553,
+            "effect_size": 0.48,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 3.9926211885755465e-10,
+            "effect_size": -9.035470110597625,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.05429090935379422,
+            "effect_size": -0.9302605094190612,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.004157235220324767,
+            "effect_size": 1.4696143662416814,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.02877831545644046,
+            "effect_size": -1.0956059536298404,
+            "effect_size_name": "cohens_d"
+          },
+          "igd": {
+            "p_value": 0.031209012771740218,
+            "effect_size": 0.21,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.1614988122969947,
+            "effect_size": 0.31,
+            "effect_size_name": "a12"
+          }
+        },
+        "trex vs ideal_shots600": {
+          "qubo_energy": {
+            "p_value": 0.6775849579524755,
+            "effect_size": 0.44,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 2.6617135401178437e-11,
+            "effect_size": -13.123181409848458,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.23034837148941276,
+            "effect_size": -0.5563035899673137,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.16192916844885963,
+            "effect_size": 0.6543358004922329,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.7337299956962472,
+            "effect_size": 0.45,
+            "effect_size_name": "a12"
+          },
+          "igd": {
+            "p_value": 0.3074894566186813,
+            "effect_size": 0.36,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.44883787662263086,
+            "effect_size": 0.605,
+            "effect_size_name": "a12"
+          }
+        }
+      }
+    },
+    "gzip_qaoa_tcs": {
+      "descriptive": {
+        "raw": {
+          "qubo_energy": {
+            "mean": -124.47961950345487,
+            "sd": 14.026825297295362,
+            "median": -120.0476882370221,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.7352459016393442,
+            "sd": 0.00360158624115502,
+            "median": 0.7357377049180328,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.7852459016393443,
+            "sd": 0.03037582974795039,
+            "median": 0.7786885245901639,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 181.9,
+            "sd": 3.1780497164141406,
+            "median": 181.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 31212573380766.8,
+            "sd": 4810733594917.787,
+            "median": 31004137352528.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 1174008.148324433,
+            "sd": 861414.7871902516,
+            "median": 1022202.63110129,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 135.5,
+            "sd": 65.29633306021948,
+            "median": 163.0,
+            "n": 10
+          }
+        },
+        "mem": {
+          "qubo_energy": {
+            "mean": -124.47589562623276,
+            "sd": 14.019891601524787,
+            "median": -120.04690922384964,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.7439929506905634,
+            "sd": 0.0031802279423676855,
+            "median": 0.7440057012197638,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.7688524590163934,
+            "sd": 0.03319419136281409,
+            "median": 0.7540983606557377,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 184.1,
+            "sd": 2.998147576235848,
+            "median": 185.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 31295286460435.9,
+            "sd": 4707408843177.509,
+            "median": 31045716099329.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 1186839.5467047729,
+            "sd": 850369.2327642574,
+            "median": 1053964.1264567464,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 111.1,
+            "sd": 71.31845639259323,
+            "median": 153.0,
+            "n": 10
+          }
+        },
+        "m3": {
+          "qubo_energy": {
+            "mean": -124.47581309792879,
+            "sd": 14.019920876249705,
+            "median": -120.04629759969441,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.7428486151574942,
+            "sd": 0.0035564405058440933,
+            "median": 0.742681368185421,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.7754098360655737,
+            "sd": 0.03460358513439906,
+            "median": 0.7622950819672131,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 183.8,
+            "sd": 3.2930904093942583,
+            "median": 185.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 31220864978548.1,
+            "sd": 4757838960631.127,
+            "median": 31036986940599.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 1190084.1435798672,
+            "sd": 846116.4993470394,
+            "median": 1054735.392400619,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 83.2,
+            "sd": 71.84211083263693,
+            "median": 80.5,
+            "n": 10
+          }
+        },
+        "trex": {
+          "qubo_energy": {
+            "mean": -128.92990429095215,
+            "sd": 18.701593648757566,
+            "median": -120.06141371699425,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.7446448087431694,
+            "sd": 0.001873926579178399,
+            "median": 0.7452322404371585,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.8311475409836067,
+            "sd": 0.029980036555945788,
+            "median": 0.8278688524590164,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 177.8,
+            "sd": 2.8982753492378874,
+            "median": 177.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 30432401835248.6,
+            "sd": 4296404560140.985,
+            "median": 32632547316895.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 2264534.974713646,
+            "sd": 1358745.6879062622,
+            "median": 2903533.7424619677,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 110.2,
+            "sd": 65.44514242223534,
+            "median": 119.0,
+            "n": 10
+          }
+        },
+        "ideal_exact": {
+          "qubo_energy": {
+            "mean": -120.07448974929177,
+            "sd": 0.0,
+            "median": -120.07448974929177,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.753073666568751,
+            "sd": 0.0,
+            "median": 0.753073666568751,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.9836065573770492,
+            "sd": 0.0,
+            "median": 0.9836065573770492,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 166.0,
+            "sd": 0.0,
+            "median": 166.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 21041097409699.8,
+            "sd": 190242422599.27234,
+            "median": 21059272213239.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 1845519.5665213638,
+            "sd": 1535884.3188308214,
+            "median": 1303105.5733744667,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 166.0,
+            "sd": 0.0,
+            "median": 166.0,
+            "n": 10
+          }
+        },
+        "ideal_shots200": {
+          "qubo_energy": {
+            "mean": -137.7900195920733,
+            "sd": 22.902975681237,
+            "median": -120.05541514038893,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.751,
+            "sd": 0.001843725888396198,
+            "median": 0.7505737704918033,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.7918032786885245,
+            "sd": 0.020519107492370067,
+            "median": 0.7868852459016393,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 181.2,
+            "sd": 2.440400695696417,
+            "median": 181.5,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 31261106665292.9,
+            "sd": 4983613028974.396,
+            "median": 34369129436343.5,
+            "n": 10
+          },
+          "igd": {
+            "mean": 2356421.318501177,
+            "sd": 1162201.9643518361,
+            "median": 2850839.020614247,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 83.9,
+            "sd": 75.2956395373154,
+            "median": 51.5,
+            "n": 10
+          }
+        },
+        "ideal_shots600": {
+          "qubo_energy": {
+            "mean": -120.06076119836894,
+            "sd": 0.007262454762136409,
+            "median": -120.06114806002283,
+            "n": 10
+          },
+          "probability_of_optimal": {
+            "mean": 0.7530327868852459,
+            "sd": 0.0009902460925771172,
+            "median": 0.7528142076502733,
+            "n": 10
+          },
+          "argmax_is_optimal_fraction": {
+            "mean": 0.8163934426229508,
+            "sd": 0.031675140428829386,
+            "median": 0.819672131147541,
+            "n": 10
+          },
+          "num_selected_tests": {
+            "mean": 180.1,
+            "sd": 2.4698178070456938,
+            "median": 179.0,
+            "n": 10
+          },
+          "hypervolume": {
+            "mean": 29264367053819.6,
+            "sd": 4926827897597.2,
+            "median": 26088756940137.0,
+            "n": 10
+          },
+          "igd": {
+            "mean": 3205412.1779990336,
+            "sd": 468037.15093690495,
+            "median": 3223445.380829843,
+            "n": 10
+          },
+          "num_non_dominated": {
+            "mean": 84.9,
+            "sd": 77.71808026450474,
+            "median": 49.5,
+            "n": 10
+          }
+        }
+      },
+      "tests": {
+        "raw vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.08897301170181328,
+            "effect_size": 0.73,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 1.0852455386604648e-08,
+            "effect_size": -5.506482721542287,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.5795542604837172,
+            "effect_size": -0.25298221281346706,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.5878898226459461,
+            "effect_size": 0.2470588235294178,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.47267559351158717,
+            "effect_size": 0.6,
+            "effect_size_name": "a12"
+          },
+          "igd": {
+            "p_value": 0.021133928129161098,
+            "effect_size": 0.19,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.3837776503207253,
+            "effect_size": 0.62,
+            "effect_size_name": "a12"
+          }
+        },
+        "mem vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.04515456962427901,
+            "effect_size": 0.77,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 2.723914240185963e-05,
+            "effect_size": -2.695699464251619,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.08263724602900077,
+            "effect_size": -0.8317239361004036,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.029533151733136774,
+            "effect_size": 1.0608967238784668,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.47267559351158717,
+            "effect_size": 0.6,
+            "effect_size_name": "a12"
+          },
+          "igd": {
+            "p_value": 0.021133928129161098,
+            "effect_size": 0.19,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.8797843010569926,
+            "effect_size": 0.525,
+            "effect_size_name": "a12"
+          }
+        },
+        "m3 vs ideal_shots200": {
+          "qubo_energy": {
+            "p_value": 0.04515456962427901,
+            "effect_size": 0.77,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 1.848614435842011e-05,
+            "effect_size": -2.877672908296353,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.2175356436399214,
+            "effect_size": -0.5762840627964743,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.061446927375569664,
+            "effect_size": 0.8970852271450684,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 0.47267559351158717,
+            "effect_size": 0.6,
+            "effect_size_name": "a12"
+          },
+          "igd": {
+            "p_value": 0.021133928129161098,
+            "effect_size": 0.19,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.520209005780562,
+            "effect_size": 0.41,
+            "effect_size_name": "a12"
+          }
+        },
+        "trex vs ideal_shots600": {
+          "qubo_energy": {
+            "p_value": 0.7337299956962472,
+            "effect_size": 0.45,
+            "effect_size_name": "a12"
+          },
+          "probability_of_optimal": {
+            "p_value": 7.198756552582814e-09,
+            "effect_size": -5.5968455080562665,
+            "effect_size_name": "cohens_d"
+          },
+          "argmax_is_optimal_fraction": {
+            "p_value": 0.2988971997384733,
+            "effect_size": 0.4784196905583803,
+            "effect_size_name": "cohens_d"
+          },
+          "num_selected_tests": {
+            "p_value": 0.0726014001998762,
+            "effect_size": -0.8541985556144323,
+            "effect_size_name": "cohens_d"
+          },
+          "hypervolume": {
+            "p_value": 1.0,
+            "effect_size": 0.5,
+            "effect_size_name": "a12"
+          },
+          "igd": {
+            "p_value": 0.161972410480126,
+            "effect_size": 0.31,
+            "effect_size_name": "a12"
+          },
+          "num_non_dominated": {
+            "p_value": 0.3246575759730582,
+            "effect_size": 0.635,
+            "effect_size_name": "a12"
+          }
+        }
+      }
+    }
+  }
+}

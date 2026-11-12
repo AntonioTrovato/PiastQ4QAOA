@@ -1,0 +1,94 @@
+Ideal-simulator reference vs PIAST-Q hardware
+==============================================
+
+Combo: gsdtsr_qaoa_tcs
+  ideal_exact     qubo_energy=-4.2644+-0  probability_of_optimal=0.410311+-0  argmax_is_optimal_fraction=1+-0  execution_cost=4.76036e+06+-0  effectiveness.failure_rate=7.57057+-0
+  ideal_shots200  qubo_energy=-4.0672+-0.0272  probability_of_optimal=0.409785+-0.00156  argmax_is_optimal_fraction=0.632911+-0.0207  execution_cost=6.83021e+06+-4.47e+05  effectiveness.failure_rate=7.58252+-0.0534
+  ideal_shots600  qubo_energy=-4.13783+-0.0208  probability_of_optimal=0.410032+-0.00133  argmax_is_optimal_fraction=0.68481+-0.0202  execution_cost=5.81991e+06+-4.05e+05  effectiveness.failure_rate=7.53572+-0.0544
+
+Combo: paintcontrol_qaoa_tcs
+  ideal_exact     qubo_energy=-2.08042+-0  probability_of_optimal=0.458586+-5.85e-17  argmax_is_optimal_fraction=1+-0  execution_cost=1.1655e+06+-0  effectiveness.failure_rate=14.4554+-3.74e-15
+  ideal_shots200  qubo_energy=-2.04322+-0.0147  probability_of_optimal=0.460917+-0.00389  argmax_is_optimal_fraction=0.816667+-0.0403  execution_cost=1.15807e+06+-6.89e+04  effectiveness.failure_rate=14.2739+-0.384
+  ideal_shots600  qubo_energy=-2.06017+-0.013  probability_of_optimal=0.457722+-0.00215  argmax_is_optimal_fraction=0.854167+-0.0715  execution_cost=1.14483e+06+-7.04e+04  effectiveness.failure_rate=14.2611+-0.414
+
+Combo: flex_qaoa_tcs
+  raw             qubo_energy=-304.019+-0.00096  probability_of_optimal=0.900938+-0.00223  argmax_is_optimal_fraction=0.932381+-0.00834  num_selected_tests=553.2+-3.19  hypervolume=2.5178e+14+-2.84e+12  igd=69073.6+-2.95e+04  num_non_dominated=350.3+-241
+  mem             qubo_energy=-296.979+-14.8  probability_of_optimal=0.918331+-0.00187  argmax_is_optimal_fraction=0.929524+-0.0112  num_selected_tests=554.6+-3.78  hypervolume=2.51129e+14+-3.54e+12  igd=71047.1+-3.18e+04  num_non_dominated=270.7+-240
+  m3              qubo_energy=-300.499+-11.1  probability_of_optimal=0.914952+-0.00228  argmax_is_optimal_fraction=0.929524+-0.00803  num_selected_tests=554.8+-3.08  hypervolume=2.51078e+14+-3.11e+12  igd=71063.2+-3.19e+04  num_non_dominated=297.8+-224
+  trex            qubo_energy=-300.5+-11.1  probability_of_optimal=0.9141+-0.00167  argmax_is_optimal_fraction=0.934286+-0.0105  num_selected_tests=552+-1.83  hypervolume=2.51102e+14+-3.1e+12  igd=94090.1+-7.44e+04  num_non_dominated=380.9+-247
+  ideal_exact     qubo_energy=-304.021+-5.99e-14  probability_of_optimal=0.930137+-1.17e-16  argmax_is_optimal_fraction=1+-0  num_selected_tests=540+-0  hypervolume=2.5361e+14+-8.27e+11  igd=1.66564e+06+-1.97e+06  num_non_dominated=537.3+-4.35
+  ideal_shots200  qubo_energy=-296.98+-14.8  probability_of_optimal=0.930357+-0.00079  argmax_is_optimal_fraction=0.939048+-0.012  num_selected_tests=550.5+-2.76  hypervolume=2.56392e+14+-6.12e+12  igd=364570+-5.31e+05  num_non_dominated=408.7+-184
+  ideal_shots600  qubo_energy=-300.5+-11.1  probability_of_optimal=0.930189+-0.000459  argmax_is_optimal_fraction=0.940952+-0.0133  num_selected_tests=550.6+-2.41  hypervolume=2.53476e+14+-6.59e+12  igd=358730+-5.45e+05  num_non_dominated=259.5+-229
+  raw vs ideal_shots200:
+    qubo_energy: p=0.4727, a12=0.4
+    probability_of_optimal: p=2.273e-13, cohens_d=-17.6
+    argmax_is_optimal_fraction: p=0.123, a12=0.3
+    num_selected_tests: p=0.05835, cohens_d=0.905
+    hypervolume: p=0.05025, cohens_d=-0.967
+    igd: p=0.03121, a12=0.21
+    num_non_dominated: p=0.2896, a12=0.355
+  mem vs ideal_shots200:
+    qubo_energy: p=0.7913, a12=0.54
+    probability_of_optimal: p=2.666e-10, cohens_d=-8.37
+    argmax_is_optimal_fraction: p=0.08356, cohens_d=-0.82
+    num_selected_tests: p=0.01333, cohens_d=1.24
+    hypervolume: p=0.03311, cohens_d=-1.05
+    igd: p=0.03121, a12=0.21
+    num_non_dominated: p=0.06901, a12=0.255
+  m3 vs ideal_shots200:
+    qubo_energy: p=0.9097, a12=0.48
+    probability_of_optimal: p=3.993e-10, cohens_d=-9.04
+    argmax_is_optimal_fraction: p=0.05429, cohens_d=-0.93
+    num_selected_tests: p=0.004157, cohens_d=1.47
+    hypervolume: p=0.02878, cohens_d=-1.1
+    igd: p=0.03121, a12=0.21
+    num_non_dominated: p=0.1615, a12=0.31
+  trex vs ideal_shots600:
+    qubo_energy: p=0.6776, a12=0.44
+    probability_of_optimal: p=2.662e-11, cohens_d=-13.1
+    argmax_is_optimal_fraction: p=0.2303, cohens_d=-0.556
+    num_selected_tests: p=0.1619, cohens_d=0.654
+    hypervolume: p=0.7337, a12=0.45
+    igd: p=0.3075, a12=0.36
+    num_non_dominated: p=0.4488, a12=0.605
+
+Combo: gzip_qaoa_tcs
+  raw             qubo_energy=-124.48+-14  probability_of_optimal=0.735246+-0.0036  argmax_is_optimal_fraction=0.785246+-0.0304  num_selected_tests=181.9+-3.18  hypervolume=3.12126e+13+-4.81e+12  igd=1.17401e+06+-8.61e+05  num_non_dominated=135.5+-65.3
+  mem             qubo_energy=-124.476+-14  probability_of_optimal=0.743993+-0.00318  argmax_is_optimal_fraction=0.768852+-0.0332  num_selected_tests=184.1+-3  hypervolume=3.12953e+13+-4.71e+12  igd=1.18684e+06+-8.5e+05  num_non_dominated=111.1+-71.3
+  m3              qubo_energy=-124.476+-14  probability_of_optimal=0.742849+-0.00356  argmax_is_optimal_fraction=0.77541+-0.0346  num_selected_tests=183.8+-3.29  hypervolume=3.12209e+13+-4.76e+12  igd=1.19008e+06+-8.46e+05  num_non_dominated=83.2+-71.8
+  trex            qubo_energy=-128.93+-18.7  probability_of_optimal=0.744645+-0.00187  argmax_is_optimal_fraction=0.831148+-0.03  num_selected_tests=177.8+-2.9  hypervolume=3.04324e+13+-4.3e+12  igd=2.26453e+06+-1.36e+06  num_non_dominated=110.2+-65.4
+  ideal_exact     qubo_energy=-120.074+-0  probability_of_optimal=0.753074+-0  argmax_is_optimal_fraction=0.983607+-0  num_selected_tests=166+-0  hypervolume=2.10411e+13+-1.9e+11  igd=1.84552e+06+-1.54e+06  num_non_dominated=166+-0
+  ideal_shots200  qubo_energy=-137.79+-22.9  probability_of_optimal=0.751+-0.00184  argmax_is_optimal_fraction=0.791803+-0.0205  num_selected_tests=181.2+-2.44  hypervolume=3.12611e+13+-4.98e+12  igd=2.35642e+06+-1.16e+06  num_non_dominated=83.9+-75.3
+  ideal_shots600  qubo_energy=-120.061+-0.00726  probability_of_optimal=0.753033+-0.00099  argmax_is_optimal_fraction=0.816393+-0.0317  num_selected_tests=180.1+-2.47  hypervolume=2.92644e+13+-4.93e+12  igd=3.20541e+06+-4.68e+05  num_non_dominated=84.9+-77.7
+  raw vs ideal_shots200:
+    qubo_energy: p=0.08897, a12=0.73
+    probability_of_optimal: p=1.085e-08, cohens_d=-5.51
+    argmax_is_optimal_fraction: p=0.5796, cohens_d=-0.253
+    num_selected_tests: p=0.5879, cohens_d=0.247
+    hypervolume: p=0.4727, a12=0.6
+    igd: p=0.02113, a12=0.19
+    num_non_dominated: p=0.3838, a12=0.62
+  mem vs ideal_shots200:
+    qubo_energy: p=0.04515, a12=0.77
+    probability_of_optimal: p=2.724e-05, cohens_d=-2.7
+    argmax_is_optimal_fraction: p=0.08264, cohens_d=-0.832
+    num_selected_tests: p=0.02953, cohens_d=1.06
+    hypervolume: p=0.4727, a12=0.6
+    igd: p=0.02113, a12=0.19
+    num_non_dominated: p=0.8798, a12=0.525
+  m3 vs ideal_shots200:
+    qubo_energy: p=0.04515, a12=0.77
+    probability_of_optimal: p=1.849e-05, cohens_d=-2.88
+    argmax_is_optimal_fraction: p=0.2175, cohens_d=-0.576
+    num_selected_tests: p=0.06145, cohens_d=0.897
+    hypervolume: p=0.4727, a12=0.6
+    igd: p=0.02113, a12=0.19
+    num_non_dominated: p=0.5202, a12=0.41
+  trex vs ideal_shots600:
+    qubo_energy: p=0.7337, a12=0.45
+    probability_of_optimal: p=7.199e-09, cohens_d=-5.6
+    argmax_is_optimal_fraction: p=0.2989, cohens_d=0.478
+    num_selected_tests: p=0.0726, cohens_d=-0.854
+    hypervolume: p=1, a12=0.5
+    igd: p=0.162, a12=0.31
+    num_non_dominated: p=0.3247, a12=0.635
