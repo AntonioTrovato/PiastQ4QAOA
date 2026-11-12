@@ -18,12 +18,9 @@ research questions (README.md's Quickstart section):
     variance as an astronomically large effect size. The quality numbers of
     RQ1/RQ2 are related to them by hand, rather than collapsed into one
     invented composite index this module would have to justify.
-  (IGDec-QAOA, implemented but not part of the reported study): for combo pairs
-    sharing the same `dataset` across algorithms, a same-method comparison on
-    RQ4_METRICS; it only runs when both algorithms are in the plan.
 
 Reads results/evaluation/<combo>.json (evaluate_all.py's output) and
-configs/execution_plan.yaml (for the algorithm/dataset pairing). Pure
+configs/execution_plan.yaml. Pure
 classical statistics -- no backend, no AQT, safe anywhere.
 """
 
@@ -36,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from piastq_execution.evaluate_all import load_combo_definitions, repo_root
+from piastq_execution.evaluate_all import repo_root
 from piastq_execution.statistics import ComparisonResult, compare_groups
 
 
@@ -70,8 +67,8 @@ def extract_samples(records: List[Dict[str, Any]], metric_path: str) -> List[flo
     """Pulls one scalar metric out of a list of per-repetition result
     dicts. `metric_path` supports dotted paths, e.g.
     "mitigation_overhead.calibration_wall_clock_seconds". Skips records
-    where the metric is None/missing (e.g. execution_cost on IGDec-QAOA's
-    non-raw methods) rather than raising, since a report should degrade
+    where the metric is None/missing (e.g. an effectiveness indicator a
+    combo did not record) rather than raising, since a report should degrade
     gracefully instead of crashing on one combo's inapplicable metric.
     """
     samples = []
@@ -141,12 +138,6 @@ SINGLE_OBJECTIVE_QUALITY_METRICS = ["qubo_energy", "probability_of_optimal"]
 SINGLE_OBJECTIVE_EFFECTIVENESS_METRICS = ["execution_cost"]
 MULTI_OBJECTIVE_QUALITY_METRICS = ["hypervolume", "igd", "num_non_dominated"]
 COST_METRICS = ["execution_time_seconds", "mitigation_overhead.calibration_wall_clock_seconds"]
-RQ4_METRICS = [
-    "execution_time_seconds",
-    "probability_of_optimal",
-    "execution_cost",
-    "effectiveness.failure_rate",
-]
 
 
 def _effectiveness_metric_paths(combo_results: Dict[str, List[Dict[str, Any]]]) -> List[str]:
@@ -195,73 +186,6 @@ def compare_combo(combo_name: str, combo_results: Dict[str, List[Dict[str, Any]]
 
 
 # ---------------------------------------------------------------------------
-# QAOA-TCS vs IGDec-QAOA (not part of the reported study)
-# ---------------------------------------------------------------------------
-
-def pair_combos_by_dataset(combo_defs: Dict[str, Dict[str, Any]]) -> List[Dict[str, str]]:
-    """Pairs (qaoa_tcs_combo, igdec_qaoa_combo) sharing the same `dataset`
-    field -- works directly for gsdtsr/iofrol/paintcontrol (both algorithms
-    use the same dataset name); elevator variants use different naming per
-    algorithm (QAOA-TCS: "elevator"/"elevator2", IGDec-QAOA:
-    "elevator_o2"/"elevator_o3") and are NOT auto-paired here, since there
-    is no verified 1:1 correspondence to pair them by (see
-    evaluation.py's EFFECTIVENESS_METRICS comment).
-    """
-    by_dataset: Dict[str, Dict[str, str]] = {}
-    for combo_name, cfg in combo_defs.items():
-        dataset = cfg["dataset"]
-        by_dataset.setdefault(dataset, {})[cfg["algorithm"]] = combo_name
-
-    pairs = []
-    for dataset, algos in by_dataset.items():
-        if "qaoa_tcs" in algos and "igdec_qaoa" in algos:
-            pairs.append({"dataset": dataset, "qaoa_tcs": algos["qaoa_tcs"], "igdec_qaoa": algos["igdec_qaoa"]})
-    return pairs
-
-
-def compare_algorithms(
-    all_results: Dict[str, Dict[str, List[Dict[str, Any]]]],
-    combo_defs: Dict[str, Dict[str, Any]],
-    metric_path: str = "execution_time_seconds",
-) -> List[Dict[str, Any]]:
-    """For each dataset with both a QAOA-TCS and an IGDec-QAOA combo,
-    compares `metric_path` between the two algorithms, per shared method
-    (raw vs raw, mem vs mem, ...)."""
-    reports = []
-    for pair in pair_combos_by_dataset(combo_defs):
-        qaoa_tcs_results = all_results.get(pair["qaoa_tcs"], {})
-        igdec_results = all_results.get(pair["igdec_qaoa"], {})
-        shared_methods = set(qaoa_tcs_results.keys()) & set(igdec_results.keys())
-
-        per_method = {}
-        degenerate = []
-        for method in sorted(shared_methods):
-            groups = {
-                "qaoa_tcs": extract_samples(qaoa_tcs_results[method], metric_path),
-                "igdec_qaoa": extract_samples(igdec_results[method], metric_path),
-            }
-            groups = {k: v for k, v in groups.items() if v}
-            if len(groups) == 2:
-                try:
-                    per_method[method] = compare_groups(groups)
-                except ValueError:
-                    # e.g. every sample identical in both groups -- reported
-                    # as degenerate rather than silently dropped.
-                    degenerate.append(method)
-
-        if per_method or degenerate:
-            reports.append({
-                "dataset": pair["dataset"],
-                "qaoa_tcs_combo": pair["qaoa_tcs"],
-                "igdec_qaoa_combo": pair["igdec_qaoa"],
-                "metric": metric_path,
-                "by_method": per_method,
-                "degenerate_methods": degenerate,
-            })
-    return reports
-
-
-# ---------------------------------------------------------------------------
 # Top-level driver + rendering
 # ---------------------------------------------------------------------------
 
@@ -269,14 +193,9 @@ def compare_all(
     evaluation_dir: str, execution_plan_path: str
 ) -> Dict[str, Any]:
     all_results = load_evaluation_results(evaluation_dir)
-    combo_defs = load_combo_definitions(execution_plan_path)
 
     per_combo = [compare_combo(name, results) for name, results in all_results.items()]
-    rq4 = []
-    for metric_path in RQ4_METRICS:
-        rq4.extend(compare_algorithms(all_results, combo_defs, metric_path))
-
-    return {"per_combo": per_combo, "rq4_algorithm_comparison": rq4}
+    return {"per_combo": per_combo}
 
 
 def _render_comparison(result: ComparisonResult, indent: str = "      ") -> List[str]:
@@ -314,21 +233,6 @@ def render_report(comparison: Dict[str, Any]) -> str:
                     lines.append(f"      {method}: mean={entry['mean']:.4g}, sd={entry['sd']:.3g}, n={entry['n']}, {ratio}")
         lines.append("")
 
-    if comparison["rq4_algorithm_comparison"]:
-        lines.append("QAOA-TCS vs IGDec-QAOA")
-        lines.append("-" * 32)
-        for report in comparison["rq4_algorithm_comparison"]:
-            lines.append(
-                f"  {report['dataset']} ({report['qaoa_tcs_combo']} vs {report['igdec_qaoa_combo']}), "
-                f"metric={report['metric']}:"
-            )
-            for method, result in report["by_method"].items():
-                lines.append(f"    method={method}:")
-                lines.extend(_render_comparison(result, indent="        "))
-            for method in report.get("degenerate_methods", []):
-                lines.append(f"    method={method}: not testable (identical samples)")
-        lines.append("")
-
     return "\n".join(lines)
 
 
@@ -362,20 +266,7 @@ def comparison_to_json_dict(comparison: Dict[str, Any]) -> Dict[str, Any]:
         entry["rq3_cost"] = combo_report["rq3_cost"]
         per_combo_json.append(entry)
 
-    rq4_json = []
-    for report in comparison["rq4_algorithm_comparison"]:
-        rq4_json.append({
-            "dataset": report["dataset"],
-            "qaoa_tcs_combo": report["qaoa_tcs_combo"],
-            "igdec_qaoa_combo": report["igdec_qaoa_combo"],
-            "metric": report["metric"],
-            "by_method": {
-                method: _comparison_result_to_json(result) for method, result in report["by_method"].items()
-            },
-            "degenerate_methods": report.get("degenerate_methods", []),
-        })
-
-    return {"per_combo": per_combo_json, "rq4_algorithm_comparison": rq4_json}
+    return {"per_combo": per_combo_json}
 
 
 if __name__ == "__main__":

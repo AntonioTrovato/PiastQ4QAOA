@@ -295,9 +295,8 @@ class TestAggregateTrexRecords(unittest.TestCase):
         self.assertEqual(result[(0, 1, None)], {"01": 10, "10": 5, "11": 8, "00": 2})
         self.assertEqual(result[(1, 1, None)], {"00": 3})
 
-    def test_igdec_style_keys_use_subproblem_not_cluster(self):
-        # IGDec-QAOA never sets cluster_id (stays None); iteration+subproblem
-        # is what distinguishes circuits there.
+    def test_keys_use_subproblem_when_cluster_is_none(self):
+        # Records without a cluster_id are told apart by iteration+subproblem.
         records = [
             _FakeTrexRecord("x_trex0", cluster_id=None, iteration_id=1, subproblem_id=0,
                              twirl_mask=[1], aggregated_counts={"0": 5, "1": 5}),

@@ -38,7 +38,7 @@
 15. [Every parameter and why it has that value](#15-every-parameter-and-why-it-has-that-value)
 16. [Repository map and data dictionary](#16-repository-map-and-data-dictionary)
 17. [How to reproduce, re-evaluate or extend](#17-how-to-reproduce-re-evaluate-or-extend)
-18. [Out of scope but implemented (IGDec-QAOA, other datasets)](#18-out-of-scope-but-implemented-igdec-qaoa-other-datasets)
+18. [What was removed from the package](#18-what-was-removed-from-the-package)
 19. [Glossary](#19-glossary)
 20. [Decision log](#20-decision-log)
 
@@ -184,22 +184,22 @@ History (useful when reading older commits/docs): an earlier design had RQ3a
 ("which method improves quality most, regardless of cost"), RQ3b (cost) and RQ4
 (QAOA-TCS vs IGDec-QAOA). RQ3a was merged into RQ1 as a discussion point (it is
 the same comparison), RQ3b became RQ3, and RQ4 was dropped because IGDec-QAOA
-was not executed (§3.4).
+was not executed (§3.4); its code was afterwards removed from the package (§18).
 
 ### 3.3 Subjects and why these four
 
 QAOA-TCS on `gsdtsr` and `paintcontrol` (single-objective) and `flex` and
 `gzip` (multi-objective). Two of each type so conclusions are not tied to one
 problem type. They were the subset that fits the 25-QPU-hour allowance and the
-6 Nov deadline: `iofrol` (443 circuits), `elevator` (881) and `grep`/`sed`
-need several times the machine time; `elevator2`'s 56 saved circuits do not
-match the current clustering (800 target clusters) and cannot be evaluated.
+paper deadline: the other subjects of the original package (`iofrol` with 443
+circuits, `elevator` 881, `grep` 139, `sed` 77) need several times the machine
+time. They were removed from the repository (§18).
 
 ### 3.4 What is explicitly out of scope
 
-* **IGDec-QAOA** (the second algorithm of the original study) is implemented
-  and unit-tested here (§18) but was **not run on the hardware**, so no
-  algorithm comparison is made.
+* **IGDec-QAOA** (the second algorithm of the original study) was **not run on
+  the hardware**, so no algorithm comparison is made; its code and circuits
+  were removed from the package (§18).
 * Mitigation scope is **readout error only**. Gate-error mitigation is not
   studied.
 * Only `p = 1` circuits (`rep_1`) are used.
@@ -316,8 +316,9 @@ the training code lives in `single_obj.py train` / `multi_obj.py train`:
 
 **Reproducibility caveat:** QAOA-TCS's training is not explicitly seeded, so
 re-running `train` is not guaranteed to reproduce the same `.qpy` files. The
-committed `.qpy` files are the artifacts the study used. (IGDec-QAOA's training
-*is* seeded, via `seeding.seed_for_sampling`.)
+committed `.qpy` files are the artifacts the study used. (The
+`gsdtsr`/`paintcontrol` circuits were retrained on 9 Nov 2026 with
+`algorithm_globals.random_seed = 42` set from outside the training script.)
 
 ---
 
@@ -446,9 +447,9 @@ calibrated with all slots active, §9.1, to reflect this).
 
 Stages, in order: (1) unit tests; (1b) QUBO backfill; (2) budget plan;
 (3) calibration (also saves a backend-properties snapshot); (4) pilot gate;
-(5) QAOA-TCS single-objective; (6) QAOA-TCS multi-objective; (7) IGDec-QAOA
-(only if planned — not in this study); (8) end-of-session drift check;
-(9) evaluation and statistical comparison. A failing stage stops the run;
+(5) QAOA-TCS single-objective; (6) QAOA-TCS multi-objective; (7) end-of-session
+drift check; (8) evaluation and statistical comparison; (9) noiseless reference
+simulations. A failing stage stops the run;
 `--resume` continues. The unit-test stage runs with every `PIASTQ_*` variable
 stripped so tests can never reach the real service. Output: console,
 `logs/run_all_<time>.log`, `logs/run_summary_<time>.json` (the `logs/` folder
@@ -652,6 +653,31 @@ raw instead.
 `comparison_report.txt/.json` (RQ1, RQ2 tests and RQ3 cost summary per subject),
 `ideal_reference.json` (noiseless reference).
 
+### 10.4 Ideal-simulator reference (`ideal_simulation.py`, added 10 Nov 2026)
+
+The frozen circuits are re-run on a noiseless simulator in three
+configurations and evaluated with the same code as the hardware data:
+`ideal_exact` (exact statevector distribution, i.e. infinite shots),
+`ideal_shots200` (qiskit-aer `AerSimulator` without noise model, 200 shots,
+10 seeded repetitions: the budget of raw/MEM/M3) and `ideal_shots600` (600
+shots: the budget of TREx). Seeds are SHA-256 of (subject, configuration,
+repetition), so the simulation is reproducible.
+
+Why: a hardware result can miss the optimum because of device noise or
+because 200 shots are a finite sample. `ideal_exact` gives the total gap;
+`ideal_shots200` keeps the sampling and removes the device, so
+"hardware vs ideal_shots200" is the part the device (and hence readout
+mitigation) can be responsible for; `ideal_shots600` does the same for TREx.
+
+Outputs: `results/ideal_simulation/<subject>/*-counts.jsonl` (simulated
+counts) and `results/evaluation/ideal_comparison.json` /
+`ideal_comparison_report.txt` (per-repetition metrics of every hardware method
+and ideal configuration, and each hardware method tested against its
+shot-matched configuration). Multi-objective HV/IGD in this file use a
+reference front that also contains the ideal fronts, so they differ from the
+values in `comparison_report.txt`. Run as stage 10 of `run_all.py` or with
+`python ideal_simulation.py` (no QPU, about one minute).
+
 ---
 
 ## 11. What was actually run: configuration and chronology
@@ -703,6 +729,18 @@ raw instead.
 * **Final audit (9 Nov)** — the evaluator was corrected (§20) and the
   evaluation/comparison re-run on the unchanged raw data (quality metrics
   identical up to 1e-8; calibration-overhead and report format changed).
+
+* **Mon 9 Nov, evening — single-objective re-run.** The QUBO weights of the
+  single-objective subjects were found not to be the Optuna-tuned values of the
+  original study (`gsdtsr` 0 → 0.3745, `paintcontrol` 0.45 → 0.7320; commit
+  edbf6a6d). Both subjects were retrained (seed 42) and re-executed with the
+  same protocol (Slurm job 2005, `--resume`, reusing the 30 Oct calibration,
+  770 execution jobs ≈ 4 billed hours). The old data is kept in
+  `archive/alpha_v1_2026-11-09/`. `flex`/`gzip` are unaffected. With the new
+  weights the noiseless suites reproduce exactly the ideal-simulator values
+  reported in the original study (`gsdtsr` cost 4,760,360 / failure rate
+  7.571; `paintcontrol` 1,165,500 / 14.455). **§12 still reports the v1
+  single-objective numbers until the re-run is evaluated.**
 
 Observed throughput: a job started every ≈ 2–3 minutes on average, with
 slow periods of ≈ 7 minutes per job; ≈ 7.3 days wall-clock in total.
@@ -920,7 +958,7 @@ claims about subjects other than the four.
 
 | Parameter | Value | Note |
 |---|---|---|
-| Max cluster size | 7 qubits | consistency with prior IGDec-QAOA work |
+| Max cluster size | 7 qubits | consistency with the original QAOA-TCS study |
 | QAOA depth `p` | 1 | paper: depth did not significantly affect quality |
 | `COBYLA(maxiter=500)` | 500 | engineering default, no cited reason |
 | α single-objective | `gsdtsr` 0, `paintcontrol` 0.45 | Optuna search in the paper; values carried over |
@@ -965,7 +1003,6 @@ PiastQ4QAOA/
 ├── trained_qaoa_circuits/       # frozen .qpy circuits + *_qubos.json (QUBO coefficients)
 ├── src/
 │   ├── qaoa_tcs/                # single_obj.py, multi_obj.py: clustering, QUBO, train/qubos/execute
-│   ├── igdec_qaoa/              # implemented, not run on hardware (§18)
 │   └── piastq_execution/        # shared library
 │       ├── backend_config.py    # backend/token resolution, PCSS hardening (retries)
 │       ├── packing.py           # slots, first-fit-decreasing, joint circuits, marginalization
@@ -1046,20 +1083,19 @@ seconds, entirely synthetic).
 
 ---
 
-## 18. Out of scope but implemented (IGDec-QAOA, other datasets)
+## 18. What was removed from the package
 
-`src/igdec_qaoa/` holds IGDec-QAOA (impact-guided decomposition: a random
-initial solution, repeated re-ranking of tests by impact, QAOA on the next 7
-highest-impact tests, keep the best solution). Its trained circuits exist for
-`iofrol` (10 samplings × 1,230 circuits) and `paintcontrol` (10 × 30); training
-code for `gsdtsr`, `elevator_o2`, `elevator_o3` exists but was not run. The
-hardware and evaluation scripts support it (with a replay of the training-fixed
-subproblem sequence for the final suite), and it is covered by unit tests, but
-it was **not executed on PIAST-Q** and `results/igdec_qaoa/` is empty. Other
-QAOA-TCS datasets (`iofrol` 443 circuits, `elevator` 881, `elevator2` 56 — not
-evaluable, `grep` 139, `sed` 77) are defined in the config but excluded from the
-plan. The full study design (14 dataset × algorithm combinations) is described
-in `README.md` §11 ("Out-of-scope combinations").
+The repository was cleaned up at the end of the study so that it contains only
+what the study used. Removed: the IGDec-QAOA implementation (`src/igdec_qaoa/`,
+its trained circuits, its evaluation path and its statistical comparison), the
+trained circuits and combo definitions of the subjects that were never
+executed (`iofrol`, `elevator`, `elevator2`, `grep`, `sed`), their datasets
+(`elevator.csv`, `iofrol.csv`, the `grep` and `sed` SIR folders) and the matching
+tests. None of these was run on PIAST-Q, so no result depends on them. They
+remain available in the git history (commits up to `edbf6a6d`). Extending the
+study to them needs only their trained circuits, a combo entry in
+`configs/execution_plan.yaml`, and billed QPU time (estimated at 4.5 h for
+`sed` and 9 h for `grep` at 10 repetitions with all four methods).
 
 ---
 
@@ -1096,5 +1132,6 @@ in `README.md` §11 ("Out-of-scope combinations").
 | 8 | Real-machine switches only in `run_cluster.sh` | repo stays on the simulator; no accidental hardware use |
 | 9 | Retry submit-time timeouts (during the run) | a `ReadTimeout` killed the run once; cost of an orphan job ≈ 18 s |
 | 10 | Skip pilot gate on resume (during the run) | gate used wall-clock (queue wait) and falsely projected 575 h |
-| 11 | RQ3a merged into RQ1; RQ3b → RQ3; RQ4 dropped | same comparison; IGDec-QAOA not run |
+| 11 | RQ3a merged into RQ1; RQ3b → RQ3; RQ4 dropped | same comparison; IGDec-QAOA not run (and later removed, decision 13) |
 | 12 | Final audit fixes (9 Nov): (a) calibration overhead = cost of the stored shared calibration, also reported for multi-objective subjects; (b) `compare_all` no longer treats its own report as a subject; (c) RQ3 cost reported descriptively (zero variance) with RQ1/RQ2/RQ3 labels; (d) QUBO coefficient files added to the package; (e) docs and stale comments refreshed | found while auditing code and results; the quality metrics were unchanged by the re-evaluation (max difference 1.6e-8, no argmax changed) |
+| 13 | Single-objective alphas corrected (9 Nov) and the two single-objective subjects retrained and re-executed; at the end of the study IGDec-QAOA and every subject that was not executed were removed from the package (§18) | the first alphas (`gsdtsr` 0, `paintcontrol` 0.45) were not the Optuna values of the original study; unexecuted code and data were dead weight |

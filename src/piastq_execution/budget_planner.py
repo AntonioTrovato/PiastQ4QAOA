@@ -1,18 +1,16 @@
 """Shot/time budget planner for PIAST-Q hardware execution.
 
-The real machine time available to run the 14 QAOA-TCS / IGDec-QAOA combos in
+The real machine time available to run the QAOA-TCS combos in
 this study is split across one or more named POOLS, each with its own
 wall-clock hour budget and an explicit list of which combos it covers. A pool
-covering every combo is a "global" setup; 14 pools of one combo each is
-"per_combo"; anything in between (e.g. one pool per algorithm, or one pool per
-dataset) is just a different assignment of the same `combos: [...]` list --
+covering every combo is a "global" setup; one pool per combo is
+"per_combo"; anything in between (e.g. one pool per objective mode) is just a different assignment of the same `combos: [...]` list --
 there is no separate code path per split.
 
 Given a pool's budget, this planner degrades a target execution profile
 (repetitions x shots-per-circuit x mitigation methods) in priority order:
-  1. reduce the number of repetitions (QAOA-TCS: how many times the same,
-     reusable circuit set is re-run; IGDec-QAOA: how many of the distinct,
-     non-reusable per-sampling circuit sets are included),
+  1. reduce the number of repetitions (how many times the same,
+     reusable circuit set is re-run),
   2. reduce shots-per-circuit, down to a configurable floor (never below one
      200-shot batch),
   3. only as a last resort, and with an explicit warning, subsample the
@@ -70,13 +68,12 @@ class ComboInventory:
     tests, hand-built) rather than assumed.
     """
     combo: str
-    algorithm: str        # "qaoa_tcs" | "igdec_qaoa"
+    algorithm: str        # "qaoa_tcs"
     objective_mode: str   # "single_objective" | "multi_objective"
     reusable_across_repetitions: bool
-    # One entry per repetition unit. QAOA-TCS: exactly one entry (the
-    # canonical circuit set, reused for every repetition). IGDec-QAOA: one
-    # entry per discovered sampling_N folder (each is a distinct circuit set
-    # that cannot be reused for a different repetition).
+    # One entry per repetition unit. Exactly one entry for QAOA-TCS (the
+    # canonical circuit set, reused for every repetition); a combo with
+    # non-reusable circuit sets would have one entry per repetition unit.
     repetition_units: List[List[CircuitRecord]] = field(default_factory=list)
 
     @property
@@ -124,36 +121,6 @@ def discover_qaoa_tcs_inventory(
         objective_mode=objective_mode,
         reusable_across_repetitions=True,
         repetition_units=[records],
-    )
-
-
-def discover_igdec_inventory(
-    combo: str,
-    trained_circuits_dir: str,
-    objective_mode: str = "single_objective",
-) -> ComboInventory:
-    """Reads trained_qaoa_circuits/igdec_qaoa/{combo}/sampling_*/*.qpy --
-    IGDec-QAOA trains a distinct, non-reusable circuit set per sampling run."""
-    combo_dir = os.path.join(trained_circuits_dir, "igdec_qaoa", combo)
-    sampling_dirs = sorted(
-        (d for d in glob.glob(os.path.join(combo_dir, "sampling_*")) if os.path.isdir(d)),
-        key=lambda d: int(d.rsplit("_", 1)[-1]),
-    )
-    repetition_units = []
-    for sdir in sampling_dirs:
-        files = sorted(glob.glob(os.path.join(sdir, "*.qpy")))
-        label = os.path.basename(sdir)
-        records = [
-            CircuitRecord(circuit_id=f"{label}/{os.path.basename(f)}", num_qubits=_qpy_num_qubits(f))
-            for f in files
-        ]
-        repetition_units.append(records)
-    return ComboInventory(
-        combo=combo,
-        algorithm="igdec_qaoa",
-        objective_mode=objective_mode,
-        reusable_across_repetitions=False,
-        repetition_units=repetition_units,
     )
 
 
@@ -485,10 +452,6 @@ def build_inventories_from_config(path: str, trained_circuits_dir: str) -> Dict[
             inventories[combo_name] = discover_qaoa_tcs_inventory(
                 circuits_dir, trained_circuits_dir, objective_mode=objective_mode
             )
-        elif algorithm == "igdec_qaoa":
-            inventories[combo_name] = discover_igdec_inventory(
-                circuits_dir, trained_circuits_dir, objective_mode=objective_mode
-            )
         else:
             raise ValueError(f"Unknown algorithm '{algorithm}' for combo '{combo_name}'")
     return inventories
@@ -637,7 +600,7 @@ if __name__ == "__main__":
     print(report)
 
     # Kept outside results/ on purpose: results/ is reserved for the
-    # qaoa_tcs/ and igdec_qaoa/ combo output subfolders.
+    # qaoa_tcs/ combo output subfolders.
     output_dir = os.path.join(repo_root, "execution_plan")
     text_path, json_path = write_report(plans, output_dir)
     print(f"\nSaved report: {text_path}")

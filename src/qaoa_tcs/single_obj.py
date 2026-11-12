@@ -47,12 +47,12 @@ from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict
 
-bootqa_programs = ["gsdtsr", "paintcontrol", "iofrol", "elevator", "elevator2"]
-bootqa_programs_rep_values = {"gsdtsr": 1, "paintcontrol": 1, "iofrol": 1, "elevator": 1, "elevator2": 1}
-# Per-dataset QUBO alpha (elevator2: alpha, beta, gamma) used when (re)training
+bootqa_programs = ["gsdtsr", "paintcontrol"]
+bootqa_programs_rep_values = {"gsdtsr": 1, "paintcontrol": 1}
+# Per-dataset QUBO alpha (Optuna values) used when (re)training
 # circuits -- matches SelectQAOA/MOQ-Pipeline.ipynb's single-objective
 # training cell, i.e. what the already-ported circuits were trained with.
-bootqa_alphas = {"gsdtsr": 0.3745401188473625, "paintcontrol": 0.7319939418114051, "iofrol": 0.7319939418114051, "elevator": 0.3745401188473625, "elevator2": (0.13949386065204183, 0.29214464853521815, 0.3663618432936917)}
+bootqa_alphas = {"gsdtsr": 0.3745401188473625, "paintcontrol": 0.7319939418114051}
 experiments = 10
 
 def get_data(data_name):

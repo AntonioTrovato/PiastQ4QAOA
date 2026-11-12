@@ -43,7 +43,7 @@ def nonreusable_inventory(combo, samplings, width):
     units = [[CircuitRecord(circuit_id=cid, num_qubits=width) for cid in s] for s in samplings]
     return ComboInventory(
         combo=combo,
-        algorithm="igdec_qaoa",
+        algorithm="qaoa_tcs",
         objective_mode="single_objective",
         reusable_across_repetitions=False,
         repetition_units=units,

@@ -215,7 +215,7 @@ class TestEvaluateSingleObjectiveCombo(unittest.TestCase):
         records = [make_raw_record(100, 0.5)]
 
         result = evaluate_single_objective_combo(
-            combo="toy_igdec_qaoa",
+            combo="toy_no_final_suite",
             method="raw",
             dataset="iofrol",
             cluster_assignments=assignments,
@@ -326,28 +326,6 @@ class TestExtractMetricSamples(unittest.TestCase):
         results = [_make_single_objective_result(1.0, 80), _make_single_objective_result(2.0, 160)]
         samples = extract_metric_samples(results, "mitigation_overhead.total_shots")
         self.assertEqual(samples, [80.0, 160.0])
-
-    def test_end_to_end_compare_algorithms_on_execution_time(self):
-        # Demonstrates the exact workflow the README documents for comparing
-        # two algorithms' quantum-hardware execution time with statistical
-        # soundness: extract samples per group, then compare_groups().
-        qaoa_tcs_results = [_make_single_objective_result(t, 80) for t in [1.0, 1.1, 0.9, 1.05, 0.95]]
-        igdec_results = [_make_single_objective_result(t, 80) for t in [5.0, 5.2, 4.8, 5.1, 4.9]]
-
-        groups = {
-            "qaoa_tcs": extract_metric_samples(qaoa_tcs_results, "execution_time_seconds"),
-            "igdec_qaoa": extract_metric_samples(igdec_results, "execution_time_seconds"),
-        }
-        comparison = compare_groups(groups)
-
-        self.assertIn(comparison.omnibus_test, ("anova", "kruskal_wallis"))
-        self.assertEqual(len(comparison.pairwise), 1)
-        pair = comparison.pairwise[0]
-        # igdec_qaoa's execution times are all clearly larger than qaoa_tcs's
-        if pair.effect_size_name == "a12":
-            self.assertLess(pair.effect_size, 0.5)
-        else:
-            self.assertLess(pair.effect_size, 0.0)
 
 
 if __name__ == "__main__":

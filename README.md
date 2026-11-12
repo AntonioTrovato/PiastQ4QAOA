@@ -27,7 +27,7 @@ TREx) improves it, and at what cost in billed QPU time.
 - [8. Mitigation and calibration](#8-mitigation-and-calibration)
 - [9. Evaluation and statistics](#9-evaluation-and-statistics)
 - [10. Environment variables](#10-environment-variables)
-- [11. Out-of-scope combinations (implemented, not run)](#11-out-of-scope-combinations-implemented-not-run)
+- [11. Training and scope](#11-training-and-scope)
 - [12. Tests](#12-tests)
 - [13. Parameters](#13-parameters)
 
@@ -62,11 +62,9 @@ PiastQ4QAOA/
 │   └── execution_plan.yaml       # budget planner + evaluation configuration (10 reps, 3 twirls)
 ├── datasets/                     # input data (unchanged from the original study)
 ├── trained_qaoa_circuits/
-│   ├── qaoa_tcs/<subject>/rep_1/ # frozen .qpy circuits + <subject>_rep1_qubos.json
-│   └── igdec_qaoa/...            # IGDec-QAOA circuits (not used in the study)
+│   └── qaoa_tcs/<subject>/rep_1/ # frozen .qpy circuits + <subject>_rep1_qubos.json
 ├── src/
 │   ├── qaoa_tcs/                 # single_obj.py, multi_obj.py: clustering, QUBO, train / qubos / execute
-│   ├── igdec_qaoa/               # IGDec-QAOA (implemented, not run on hardware)
 │   └── piastq_execution/         # shared library
 │       ├── backend_config.py     #   backend/token resolution; PCSS retry hardening
 │       ├── packing.py            #   slots, first-fit-decreasing, joint circuits, marginalization
@@ -83,7 +81,7 @@ PiastQ4QAOA/
 │   └── evaluation/               # evaluation, statistical report, ideal reference (§4)
 ├── calibration/                  # MEM/M3 matrices, drift/, backend_snapshots/
 ├── execution_plan/               # budget planner report
-├── tests/                        # 235 unit tests (never touch real hardware)
+├── tests/                        # 229 unit tests (never touch real hardware)
 └── logs/                         # run logs; git-ignored, so absent from a clone
 ```
 
@@ -152,7 +150,7 @@ append to existing files, and a fresh start archives them.
 ### A. Unit tests (no backend, a few seconds)
 
 ```bash
-python -m unittest discover -s tests          # 235 tests
+python -m unittest discover -s tests          # 229 tests
 ```
 
 ### B. Re-evaluate from the stored data (no hardware, about a minute)
@@ -213,9 +211,8 @@ the number of TREx passes later is wasteful: every pass would have to be re-run.
 Stages, in order (a failing stage stops the run): (1) unit tests, run with all
 `PIASTQ_*` variables stripped; (1b) **QUBO backfill**; (2) budget plan;
 (3) **calibration** (+ backend snapshot); (4) **pilot gate**; (5) QAOA-TCS
-single-objective; (6) QAOA-TCS multi-objective; (7) IGDec-QAOA (only if planned;
-not in this study); (8) **drift check** (2 M3 jobs); (9) evaluation and
-statistical comparison.
+single-objective; (6) QAOA-TCS multi-objective; (7) **drift check** (2 M3 jobs); (8) evaluation and
+statistical comparison; (9) noiseless reference simulations.
 
 * **Which backend:** decided by `configs/backend.yaml` or the `PIASTQ_*`
   variables (which win). Without `PIASTQ_ALLOW_REAL_HARDWARE=1` the script
@@ -306,40 +303,35 @@ definitions: `EXPLAINATION.md` §10.
 
 ---
 
-## 11. Out-of-scope combinations (implemented, not run)
+## 11. Training and scope
 
-The package was built for 14 algorithm × dataset combinations; only four were
-executed (budget and deadline). The rest are implemented and unit-tested but
-have no hardware data.
+Only the four subjects of the study are kept in the repository; everything else
+of the original package (IGDec-QAOA, the datasets `iofrol` and `elevator`, the
+SIR programs `grep` and `sed`) was removed because it was never executed on
+PIAST-Q (it needed several times the available machine time).
 
-| Algorithm | Mode | Datasets | Circuits | In the study? |
-|---|---|---|---|---|
-| QAOA-TCS | single | `gsdtsr` 79, `paintcontrol` 24 | 103 | **yes** |
-| QAOA-TCS | single | `iofrol` 443, `elevator` 881, `elevator2` 56 | 1,380 | no (`elevator2` circuits do not match the current clustering and cannot be evaluated) |
-| QAOA-TCS | multi | `flex` 105, `gzip` 61 | 166 | **yes** |
-| QAOA-TCS | multi | `grep` 139, `sed` 77 | 216 | no |
-| IGDec-QAOA | single | `iofrol` (10 samplings × 1,230), `paintcontrol` (10 × 30) trained; `gsdtsr`, `elevator_o2`, `elevator_o3` training code ready, not run | – | no (so no algorithm comparison) |
+| Algorithm | Mode | Subjects | Circuits |
+|---|---|---|---|
+| QAOA-TCS | single-objective | `gsdtsr` 79, `paintcontrol` 24 | 103 |
+| QAOA-TCS | multi-objective | `flex` 105, `gzip` 61 | 166 |
 
 **Training** (not part of the hardware study; ideal simulator,
-`COBYLA(maxiter=500)`, `p = 1`; QAOA-TCS training is not seeded, IGDec-QAOA's is):
+`COBYLA(maxiter=500)`, `p = 1`; the training code sets no seed, the
+`gsdtsr`/`paintcontrol` circuits of the study were retrained on 9 Nov 2026 with
+`algorithm_globals.random_seed = 42` set from outside):
 
 ```bash
-cd src/qaoa_tcs     && python single_obj.py train && python multi_obj.py train
-cd src/igdec_qaoa   && python loch_qaoa_tcm_extract_circuits.py train      # also: ..._elev_two_..., ..._elev_three_...
+cd src/qaoa_tcs && python single_obj.py train && python multi_obj.py train
 ```
 
 Plain `python <script>.py` (no argument) **executes** trained circuits on the
-configured backend; `qubos` rebuilds the QUBO coefficient files. IGDec-QAOA
-execution would write to `results/igdec_qaoa/` (empty in this study).
-Note for IGDec-QAOA's evaluation: the subproblem sequence is fixed by training
-and replayed with each method's bitstrings, so it is "ideal trajectory,
-hardware-filled bits", not an adaptive re-ranking.
+configured backend; `qubos` rebuilds the QUBO coefficient files.
 
 ---
 
 ## 12. Tests
 
-`python -m unittest discover -s tests` — **235 tests**, a few seconds, entirely
+`python -m unittest discover -s tests` — **229 tests**, a few seconds, entirely
 synthetic (toy 1–3 qubit circuits and QUBOs, fake samplers and a fake noisy
 machine, tiny Pareto fronts); none touches the real service. Test modules that
 touch execution code import `tests/hermetic_env.py` first, which scrubs every

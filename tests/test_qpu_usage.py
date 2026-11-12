@@ -212,6 +212,85 @@ class TestPcssBackend(unittest.TestCase):
             self.assertEqual(backend.submit(object()), "id")
         self.assertEqual(Backend.attempts, 3)
 
+    def test_negative_gate_phases_are_wrapped_before_submit(self):
+        from types import SimpleNamespace as NS
+
+        negative, positive = NS(phi=-0.00046746), NS(phi=0.5)
+        sent = []
+
+        class Backend:
+            def result(self, job_id, *, timeout=None):
+                return None
+
+            def submit(self, circuit):
+                sent.append([getattr(op.root, "phi", None) for op in circuit.quantum_circuit.root])
+                return "id"
+
+        backend = backend_config._harden_pcss_backend(Backend())
+        backend.submit(NS(quantum_circuit=NS(root=[NS(root=negative), NS(root=positive), NS(root=NS())])))
+        # the service rejects phi < 0; 2 (= 2*pi) is added, other angles are untouched
+        self.assertAlmostEqual(sent[0][0], 2 - 0.00046746)
+        self.assertEqual(sent[0][1], 0.5)
+
+    def test_string_job_ids_are_submitted_polled_and_5xx_is_retried(self):
+        # the service returns the id as a string; the vendor submit stores it and then fails
+        class Response:
+            def __init__(self, status, body):
+                self.status_code, self.body = status, body
+                self.response = self
+
+            def raise_for_status(self):
+                if self.status_code >= 500:
+                    raise httpx.HTTPStatusError("boom", request=None, response=self)
+                return self
+
+            def json(self):
+                return self.body
+
+        class Http:
+            urls, replies = [], [
+                Response(500, {}),
+                Response(200, {"status": "queued", "result": None}),
+                Response(200, {"status": "succeeded", "result": {"results": {"Tasks": [["0", "1"], ["1", "1"]]}}}),
+            ]
+
+            def get(self, url, timeout=None):
+                Http.urls.append(url)
+                return Http.replies.pop(0)
+
+        class Backend:
+            timeout = 0
+            _http_client = Http()
+            last_task_uid = None
+
+            def result(self, job_id, *, timeout=None):
+                raise AssertionError("the vendor result() must not be used for string ids")
+
+            def submit(self, circuit):
+                self.last_task_uid = "abc-123"
+                raise TypeError("'<=' not supported between instances of 'int' and 'str'")
+
+        with mock.patch.object(backend_config, "_RETRY_SECONDS", 0):
+            backend = backend_config._harden_pcss_backend(Backend())
+            job_id = backend.submit(object())
+            self.assertEqual(job_id.int, "abc-123")
+            result = backend.result(job_id, timeout=None)
+        self.assertEqual(Http.urls, ["/jobs/abc-123"] * 3)
+        self.assertEqual(result.payload.result, [[0, 1], [1, 1]])
+
+    def test_type_error_without_a_stored_id_is_not_swallowed(self):
+        class Backend:
+            last_task_uid = "stale"
+
+            def result(self, job_id, *, timeout=None):
+                return None
+
+            def submit(self, circuit):
+                raise TypeError("a real bug")
+
+        with self.assertRaises(TypeError):
+            backend_config._harden_pcss_backend(Backend()).submit(object())
+
 
 if __name__ == "__main__":
     unittest.main()

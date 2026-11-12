@@ -15,9 +15,9 @@ hand; the first failing stage stops the run):
                                        total QPU hours; aborts if > limit)
   5. QAOA-TCS single-objective        (raw + TREx counts saved)
   6. QAOA-TCS multi-objective
-  7. IGDec-QAOA                       (only if an IGDec combo is in the plan)
-  8. end-of-session drift check       (re-measures M3)
-  9. evaluation + statistical comparison  (local, no QPU)
+  7. end-of-session drift check       (re-measures M3)
+  8. evaluation + statistical comparison  (local, no QPU)
+  9. ideal-simulator reference      (local, no QPU: exact + 200/600-shot noiseless runs)
 
 Which backend it uses is decided ONLY by configs/backend.yaml or the PIASTQ_*
 environment variables (which take precedence): the shipped default
@@ -75,8 +75,8 @@ QPU_HOURS_LIMIT = 25.0             # total QPU time available (BILLED time, queu
 MAX_JOBS_IN_FLIGHT = 16            # real machine only: circuits submitted at once (waits in the queue overlap)
 ABORT_IF_PROJECTION_EXCEEDS_LIMIT = True   # pilot gate (stage 4)
 MINUTES_PER_JOB_ESTIMATE = 3.4     # measured machine time per job on PIAST-Q (wall-clock, informational)
-SINGLE_OBJECTIVE_DATASETS = {"gsdtsr", "iofrol", "paintcontrol", "elevator", "elevator2"}
-MULTI_OBJECTIVE_DATASETS = {"flex", "grep", "gzip", "sed"}
+SINGLE_OBJECTIVE_DATASETS = {"gsdtsr", "paintcontrol"}
+MULTI_OBJECTIVE_DATASETS = {"flex", "gzip"}
 
 RESUME = "--resume" in sys.argv[1:]   # continue an interrupted run instead of starting over
 
@@ -320,13 +320,10 @@ def main() -> int:
                 planned |= set(plan.methods_by_combo)
             has_single = any(c.endswith("_qaoa_tcs") and c.split("_")[0] in SINGLE_OBJECTIVE_DATASETS for c in planned)
             has_multi = any(c.endswith("_qaoa_tcs") and c.split("_")[0] in MULTI_OBJECTIVE_DATASETS for c in planned)
-            has_igdec = any(c.endswith("_igdec_qaoa") for c in planned)
             if has_single:
                 stages.append(("QUBO backfill: QAOA-TCS single-objective", ["single_obj.py", "qubos"], os.path.join(SRC, "qaoa_tcs")))
             if has_multi:
                 stages.append(("QUBO backfill: QAOA-TCS multi-objective", ["multi_obj.py", "qubos"], os.path.join(SRC, "qaoa_tcs")))
-            if has_igdec:
-                stages.append(("QUBO backfill: IGDec-QAOA", ["loch_qaoa_tcm_extract_circuits.py", "qubos"], os.path.join(SRC, "igdec_qaoa")))
             stages.append(("budget plan", ["budget_planner.py"], os.path.join(SRC, "piastq_execution")))
             stages.append(("calibration (MEM + M3)", ["run_calibration.py"], os.path.join(SRC, "piastq_execution")))
 
@@ -353,8 +350,6 @@ def main() -> int:
                 execution_stages.append(("QAOA-TCS single-objective", ["single_obj.py"], os.path.join(SRC, "qaoa_tcs")))
             if has_multi:
                 execution_stages.append(("QAOA-TCS multi-objective", ["multi_obj.py"], os.path.join(SRC, "qaoa_tcs")))
-            if has_igdec:
-                execution_stages.append(("IGDec-QAOA", ["loch_qaoa_tcm_extract_circuits.py"], os.path.join(SRC, "igdec_qaoa")))
             for stage in execution_stages:
                 run_stage(stage)
 
@@ -366,6 +361,8 @@ def main() -> int:
 
             run_stage(("evaluation", ["evaluate_all.py"], os.path.join(SRC, "piastq_execution")))
             run_stage(("statistical comparison", ["compare_all.py"], os.path.join(SRC, "piastq_execution")))
+            # local, no QPU: noiseless (exact) and shot-matched (200/600) simulator reference
+            run_stage(("ideal-simulator reference", ["ideal_simulation.py"], os.path.join(SRC, "piastq_execution")))
 
             billed_end = billed_seconds()
             if billed_end is not None:

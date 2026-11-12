@@ -13,23 +13,6 @@ Nothing here calls AQTProvider/AQTSampler/any backend -- this only reads
 already-collected files and does classical post-processing, safe to run
 anywhere, including in an authoring/review session, once Phase 5 (hardware
 execution) and Phase 4 (calibration) data exists.
-
-IGDec-QAOA's subproblem sequence (each circuit's `case_list`) is fixed by
-training, and the hardware scripts execute exactly that sequence. So every
-method (raw/mem/m3/trex) gets a real final suite by replaying that sequence
-with its own per-circuit bitstrings. Caveat for the paper: each circuit's
-QUBO was conditioned on the ideal-simulator solution at training time, so
-the hardware run is "ideal trajectory, hardware-filled bits", not a fully
-adaptive re-ranking on hardware.
-
-IGDec-QAOA's final suites are ALSO not computed via
-evaluate_single_objective_combo()'s built-in merge_selected_tests()
-(union/first-cluster-wins) -- that's correct for QAOA-TCS's genuinely
-disjoint clusters, but wrong for IGDec-QAOA, whose subproblems can revisit
-the same test case across iterations and must use "last write wins" over
-chronological iteration order, matching the real algorithm's
-`solution[case_list[i]] = bitstring[i]` update rule exactly (see
-merge_igdec_solution() below).
 """
 
 from __future__ import annotations
@@ -153,16 +136,6 @@ def cluster_counts_for_method(
 def load_qaoa_tcs_test_case_data(dataset: str, datasets_dir: str) -> Dict[str, List[float]]:
     import pandas as pd
 
-    if dataset == "elevator":
-        data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "input_div": float})
-        return {"cost": data["cost"].tolist(), "input_diversity": data["input_div"].tolist()}
-    if dataset == "elevator2":
-        data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "pcount": int, "dist": int})
-        return {
-            "cost": data["cost"].tolist(),
-            "passenger_count": data["pcount"].tolist(),
-            "travel_distance": data["dist"].tolist(),
-        }
     data = pd.read_csv(os.path.join(datasets_dir, f"{dataset}.csv"), dtype={"time": float, "rate": float})
     data = data[data["rate"] > 0]
     return {"cost": data["time"].tolist(), "failure_rate": data["rate"].tolist()}
@@ -374,174 +347,6 @@ def evaluate_qaoa_tcs_multi_objective_combo(
 
 
 # ---------------------------------------------------------------------------
-# IGDec-QAOA single-objective
-# ---------------------------------------------------------------------------
-
-def merge_igdec_solution(
-    circuits_metadata: Sequence[Dict[str, Any]],
-    selected_bitstrings: Sequence[str],
-    initial_solution: Optional[Sequence[int]] = None,
-) -> List[int]:
-    """Replays IGDec-QAOA's solution-update rule -- last write wins,
-    chronological iteration order -- instead of
-    evaluate_single_objective_combo()'s built-in merge_selected_tests()
-    (union/first-cluster-wins), which assumes QAOA-TCS's disjoint-cluster
-    semantics: `case_list` can revisit the same test case across iterations,
-    and the most RECENT decision wins (`solution[case_list[i]] = bitstring[i]`).
-    `circuits_metadata` must already be in chronological (iteration) order,
-    as persisted.
-
-    `initial_solution` is the sampling's initial random solution
-    (initial_random_solution.json): test cases that no subproblem ever
-    touches keep their initial value, exactly as in the real algorithm. Omit
-    it to start from an all-zero background.
-
-    The subproblem sequence (`case_list` per circuit) is fixed by training,
-    and the hardware run uses exactly that sequence (the execution scripts
-    read `case_list` from the metadata), so the same replay is valid for
-    every method: each one only supplies its own bitstring per circuit.
-    """
-    if initial_solution is not None:
-        solution: Dict[int, int] = {i: int(b) for i, b in enumerate(initial_solution)}
-    else:
-        solution = {}
-    for meta, bitstring in zip(circuits_metadata, selected_bitstrings):
-        bits = [int(b) for b in bitstring[::-1]]
-        for case_index, test_id in enumerate(meta["case_list"]):
-            if case_index < len(bits):
-                solution[test_id] = bits[case_index]
-    return sorted(test_id for test_id, bit in solution.items() if bit == 1)
-
-
-def load_igdec_elevator_test_case_data(datasets_dir: str, circuits_dir: str = "elevator_three") -> Dict[str, List[float]]:
-    """elevator_two: cost + input diversity; elevator_three: cost + passenger
-    count + travel distance (see evaluation.EFFECTIVENESS_METRICS)."""
-    import pandas as pd
-
-    if circuits_dir == "elevator_two":
-        data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "input_div": float})
-        return {"cost": data["cost"].tolist(), "input_diversity": data["input_div"].tolist()}
-    data = pd.read_csv(os.path.join(datasets_dir, "elevator.csv"), dtype={"cost": int, "pcount": int, "dist": int})
-    return {
-        "cost": data["cost"].tolist(),
-        "passenger_count": data["pcount"].tolist(),
-        "travel_distance": data["dist"].tolist(),
-    }
-
-
-def load_igdec_tcm_dataset(dataset: str, datasets_dir: str) -> Dict[str, List[float]]:
-    """IGDec-QAOA's gsdtsr/iofrol/paintcontrol data. Only gsdtsr was trained on
-    the rate > 0 subset; iofrol and paintcontrol circuits were trained on the
-    full, unfiltered frame, so their indices refer to the full frame."""
-    import pandas as pd
-
-    data = pd.read_csv(os.path.join(datasets_dir, f"{dataset}.csv"), dtype={"time": float, "rate": float})
-    if dataset == "gsdtsr":
-        data = data[data["rate"] > 0]
-    return {"cost": data["time"].tolist(), "failure_rate": data["rate"].tolist()}
-
-
-def evaluate_igdec_qaoa_single_objective_combo(
-    combo_name: str, combo_cfg: Dict[str, Any], root: str, calibration_store: CalibrationStore,
-) -> Dict[str, List[Any]]:
-    dataset = combo_cfg["dataset"]
-    circuits_dir = combo_cfg["circuits_dir"]
-    methods = combo_cfg["methods"]
-
-    results_dir = os.path.join(root, "results", "igdec_qaoa")
-    circuits_base_dir = os.path.join(root, "trained_qaoa_circuits", "igdec_qaoa", circuits_dir)
-
-    raw_records = load_raw_records(os.path.join(results_dir, f"{circuits_dir}-raw_counts.jsonl"))
-    trex_records = load_raw_records(os.path.join(results_dir, f"{circuits_dir}-trex-raw_counts.jsonl"))
-
-    if circuits_dir in ("elevator_two", "elevator_three"):
-        test_case_data = load_igdec_elevator_test_case_data(
-            os.path.join(root, "datasets", "quantum_sota_datasets"), circuits_dir
-        )
-    else:
-        test_case_data = load_igdec_tcm_dataset(dataset, os.path.join(root, "datasets", "quantum_sota_datasets"))
-
-    results_by_method: Dict[str, List[Any]] = defaultdict(list)
-
-    sampling_dirs = sorted(
-        (d for d in os.listdir(circuits_base_dir) if d.startswith("sampling_")),
-        key=lambda d: int(d.rsplit("_", 1)[-1]),
-    )
-
-    for sampling_dir_name in sampling_dirs:
-        metadata_path = os.path.join(circuits_base_dir, sampling_dir_name, "circuits_metadata.json")
-        if not os.path.exists(metadata_path):
-            continue
-        # Records of all samplings share one file and the same
-        # (iteration, subproblem) keys, so each sampling's records are
-        # selected by the sampling id embedded in circuit_id
-        # ("..._sampling<N>_itr<I>_sub<S>[_trex<K>]"). A sampling that was
-        # not executed (fewer repetitions than trained samplings) is skipped.
-        sampling_tag = f"_{sampling_dir_name.replace('_', '')}_"
-        sampling_raw = [r for r in raw_records if sampling_tag in r.circuit_id]
-        sampling_trex = [r for r in trex_records if sampling_tag in r.circuit_id]
-        if not sampling_raw:
-            continue
-        raw_index = index_raw_records_by_key(sampling_raw)
-        trex_aggregated = aggregate_trex_records(sampling_trex) if sampling_trex else {}
-
-        with open(metadata_path) as f:
-            circuits_metadata = json.load(f)
-        with open(os.path.join(circuits_base_dir, sampling_dir_name, "initial_random_solution.json")) as f:
-            initial_solution = json.load(f)["initial_solution"]
-
-        assignments = [
-            ClusterAssignment(cluster_id=None, cluster_test_cases=m["case_list"])
-            for m in circuits_metadata
-        ]
-        cluster_qubos = [
-            (m["linear"], {(int(i), int(j)): float(c) for i, j, c in m["quadratic"]}, m["num_qubits"])
-            for m in circuits_metadata
-        ]
-
-        for method in methods:
-            keys = [(None, m["iteration"], m["subproblem_index"]) for m in circuits_metadata]
-            cluster_raw_counts = [
-                cluster_counts_for_method(method, key, raw_index, trex_aggregated) for key in keys
-            ]
-            exp_records = sampling_trex if method == "trex" else sampling_raw
-
-            calibration_records = [
-                load_calibration_for_width(calibration_store, method, num_qubits)
-                for _linear, _quadratic, num_qubits in cluster_qubos
-            ]
-
-            result = evaluate_single_objective_combo(
-                combo=combo_name,
-                method=method,
-                dataset=dataset,
-                cluster_assignments=assignments,
-                cluster_raw_counts=cluster_raw_counts,
-                cluster_qubos=cluster_qubos,
-                test_case_data=test_case_data,
-                raw_records=exp_records,
-                calibration_records=calibration_records,
-                calibration_shots_per_circuit=200,
-                # Never let evaluate_single_objective_combo() do its own
-                # merge_selected_tests() -- that's the wrong (union/
-                # first-wins) semantics for IGDec-QAOA. Every method's final
-                # suite is computed below via merge_igdec_solution() over
-                # the (training-fixed) subproblem sequence instead.
-                compute_final_suite_metrics=False,
-            )
-            selected_bitstrings = result.optimal_bitstring.split("+")
-            final_selected_tests = merge_igdec_solution(circuits_metadata, selected_bitstrings, initial_solution)
-            effectiveness_metrics = compute_single_objective_metrics(
-                dataset, final_selected_tests, test_case_data
-            )
-            result.execution_cost = effectiveness_metrics.pop("execution_cost")
-            result.effectiveness = effectiveness_metrics
-            results_by_method[method].append(result)
-
-    return results_by_method
-
-
-# ---------------------------------------------------------------------------
 # Top-level driver
 # ---------------------------------------------------------------------------
 
@@ -571,10 +376,6 @@ def evaluate_all(execution_plan_path: str, root: Optional[str] = None) -> Dict[s
                 )
             elif algorithm == "qaoa_tcs" and objective_mode == "multi_objective":
                 results_by_method = evaluate_qaoa_tcs_multi_objective_combo(
-                    combo_name, combo_cfg, root, calibration_store
-                )
-            elif algorithm == "igdec_qaoa" and objective_mode == "single_objective":
-                results_by_method = evaluate_igdec_qaoa_single_objective_combo(
                     combo_name, combo_cfg, root, calibration_store
                 )
             else:

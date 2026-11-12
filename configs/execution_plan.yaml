@@ -1,16 +1,12 @@
-# Shot/time budget plan for the 14 QAOA-TCS / IGDec-QAOA combos in this
-# replication package. See piastq_execution/budget_planner.py for the model.
+# Shot/time budget plan for the four QAOA-TCS combos of this replication
+# package. See piastq_execution/budget_planner.py for the model.
 #
 # The `combos` section defines *what* each combo needs (used to discover its
 # real circuit inventory under trained_qaoa_circuits/) and *which mitigation
 # methods* it should be evaluated with. The `pools` section defines *when/
 # where* those combos actually get to run: each pool is an independent time
-# budget with an explicit combo list. This example mixes granularities on
-# purpose -- one pool per objective-mode for QAOA-TCS, one pool per dataset
-# for IGDec-QAOA -- to show that "global" (one pool, all 14 combos) and
-# "per_combo" (14 pools of one combo each) are just two points on the same
-# spectrum, not separate modes. Edit `pools:` freely; nothing else needs to
-# change.
+# budget with an explicit combo list. Here there is a single pool with all
+# four combos.
 
 seconds_per_batch: 18.4974     # BILLED QPU time of one 200-shot batch on PIAST-Q (measured 2026-10-29 from the
                                 # account usage counter: 18.4974 s for 1-, 3- and 7-qubit circuits alike; 100 shots
@@ -28,18 +24,12 @@ trex_twirl_instances: 3         # independent random-twirl hardware passes avera
                                  # once, not per script.
 
 combos:
-  # ---- QAOA-TCS, single-objective (5) ----
+  # ---- QAOA-TCS, single-objective (2) ----
   gsdtsr_qaoa_tcs:
     algorithm: qaoa_tcs
     objective_mode: single_objective
     dataset: gsdtsr
     circuits_dir: gsdtsr
-    methods: [raw, mem, m3, trex]
-  iofrol_qaoa_tcs:
-    algorithm: qaoa_tcs
-    objective_mode: single_objective
-    dataset: iofrol
-    circuits_dir: iofrol
     methods: [raw, mem, m3, trex]
   paintcontrol_qaoa_tcs:
     algorithm: qaoa_tcs
@@ -47,31 +37,13 @@ combos:
     dataset: paintcontrol
     circuits_dir: paintcontrol
     methods: [raw, mem, m3, trex]
-  elevator_qaoa_tcs:
-    algorithm: qaoa_tcs
-    objective_mode: single_objective
-    dataset: elevator
-    circuits_dir: elevator
-    methods: [raw, mem, m3, trex]
-  elevator2_qaoa_tcs:
-    algorithm: qaoa_tcs
-    objective_mode: single_objective
-    dataset: elevator2
-    circuits_dir: elevator2
-    methods: [raw, mem, m3, trex]
 
-  # ---- QAOA-TCS, multi-objective (4) ----
+  # ---- QAOA-TCS, multi-objective (2) ----
   flex_qaoa_tcs:
     algorithm: qaoa_tcs
     objective_mode: multi_objective
     dataset: flex
     circuits_dir: flex
-    methods: [raw, mem, m3, trex]
-  grep_qaoa_tcs:
-    algorithm: qaoa_tcs
-    objective_mode: multi_objective
-    dataset: grep
-    circuits_dir: grep
     methods: [raw, mem, m3, trex]
   gzip_qaoa_tcs:
     algorithm: qaoa_tcs
@@ -79,50 +51,11 @@ combos:
     dataset: gzip
     circuits_dir: gzip
     methods: [raw, mem, m3, trex]
-  sed_qaoa_tcs:
-    algorithm: qaoa_tcs
-    objective_mode: multi_objective
-    dataset: sed
-    circuits_dir: sed
-    methods: [raw, mem, m3, trex]
-
-  # ---- IGDec-QAOA, single-objective only (5) ----
-  gsdtsr_igdec_qaoa:
-    algorithm: igdec_qaoa
-    objective_mode: single_objective
-    dataset: gsdtsr
-    circuits_dir: gsdtsr
-    methods: [raw, mem, m3, trex]
-  iofrol_igdec_qaoa:
-    algorithm: igdec_qaoa
-    objective_mode: single_objective
-    dataset: iofrol
-    circuits_dir: iofrol
-    methods: [raw, mem, m3, trex]
-  paintcontrol_igdec_qaoa:
-    algorithm: igdec_qaoa
-    objective_mode: single_objective
-    dataset: paintcontrol
-    circuits_dir: paintcontrol
-    methods: [raw, mem, m3, trex]
-  elevator_o2_igdec_qaoa:
-    algorithm: igdec_qaoa
-    objective_mode: single_objective
-    dataset: elevator_o2
-    circuits_dir: elevator_two
-    methods: [raw, mem, m3, trex]
-  elevator_o3_igdec_qaoa:
-    algorithm: igdec_qaoa
-    objective_mode: single_objective
-    dataset: elevator_o3
-    circuits_dir: elevator_three
-    methods: [raw, mem, m3, trex]
 
 # Reduced-scope run (25 QPU-hours available, results needed by 6 Nov):
 # ONE pool, four QAOA-TCS combos (2 multi-objective: gzip, flex; 2 single-
 # objective: paintcontrol, gsdtsr), all four methods (raw+MEM+M3+TREx),
-# 10 repetitions (5, then extended with --resume), 200 shots/circuit, 3 TREx twirls. IGDec-QAOA is not part of
-# this run. The planner prices one circuit per job (an upper bound: ~56.9h at 10 repetitions, 29.2h at 5, at
+# 10 repetitions (5, then extended with --resume), 200 shots/circuit, 3 TREx twirls.  The planner prices one circuit per job (an upper bound: ~56.9h at 10 repetitions, 29.2h at 5, at
 # the measured 18.4974 s/job); the run packs circuits side by side, so it
 # really needs ~1,390 jobs, ~7.1 billed hours and ~78h of wall-clock.
 # total_hours is only the planner's cap and must stay above its upper-bound
@@ -131,4 +64,6 @@ combos:
 pools:
   - name: reduced_scope_run
     total_hours: 80
+    # The 9-10 Nov 2026 re-run (corrected single-objective alphas, commit edbf6a6d) executed only
+    # paintcontrol and gsdtsr on the cluster copy; on resume, finished flex/gzip records are reused.
     combos: [gzip_qaoa_tcs, flex_qaoa_tcs, paintcontrol_qaoa_tcs, gsdtsr_qaoa_tcs]

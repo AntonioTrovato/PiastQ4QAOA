@@ -216,7 +216,7 @@ class TestRunCircuitWithBatchingRecorded(unittest.TestCase):
         total_counts, record = run_circuit_with_batching_recorded(
             circuit,
             sampler,
-            algorithm="igdec_qaoa",
+            algorithm="qaoa_tcs",
             objective_mode="single_objective",
             dataset="toy",
             circuit_id="toy_iter1_sub0",

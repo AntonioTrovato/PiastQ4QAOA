@@ -42,10 +42,10 @@ from scipy.cluster.hierarchy import linkage, fcluster
 from collections import defaultdict
 
 #this cell contains all variable definitions that will be useful throughout the entire project
-sir_programs = ["flex","grep","gzip","sed"]
-sir_programs_tests_number = {"flex":567,"grep":806,"gzip":214,"sed":360}
-sir_programs_end_lines = {"flex":14192,"grep":13281,"gzip":6701,"sed":7118}
-sir_programs_rep_values = {"flex":1,"grep":1,"gzip":1,"sed":1}
+sir_programs = ["flex","gzip"]
+sir_programs_tests_number = {"flex":567,"gzip":214}
+sir_programs_end_lines = {"flex":14192,"gzip":6701}
+sir_programs_rep_values = {"flex":1,"gzip":1}
 alpha = 0.5
 experiments = 10
 
@@ -275,7 +275,7 @@ def create_QUBO_problem(linear_terms, quadratic_terms):
 
     return qubo
 
-penalties_dictionary = {"flex":None,"grep":None,"gzip":None,"sed":None}
+penalties_dictionary = {"flex":None,"gzip":None}
 
 #to get a QUBO problem from a quadratic problem with constraints, we have to insert those constraints into the Hamiltonian to solve (which is the one encoded by the QUBO problem). When we insert constraint into the Hamiltonian, we have to specify also penalties
 for sir_program in sir_programs:
@@ -287,7 +287,7 @@ for sir_program in sir_programs:
             max_penalty = cost
     penalties_dictionary[sir_program] = max_penalty + 1
 
-qubos_dictionary = {"flex":[],"grep":[],"gzip":[],"sed":[]}
+qubos_dictionary = {"flex":[],"gzip":[]}
 converter = QuadraticProgramToQubo()
 #make a dictionary that saves, for each program, the correspondent QUBO
 for sir_program in sir_programs:

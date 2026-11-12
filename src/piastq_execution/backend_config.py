@@ -19,6 +19,7 @@ import contextlib
 import io
 import os
 import time
+import uuid
 from typing import Optional, Tuple
 
 import yaml
@@ -82,6 +83,34 @@ _RETRY_SECONDS = 5
 _MAX_RETRIES = 360  # ~30 min of network trouble before giving up
 
 
+class _JobId:
+    """A job id exactly as the service returned it (`.int` mirrors the
+    attribute of the UUID the vendor client expected)."""
+
+    def __init__(self, raw):
+        self.int = raw
+
+    def __repr__(self):
+        return f"_JobId({self.int!r})"
+
+
+def _wrap_negative_phases(circuit):
+    """The PCSS service validates `phi >= 0` on RZ/R gates (angles in units of
+    pi) and rejects the whole job otherwise, while the transpiler can emit
+    tiny negative angles. A phase is defined modulo 2 (i.e. 2*pi), so adding
+    2 to a negative one gives the same operation (an RZ differs only by a
+    global phase, which no measurement can see). Only negative angles are
+    touched; everything else is submitted exactly as transpiled."""
+    # the submitted payload wraps the gate list: payload.quantum_circuit.root
+    gates = getattr(circuit, "quantum_circuit", circuit)
+    for operation in getattr(gates, "root", []):
+        gate = getattr(operation, "root", None)
+        phi = getattr(gate, "phi", None)
+        if phi is not None and phi < 0:
+            gate.phi = phi % 2.0
+    return circuit
+
+
 def _harden_pcss_backend(backend):
     """Makes the PIAST-Q resource survive transient network errors and keeps
     its console output readable. The vendor wrapper (a) dies on any connection
@@ -95,23 +124,67 @@ def _harden_pcss_backend(backend):
 
     original_result, original_submit = backend.result, backend.submit
 
+    def poll_job(raw_id, timeout):
+        """GET /jobs/<id> until the result exists (same protocol as the vendor
+        loop), with `raw_id` used verbatim in the URL: the service started
+        returning the job id as a string, which the vendor client (0.3.2)
+        cannot handle (it builds a UUID from an int)."""
+        while True:
+            try:
+                response = backend._http_client.get(
+                    f"/jobs/{raw_id}", timeout=backend.timeout
+                ).raise_for_status().json()
+                if response["status"] in ["failed", "canceled"]:
+                    raise RuntimeError(f"Your task has status: {response['status']}")
+                if response["result"] is not None:
+                    return response["result"]
+            except httpx.ReadTimeout:
+                pass
+            time.sleep(backend.timeout)
+
     def result(job_id, *, timeout=None):
         attempts = 0
         while True:
             try:
-                with contextlib.redirect_stdout(io.StringIO()):
-                    return original_result(job_id, timeout=timeout)
+                if not isinstance(job_id, _JobId):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        return original_result(job_id, timeout=timeout)
+                payload = poll_job(job_id.int, timeout)
+                formatted = [list(map(int, bitstring)) for bitstring in payload["results"]["Tasks"]]
+                from qiskit_aqt_provider.api_client import models_direct as api_models_direct
+
+                return api_models_direct.JobResult.model_validate({
+                    "job_id": uuid.uuid5(uuid.NAMESPACE_URL, str(job_id.int)),
+                    "payload": {"status": "finished", "result": formatted},
+                })
             except httpx.TransportError:
+                attempts += 1
+                if attempts > _MAX_RETRIES:
+                    raise
+                time.sleep(_RETRY_SECONDS)
+            except httpx.HTTPStatusError as exc:
+                # a 5xx on a GET is a service hiccup (one killed a run on 10 Nov); the job still exists
+                if exc.response.status_code < 500:
+                    raise
                 attempts += 1
                 if attempts > _MAX_RETRIES:
                     raise
                 time.sleep(_RETRY_SECONDS)
 
     def submit(circuit):
+        _wrap_negative_phases(circuit)
         attempts = 0
         while True:
             try:
-                return original_submit(circuit)
+                backend.last_task_uid = None
+                try:
+                    return original_submit(circuit)
+                except TypeError:
+                    # the POST succeeded (the vendor code stored the id before failing to
+                    # build a UUID from it): the service now returns the id as a string
+                    if backend.last_task_uid is None:
+                        raise
+                    return _JobId(backend.last_task_uid)
             except (httpx.ConnectError, httpx.TimeoutException):
                 attempts += 1
                 if attempts > _MAX_RETRIES:

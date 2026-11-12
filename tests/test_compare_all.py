@@ -14,13 +14,11 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piastq_execution.compare_all import (
-    compare_algorithms,
     compare_all,
     compare_combo,
     comparison_to_json_dict,
     extract_samples,
     load_evaluation_results,
-    pair_combos_by_dataset,
     render_report,
 )
 
@@ -109,52 +107,8 @@ class TestEffectivenessMetricsCompared(unittest.TestCase):
         raw = _single_obj_record(1.0, 1.0, 1.0)
         mem = _single_obj_record(2.0, None, 1.0)
         mem["effectiveness"] = {}
-        report = compare_combo("igdec_like", {"raw": [raw, raw], "mem": [mem, mem]})
+        report = compare_combo("no_effectiveness", {"raw": [raw, raw], "mem": [mem, mem]})
         self.assertEqual(report["rq2_effectiveness"], {})
-
-
-class TestPairCombosByDataset(unittest.TestCase):
-    def test_pairs_matching_dataset_across_algorithms(self):
-        combo_defs = {
-            "gsdtsr_qaoa_tcs": {"algorithm": "qaoa_tcs", "dataset": "gsdtsr"},
-            "gsdtsr_igdec_qaoa": {"algorithm": "igdec_qaoa", "dataset": "gsdtsr"},
-            "flex_qaoa_tcs": {"algorithm": "qaoa_tcs", "dataset": "flex"},  # no igdec counterpart
-        }
-        pairs = pair_combos_by_dataset(combo_defs)
-        self.assertEqual(len(pairs), 1)
-        self.assertEqual(pairs[0]["dataset"], "gsdtsr")
-        self.assertEqual(pairs[0]["qaoa_tcs"], "gsdtsr_qaoa_tcs")
-        self.assertEqual(pairs[0]["igdec_qaoa"], "gsdtsr_igdec_qaoa")
-
-
-class TestCompareAlgorithms(unittest.TestCase):
-    def test_compares_shared_methods_across_algorithms(self):
-        all_results = {
-            "gsdtsr_qaoa_tcs": {
-                "raw": [_single_obj_record(1.0, 1.0, 0.5), _single_obj_record(1.0, 1.0, 0.6)],
-            },
-            "gsdtsr_igdec_qaoa": {
-                "raw": [_single_obj_record(1.0, 1.0, 5.0), _single_obj_record(1.0, 1.0, 5.5)],
-            },
-        }
-        combo_defs = {
-            "gsdtsr_qaoa_tcs": {"algorithm": "qaoa_tcs", "dataset": "gsdtsr"},
-            "gsdtsr_igdec_qaoa": {"algorithm": "igdec_qaoa", "dataset": "gsdtsr"},
-        }
-        reports = compare_algorithms(all_results, combo_defs)
-        self.assertEqual(len(reports), 1)
-        self.assertIn("raw", reports[0]["by_method"])
-
-
-    def test_degenerate_identical_samples_reported_not_dropped(self):
-        same = [_single_obj_record(1.0, 1.0, 2.0), _single_obj_record(1.0, 1.0, 2.0)]
-        all_results = {"gsdtsr_qaoa_tcs": {"raw": same}, "gsdtsr_igdec_qaoa": {"raw": same}}
-        combo_defs = {
-            "gsdtsr_qaoa_tcs": {"algorithm": "qaoa_tcs", "dataset": "gsdtsr"},
-            "gsdtsr_igdec_qaoa": {"algorithm": "igdec_qaoa", "dataset": "gsdtsr"},
-        }
-        reports = compare_algorithms(all_results, combo_defs)
-        self.assertEqual(reports[0]["degenerate_methods"], ["raw"])
 
 
 class TestCostIsDescriptive(unittest.TestCase):
@@ -177,7 +131,7 @@ class TestCostIsDescriptive(unittest.TestCase):
             with open(os.path.join(eval_dir, "gsdtsr_qaoa_tcs.json"), "w") as f:
                 json.dump({"raw": [_single_obj_record(1.0, 1.0, 1.0)]}, f)
             with open(os.path.join(eval_dir, "comparison_report.json"), "w") as f:
-                json.dump({"per_combo": [], "rq4_algorithm_comparison": []}, f)
+                json.dump({"per_combo": []}, f)
             self.assertEqual(list(load_evaluation_results(eval_dir)), ["gsdtsr_qaoa_tcs"])
 
 
@@ -194,11 +148,6 @@ class TestEndToEnd(unittest.TestCase):
                     },
                     f,
                 )
-            with open(os.path.join(eval_dir, "gsdtsr_igdec_qaoa.json"), "w") as f:
-                json.dump(
-                    {"raw": [_single_obj_record(2.0, 3.0, 4.0), _single_obj_record(2.1, 3.1, 4.2)]}, f
-                )
-
             plan_path = os.path.join(root, "configs", "execution_plan.yaml")
             os.makedirs(os.path.dirname(plan_path))
             with open(plan_path, "w") as f:
@@ -207,26 +156,18 @@ class TestEndToEnd(unittest.TestCase):
                     "  gsdtsr_qaoa_tcs:\n"
                     "    algorithm: qaoa_tcs\n"
                     "    dataset: gsdtsr\n"
-                    "  gsdtsr_igdec_qaoa:\n"
-                    "    algorithm: igdec_qaoa\n"
-                    "    dataset: gsdtsr\n"
                     "pools: []\n"
                 )
 
             comparison = compare_all(eval_dir, plan_path)
-            self.assertEqual(len(comparison["per_combo"]), 2)
-            self.assertEqual(
-                {r["metric"] for r in comparison["rq4_algorithm_comparison"]},
-                {"execution_time_seconds", "probability_of_optimal", "execution_cost", "effectiveness.failure_rate"},
-            )
+            self.assertEqual(len(comparison["per_combo"]), 1)
 
             report_text = render_report(comparison)
-            self.assertIn("QAOA-TCS vs IGDec-QAOA", report_text)
             self.assertIn("gsdtsr_qaoa_tcs", report_text)
 
             json_dict = comparison_to_json_dict(comparison)
             json.dumps(json_dict)  # must be JSON-serializable
-            self.assertEqual(len(json_dict["per_combo"]), 2)
+            self.assertEqual(len(json_dict["per_combo"]), 1)
 
     def test_missing_evaluation_dir_returns_empty(self):
         results = load_evaluation_results("/tmp/piastq_does_not_exist_evaluation_dir")
